@@ -4,9 +4,10 @@ import { getTasks, getSkills } from "@/lib/actions"
 import { redirect } from "next/navigation"
 import { TaskListContent } from "@/components/tasks/TaskListContent"
 
+import { getCurrentUser } from '@/lib/auth'
+
 async function TasksContent() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) {
     redirect('/auth/signin')
   }

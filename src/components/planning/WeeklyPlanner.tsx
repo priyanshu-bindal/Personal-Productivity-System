@@ -160,12 +160,38 @@ export function WeeklyPlanner({ skills, initialPlans }: { skills: any[], initial
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h2 className="text-2xl font-semibold tracking-tight">Weekly Routine</h2>
-        <Button onClick={handleSave} disabled={isSaving} className="gap-2">
-          {isSaved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-          {isSaving ? 'Saving...' : isSaved ? 'Saved!' : 'Save Plan'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            onClick={() => {
+              const newCols = { ...columns }
+              if (skills.length > 0) {
+                DAYS.slice(0, 5).forEach((day, idx) => {
+                  const s = skills[idx % skills.length]
+                  newCols[day] = [{
+                    uniqueId: `autodraft-${day}-${s.id}`,
+                    skillId: s.id,
+                    name: s.name,
+                    icon: s.icon,
+                    duration: 60
+                  }]
+                })
+                setColumns(newCols)
+                setIsSaved(false)
+              }
+            }} 
+            className="gap-2 text-xs md:text-sm"
+          >
+            <Icons.Sparkles className="h-4 w-4 text-amber-500" />
+            Auto-Draft Plan
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="gap-2 text-xs md:text-sm">
+            {isSaved ? <CheckCircle2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+            {isSaving ? 'Saving...' : isSaved ? 'Saved!' : 'Save Plan'}
+          </Button>
+        </div>
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>

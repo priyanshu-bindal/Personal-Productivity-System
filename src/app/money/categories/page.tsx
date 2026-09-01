@@ -10,9 +10,10 @@ export const metadata = {
   title: 'Categories | Money | FocusFlow',
 }
 
+import { getCurrentUser } from '@/lib/auth'
+
 export default async function CategoriesPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) redirect('/auth/signin')
 
   const summary = await getMoneySummary()

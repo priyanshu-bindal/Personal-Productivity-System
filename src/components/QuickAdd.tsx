@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { motion } from 'framer-motion'
 import { CreateTaskModal } from './tasks/TaskModals'
-import { CreateGoalModal } from './goals/GoalModals'
 import { CreateNoteModal } from './notes/NoteModals'
 import { SkillModal } from './skills/SkillModal'
 import { AddExpenseModal } from './money/AddExpenseModal'
@@ -18,7 +17,7 @@ import { getSkills } from '@/lib/actions'
 
 export function QuickAdd() {
   const [isOpen, setIsOpen] = useState(false)
-  const [activeModal, setActiveModal] = useState<'task' | 'expense' | 'skill' | 'goal' | 'note' | null>(null)
+  const [activeModal, setActiveModal] = useState<'task' | 'expense' | 'skill' | 'note' | null>(null)
   const [skills, setSkills] = useState<any[]>([])
 
   // Fetch skills for modals that need them
@@ -70,13 +69,6 @@ export function QuickAdd() {
             </DropdownMenuItem>
             <DropdownMenuItem 
               className="py-3 px-4 cursor-pointer gap-3 rounded-lg focus:bg-primary/10"
-              onClick={() => setActiveModal('goal')}
-            >
-              <Target className="h-4 w-4 text-orange-500" />
-              <span className="font-medium">Add Goal</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem 
-              className="py-3 px-4 cursor-pointer gap-3 rounded-lg focus:bg-primary/10"
               onClick={() => setActiveModal('note')}
             >
               <StickyNote className="h-4 w-4 text-purple-500" />
@@ -94,10 +86,6 @@ export function QuickAdd() {
       <AddExpenseModal
         isOpen={activeModal === 'expense'}
         onClose={() => setActiveModal(null)}
-      />
-      <CreateGoalModal 
-        isOpen={activeModal === 'goal'} 
-        onClose={() => setActiveModal(null)} 
       />
       <CreateNoteModal 
         isOpen={activeModal === 'note'} 

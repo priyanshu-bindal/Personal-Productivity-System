@@ -76,10 +76,6 @@ export function GlobalSearch({ variant = "default" }: { variant?: "default" | "i
               <CheckSquare className="mr-2 h-4 w-4" />
               <span>Tasks</span>
             </CommandItem>
-            <CommandItem onSelect={() => runCommand(() => router.push('/goals'))}>
-              <Target className="mr-2 h-4 w-4" />
-              <span>Goals</span>
-            </CommandItem>
             <CommandItem onSelect={() => runCommand(() => router.push('/notes'))}>
               <StickyNote className="mr-2 h-4 w-4" />
               <span>Notes</span>

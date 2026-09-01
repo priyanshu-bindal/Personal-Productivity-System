@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { addExpense } from '@/lib/money-actions'
 import { format } from 'date-fns'
+import { useToast } from '@/components/ui/toast-provider'
+import { Loader2 } from 'lucide-react'
 
 interface AddExpenseModalProps {
   isOpen: boolean
@@ -28,36 +30,42 @@ export function AddExpenseModal({ isOpen, onClose }: AddExpenseModalProps) {
   const [amount, setAmount] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState(CATEGORIES[0])
-  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[1]) // Default to UPI for example
+  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[1])
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'))
   const [note, setNote] = useState('')
-  const [isPending, startTransition] = useTransition()
+  const [isLoading, setIsLoading] = useState(false)
+  const { success, error: showError } = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    startTransition(async () => {
-      try {
-        await addExpense({
-          amount: parseFloat(amount),
-          description,
-          category,
-          paymentMethod,
-          date: new Date(date),
-          note: note || undefined
-        })
-        setAmount('')
-        setDescription('')
-        setCategory(CATEGORIES[0])
-        setNote('')
-        onClose()
-      } catch (err) {
-        alert("Failed to save expense")
-      }
-    })
+    if (isLoading) return
+    setIsLoading(true)
+
+    try {
+      await addExpense({
+        amount: parseFloat(amount),
+        description,
+        category,
+        paymentMethod,
+        date: new Date(date),
+        note: note || undefined
+      })
+      success(`Expense recorded (₹${amount})`, description)
+      setAmount('')
+      setDescription('')
+      setCategory(CATEGORIES[0])
+      setNote('')
+      onClose()
+    } catch (err) {
+      console.error(err)
+      showError("Couldn't add expense", "Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isLoading && onClose()}>
       <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Expense</DialogTitle>
@@ -126,9 +134,13 @@ export function AddExpenseModal({ isOpen, onClose }: AddExpenseModalProps) {
           </div>
 
           <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
-            <Button type="submit" disabled={isPending || !amount || !description}>
-              {isPending ? 'Saving...' : 'Save Expense'}
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
+            <Button type="submit" disabled={isLoading || !amount || !description.trim()} className="min-w-[120px]">
+              {isLoading ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...</>
+              ) : (
+                'Save Expense'
+              )}
             </Button>
           </DialogFooter>
         </form>

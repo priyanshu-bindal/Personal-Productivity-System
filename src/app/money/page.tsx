@@ -16,9 +16,10 @@ export const metadata = {
   title: 'Money Dashboard | FocusFlow',
 }
 
+import { getCurrentUser } from '@/lib/auth'
+
 export default async function MoneyDashboard() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) redirect('/auth/signin')
 
   const summary = await getMoneySummary()

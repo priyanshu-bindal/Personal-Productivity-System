@@ -10,6 +10,13 @@ import { StickyNote, Tag, MoreVertical, Edit2, Trash2, Search } from "lucide-rea
 import { deleteNote } from '@/lib/actions'
 import { EditNoteModal } from './NoteModals'
 
+function getTagsArray(tags: any): string[] {
+  if (!tags) return []
+  if (Array.isArray(tags)) return tags.map(t => String(t).trim()).filter(Boolean)
+  if (typeof tags === 'string') return tags.split(',').map(t => t.trim()).filter(Boolean)
+  return []
+}
+
 export function NoteList({ notes, skills }: { notes: any[], skills: any[] }) {
   const [isPending, startTransition] = useTransition()
   const [editingNote, setEditingNote] = useState<any>(null)
@@ -25,9 +32,12 @@ export function NoteList({ notes, skills }: { notes: any[], skills: any[] }) {
 
   const filteredNotes = notes.filter(n => {
     const query = searchQuery.toLowerCase()
+    const tagsArr = getTagsArray(n.tags)
+    const matchesTag = tagsArr.some(t => t.toLowerCase().includes(query))
+    
     return n.title.toLowerCase().includes(query) || 
            n.content.toLowerCase().includes(query) || 
-           (n.tags && n.tags.toLowerCase().includes(query)) ||
+           matchesTag ||
            (n.skill && n.skill.name.toLowerCase().includes(query))
   })
 
@@ -53,60 +63,60 @@ export function NoteList({ notes, skills }: { notes: any[], skills: any[] }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredNotes.map((note) => (
-            <Card key={note.id} className="group hover:border-primary/50 transition-all hover:shadow-md flex flex-col">
-              <CardHeader className="pb-3 relative">
-                <div className="flex items-start justify-between">
-                  <div className="flex flex-col gap-2 mb-2 pr-8">
-                    <div className="flex items-center gap-2">
-                      <StickyNote className="h-4 w-4 text-emerald-500 shrink-0" />
-                      {note.skill && (
-                        <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded truncate">
-                          {note.skill.name}
-                        </span>
-                      )}
+          {filteredNotes.map((note) => {
+            const tagsList = getTagsArray(note.tags)
+
+            return (
+              <Card key={note.id} className="group hover:border-primary/50 transition-all hover:shadow-md flex flex-col">
+                <CardHeader className="pb-3 relative">
+                  <div className="flex items-start justify-between">
+                    <div className="flex flex-col gap-2 mb-2 pr-8">
+                      <div className="flex items-center gap-2">
+                        <StickyNote className="h-4 w-4 text-emerald-500 shrink-0" />
+                        {note.skill && (
+                          <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded truncate">
+                            {note.skill.name}
+                          </span>
+                        )}
+                      </div>
+                      <CardTitle className="text-xl line-clamp-1">{note.title}</CardTitle>
                     </div>
-                    <CardTitle className="text-xl line-clamp-1">{note.title}</CardTitle>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground absolute top-4 right-4 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <MoreVertical className="h-4 w-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setEditingNote(note)}>
+                          <Edit2 className="h-4 w-4 mr-2" /> Edit Note
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(note.id)}>
+                          <Trash2 className="h-4 w-4 mr-2" /> Delete Note
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground absolute top-4 right-4 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <MoreVertical className="h-4 w-4" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setEditingNote(note)}>
-                        <Edit2 className="h-4 w-4 mr-2" /> Edit Note
-                      </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(note.id)}>
-                        <Trash2 className="h-4 w-4 mr-2" /> Delete Note
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col">
-                <p className="text-muted-foreground text-sm line-clamp-4 flex-1 whitespace-pre-wrap">
-                  {note.content}
-                </p>
-                
-                {note.tags && (
-                  <div className="flex items-center gap-2 mt-4 pt-4 border-t">
-                    <Tag className="h-3 w-3 text-muted-foreground shrink-0" />
-                    <div className="flex flex-wrap gap-1">
-                      {note.tags.split(',').map((tag: string, i: number) => {
-                        const trimmed = tag.trim()
-                        if (!trimmed) return null
-                        return (
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col">
+                  <p className="text-muted-foreground text-sm line-clamp-4 flex-1 whitespace-pre-wrap">
+                    {note.content}
+                  </p>
+                  
+                  {tagsList.length > 0 && (
+                    <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                      <Tag className="h-3 w-3 text-muted-foreground shrink-0" />
+                      <div className="flex flex-wrap gap-1">
+                        {tagsList.map((tag, i) => (
                           <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0">
-                            {trimmed}
+                            {tag}
                           </Badge>
-                        )
-                      })}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
 

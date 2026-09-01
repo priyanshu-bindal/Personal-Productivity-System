@@ -9,9 +9,10 @@ export const metadata = {
   title: 'All Expenses | Money | FocusFlow',
 }
 
+import { getCurrentUser } from '@/lib/auth'
+
 export default async function ExpensesPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) redirect('/auth/signin')
 
   // We are fetching all expenses. In a real app we would paginate this.

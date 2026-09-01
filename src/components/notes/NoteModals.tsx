@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createNote, updateNote } from '@/lib/actions'
+import { useToast } from '@/components/ui/toast-provider'
+import { Loader2 } from 'lucide-react'
 
 interface NoteModalProps {
   isOpen: boolean
@@ -20,27 +22,37 @@ export function CreateNoteModal({ isOpen, onClose, skills }: NoteModalProps) {
   const [content, setContent] = useState('')
   const [tags, setTags] = useState('')
   const [skillId, setSkillId] = useState<string>('none')
-  const [isPending, startTransition] = useTransition()
+  const [isLoading, setIsLoading] = useState(false)
+  const { success, error: showError } = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    startTransition(async () => {
+    if (isLoading) return
+    setIsLoading(true)
+
+    try {
       await createNote({
         title,
         content,
         tags,
         skillId: skillId === 'none' ? null : skillId
       })
+      success("Note saved", title)
       setTitle('')
       setContent('')
       setTags('')
       setSkillId('none')
       onClose()
-    })
+    } catch (err) {
+      console.error(err)
+      showError("Couldn't save note", "Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isLoading && onClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Create Note</DialogTitle>
@@ -81,8 +93,14 @@ export function CreateNoteModal({ isOpen, onClose, skills }: NoteModalProps) {
             </div>
           </div>
           <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
-            <Button type="submit" disabled={isPending || !title || !content}>Save Note</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
+            <Button type="submit" disabled={isLoading || !title.trim() || !content.trim()} className="min-w-[110px]">
+              {isLoading ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+              ) : (
+                'Save Note'
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -95,32 +113,43 @@ export function EditNoteModal({ note, isOpen, onClose, skills }: { note: any, is
   const [content, setContent] = useState('')
   const [tags, setTags] = useState('')
   const [skillId, setSkillId] = useState<string>('none')
-  const [isPending, startTransition] = useTransition()
+  const [isLoading, setIsLoading] = useState(false)
+  const { success, error: showError } = useToast()
 
   useEffect(() => {
     if (note && isOpen) {
       setTitle(note.title)
       setContent(note.content)
-      setTags(note.tags || '')
+      const formattedTags = Array.isArray(note.tags) ? note.tags.join(', ') : (note.tags || '')
+      setTags(formattedTags)
       setSkillId(note.skillId || 'none')
     }
   }, [note, isOpen])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    startTransition(async () => {
+    if (isLoading) return
+    setIsLoading(true)
+
+    try {
       await updateNote(note.id, {
         title,
         content,
         tags,
         skillId: skillId === 'none' ? null : skillId
       })
+      success("Note updated", title)
       onClose()
-    })
+    } catch (err) {
+      console.error(err)
+      showError("Couldn't update note", "Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isLoading && onClose()}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Edit Note</DialogTitle>
@@ -161,8 +190,14 @@ export function EditNoteModal({ note, isOpen, onClose, skills }: { note: any, is
             </div>
           </div>
           <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
-            <Button type="submit" disabled={isPending || !title || !content}>Save Changes</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
+            <Button type="submit" disabled={isLoading || !title.trim() || !content.trim()} className="min-w-[120px]">
+              {isLoading ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/auth'
 import { getProgressStats, getSkills, getWeeklyPlans } from "@/lib/actions"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { redirect } from "next/navigation"
@@ -7,8 +7,7 @@ import { CheckCircle2, Flame, Trophy, Clock } from "lucide-react"
 import { WeeklyPlanner } from "@/components/planning/WeeklyPlanner"
 
 async function ReviewContent() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) {
     redirect('/auth/signin')
   }

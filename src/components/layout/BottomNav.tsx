@@ -21,8 +21,8 @@ import { signout } from '@/app/auth/actions'
 import { GlobalSearch } from '@/components/GlobalSearch'
 
 const mainNavItems = [
-  { name: 'Home', href: '/', icon: LayoutDashboard },
-  { name: 'Tasks', href: '/tasks', icon: CheckSquare },
+  { name: 'Today', href: '/', icon: LayoutDashboard },
+  { name: 'Skills', href: '/skills', icon: BookOpen },
 ]
 
 const rightNavItems = [
@@ -30,9 +30,7 @@ const rightNavItems = [
 ]
 
 const moreNavItems = [
-  { name: 'My Skills', href: '/skills', icon: BookOpen },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
-  { name: 'Goals', href: '/goals', icon: Target },
   { name: 'Progress', href: '/progress', icon: TrendingUp },
   { name: 'Notes', href: '/notes', icon: StickyNote },
 ]

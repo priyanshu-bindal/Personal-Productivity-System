@@ -1,15 +1,19 @@
 'use client'
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { login } from "../actions"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
+import { AlertCircle } from "lucide-react"
 
-export default function SignIn() {
-  const [error, setError] = useState<string | null>(null)
+function SignInContent() {
+  const searchParams = useSearchParams()
+  const urlError = searchParams.get('error')
+  const [error, setError] = useState<string | null>(urlError)
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -46,7 +50,7 @@ export default function SignIn() {
                 id="email" 
                 name="email"
                 type="email" 
-                placeholder="name@example.com" 
+                placeholder="you@domain.com" 
                 required
                 className="h-12"
               />
@@ -59,14 +63,16 @@ export default function SignIn() {
                 id="password" 
                 name="password"
                 type="password" 
+                placeholder="••••••••"
                 required
                 className="h-12"
               />
             </div>
             
             {error && (
-              <div className="text-sm text-destructive font-medium p-3 bg-destructive/10 rounded-md">
-                {error}
+              <div className="text-sm text-destructive font-medium p-3 bg-destructive/10 border border-destructive/20 rounded-md flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
@@ -77,10 +83,22 @@ export default function SignIn() {
         </CardContent>
         <CardFooter className="flex flex-col gap-4 border-t p-6">
           <p className="text-sm text-center text-muted-foreground">
-            Don't have an account? <Link href="/auth/signup" className="text-primary hover:underline">Sign up</Link>
+            Don&apos;t have an account? <Link href="/auth/signup" className="text-primary hover:underline">Sign up</Link>
           </p>
         </CardFooter>
       </Card>
     </div>
+  )
+}
+
+export default function SignIn() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
+        <div className="animate-pulse h-8 w-32 bg-muted rounded"></div>
+      </div>
+    }>
+      <SignInContent />
+    </Suspense>
   )
 }

@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, format, subMonths } from 'date-fns'
 
+import { getCurrentUser } from '@/lib/auth'
+
 export type ExpenseData = {
   amount: number
   description: string
@@ -19,13 +21,14 @@ export async function addExpense(data: ExpenseData) {
   if (!user) throw new Error('Unauthorized')
 
   const formattedPaymentMethod = data.paymentMethod.toLowerCase().replace(' ', '_')
+  const dateStr = format(data.date, 'yyyy-MM-dd')
 
   const { error } = await supabase.from('expenses').insert({
     amount: data.amount,
     description: data.description,
     category: data.category.toLowerCase(),
     payment_method: formattedPaymentMethod,
-    expense_date: data.date.toISOString(),
+    expense_date: dateStr,
     note: data.note || null,
     user_id: user.id
   })
@@ -36,6 +39,9 @@ export async function addExpense(data: ExpenseData) {
   }
   
   revalidatePath('/money')
+  revalidatePath('/money/expenses')
+  revalidatePath('/money/categories')
+  revalidatePath('/money/budgets')
 }
 
 export async function updateExpense(id: string, data: Partial<ExpenseData>) {
@@ -48,7 +54,7 @@ export async function updateExpense(id: string, data: Partial<ExpenseData>) {
   if (data.description !== undefined) updateData.description = data.description
   if (data.category !== undefined) updateData.category = data.category.toLowerCase()
   if (data.paymentMethod !== undefined) updateData.payment_method = data.paymentMethod.toLowerCase().replace(' ', '_')
-  if (data.date !== undefined) updateData.expense_date = data.date.toISOString()
+  if (data.date !== undefined) updateData.expense_date = format(data.date, 'yyyy-MM-dd')
   if (data.note !== undefined) updateData.note = data.note
 
   const { error } = await supabase.from('expenses').update(updateData).eq('id', id)
@@ -58,6 +64,9 @@ export async function updateExpense(id: string, data: Partial<ExpenseData>) {
   }
   
   revalidatePath('/money')
+  revalidatePath('/money/expenses')
+  revalidatePath('/money/categories')
+  revalidatePath('/money/budgets')
 }
 
 export async function deleteExpense(id: string) {
@@ -72,6 +81,9 @@ export async function deleteExpense(id: string) {
   }
   
   revalidatePath('/money')
+  revalidatePath('/money/expenses')
+  revalidatePath('/money/categories')
+  revalidatePath('/money/budgets')
 }
 
 export async function getExpenses(filter?: {
@@ -83,23 +95,27 @@ export async function getExpenses(filter?: {
   maxAmount?: number
   search?: string
 }) {
+  const user = await getCurrentUser()
+  if (!user) return []
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
 
-  let query = supabase.from('expenses').select('*').order('expense_date', { ascending: false })
+  let query = supabase.from('expenses').select('*').eq('user_id', user.id).order('expense_date', { ascending: false })
 
-  if (filter?.from) query = query.gte('expense_date', filter.from.toISOString())
-  if (filter?.to) query = query.lte('expense_date', filter.to.toISOString())
-  if (filter?.category) query = query.eq('category', filter.category)
-  if (filter?.paymentMethod) query = query.eq('payment_method', filter.paymentMethod)
+  if (filter?.from) query = query.gte('expense_date', format(filter.from, 'yyyy-MM-dd'))
+  if (filter?.to) query = query.lte('expense_date', format(filter.to, 'yyyy-MM-dd'))
+  if (filter?.category) query = query.eq('category', filter.category.toLowerCase())
+  if (filter?.paymentMethod) query = query.eq('payment_method', filter.paymentMethod.toLowerCase().replace(' ', '_'))
   if (filter?.minAmount !== undefined) query = query.gte('amount', filter.minAmount)
   if (filter?.maxAmount !== undefined) query = query.lte('amount', filter.maxAmount)
   if (filter?.search) {
     query = query.or(`description.ilike.%${filter.search}%,category.ilike.%${filter.search}%,note.ilike.%${filter.search}%`)
   }
 
-  const { data } = await query
+  const { data, error } = await query
+  if (error) {
+    console.error('getExpenses error:', error)
+    return []
+  }
   
   const dbToFrontendPayment: Record<string, string> = {
     'cash': 'Cash', 'upi': 'UPI', 'debit_card': 'Debit Card', 
@@ -117,29 +133,37 @@ export async function getExpenses(filter?: {
 }
 
 export async function getMoneySummary() {
+  const user = await getCurrentUser()
+  if (!user) return {
+    todayTotal: 0, monthTotal: 0, prevMonthTotal: 0, avgDaily: 0, 
+    highestCategory: { name: 'N/A', amount: 0 }, dailyData: [], 
+    highestDay: { date: 'N/A', amount: 0 }, categoryBreakdown: [], 
+    todayExpenses: [], monthExpenses: [], daysElapsed: 1, monthComparisonPct: null
+  }
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
 
   const now = new Date()
-  const todayStart = startOfDay(now).toISOString()
-  const todayEnd = endOfDay(now).toISOString()
-  const monthStart = startOfMonth(now).toISOString()
-  const monthEnd = endOfMonth(now).toISOString()
-  const prevMonthStart = startOfMonth(subMonths(now, 1)).toISOString()
-  const prevMonthEnd = endOfMonth(subMonths(now, 1)).toISOString()
+  const todayStr = format(now, 'yyyy-MM-dd')
+  const monthStartStr = format(startOfMonth(now), 'yyyy-MM-dd')
+  const monthEndStr = format(endOfMonth(now), 'yyyy-MM-dd')
+  const prevMonthStartStr = format(startOfMonth(subMonths(now, 1)), 'yyyy-MM-dd')
+  const prevMonthEndStr = format(endOfMonth(subMonths(now, 1)), 'yyyy-MM-dd')
 
   const [
-    { data: todayExpenses }, 
-    { data: monthExpensesAsc }, 
-    { data: prevMonthExpenses }, 
-    { data: allMonthExpenses }
+    { data: todayExpenses, error: e1 }, 
+    { data: monthExpensesAsc, error: e2 }, 
+    { data: prevMonthExpenses, error: e3 }, 
+    { data: allMonthExpenses, error: e4 }
   ] = await Promise.all([
-    supabase.from('expenses').select('*').gte('expense_date', todayStart).lte('expense_date', todayEnd),
-    supabase.from('expenses').select('*').gte('expense_date', monthStart).lte('expense_date', monthEnd).order('expense_date', { ascending: true }),
-    supabase.from('expenses').select('*').gte('expense_date', prevMonthStart).lte('expense_date', prevMonthEnd),
-    supabase.from('expenses').select('*').gte('expense_date', monthStart).lte('expense_date', monthEnd)
+    supabase.from('expenses').select('*').eq('user_id', user.id).eq('expense_date', todayStr),
+    supabase.from('expenses').select('*').eq('user_id', user.id).gte('expense_date', monthStartStr).lte('expense_date', monthEndStr).order('expense_date', { ascending: true }),
+    supabase.from('expenses').select('*').eq('user_id', user.id).gte('expense_date', prevMonthStartStr).lte('expense_date', prevMonthEndStr),
+    supabase.from('expenses').select('*').eq('user_id', user.id).gte('expense_date', monthStartStr).lte('expense_date', monthEndStr)
   ])
+
+  if (e1 || e2 || e3 || e4) {
+    console.error('getMoneySummary errors:', { e1, e2, e3, e4 })
+  }
 
   const dbToFrontendPayment: Record<string, string> = {
     'cash': 'Cash', 'upi': 'UPI', 'debit_card': 'Debit Card', 
@@ -212,15 +236,14 @@ export async function getMoneySummary() {
 }
 
 export async function getBudgets(month?: string) {
+  const user = await getCurrentUser()
+  if (!user) return []
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Unauthorized')
 
   const monthKey = month || format(new Date(), 'yyyy-MM')
-  // For Supabase we map month to a DATE column. We can use yyyy-MM-01.
   const dateKey = `${monthKey}-01`
 
-  const { data } = await supabase.from('budgets').select('*').eq('month', dateKey)
+  const { data } = await supabase.from('budgets').select('*').eq('user_id', user.id).eq('month', dateKey)
   
   return (data || []).map(b => ({
     ...b,

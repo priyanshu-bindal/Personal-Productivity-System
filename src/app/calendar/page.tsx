@@ -1,48 +1,27 @@
 import { Suspense } from "react"
-import { createClient } from '@/lib/supabase/server'
-import { getSkills, getWeeklyPlans } from "@/lib/actions"
+import { getCurrentUser } from '@/lib/auth'
+import { getCalendarSessions } from "@/lib/actions"
 import { redirect } from "next/navigation"
-import { Card, CardContent } from "@/components/ui/card"
-import { Calendar } from "@/components/ui/calendar"
-import { format } from "date-fns"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { WeeklyPlanner } from "@/components/planning/WeeklyPlanner"
-
-// Temporary client component just for the standard Calendar state
-// In a full implementation, this would fetch tasks for the selected date
-import CalendarClient from "./CalendarClient"
+import { CalendarClient } from "@/components/calendar/CalendarClient"
+import { startOfWeek, endOfWeek, format } from "date-fns"
 
 async function CalendarContent() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) {
     redirect('/auth/signin')
   }
 
-  const skills = await getSkills()
-  const weeklyPlans = await getWeeklyPlans()
+  const now = new Date()
+  const monday = startOfWeek(now, { weekStartsOn: 1 })
+  const sunday = endOfWeek(now, { weekStartsOn: 1 })
+  const startDateStr = format(monday, 'yyyy-MM-dd')
+  const endDateStr = format(sunday, 'yyyy-MM-dd')
+
+  const initialSessions = await getCalendarSessions(startDateStr, endDateStr)
 
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <header>
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Planning & Schedule</h1>
-        <p className="text-muted-foreground text-lg mt-2">Manage your calendar and design your weekly routine.</p>
-      </header>
-
-      <Tabs defaultValue="routine" className="w-full">
-        <TabsList className="mb-6">
-          <TabsTrigger value="routine">Weekly Routine</TabsTrigger>
-          <TabsTrigger value="calendar">Calendar</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="routine" className="outline-none">
-          <WeeklyPlanner skills={skills} initialPlans={weeklyPlans} />
-        </TabsContent>
-        
-        <TabsContent value="calendar" className="outline-none">
-          <CalendarClient />
-        </TabsContent>
-      </Tabs>
+    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-24 md:pb-10">
+      <CalendarClient initialSessions={initialSessions} />
     </div>
   )
 }

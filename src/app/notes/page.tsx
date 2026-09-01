@@ -5,9 +5,10 @@ import { redirect } from "next/navigation"
 import { NoteList } from "@/components/notes/NoteList"
 import { NotesHeader } from "@/components/notes/NotesHeader"
 
+import { getCurrentUser } from '@/lib/auth'
+
 async function NotesContent() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) {
     redirect('/auth/signin')
   }

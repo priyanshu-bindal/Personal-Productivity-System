@@ -1,12 +1,11 @@
 import { Suspense } from "react"
-import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/auth'
 import { getSkills } from "@/lib/actions"
 import { redirect } from "next/navigation"
 import { SkillsClient } from "@/components/skills/SkillsClient"
 
 async function SkillsPageContent() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCurrentUser()
   if (!user) {
     redirect('/auth/signin')
   }

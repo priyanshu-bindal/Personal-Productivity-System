@@ -8,15 +8,25 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Target, Flag, MoreVertical, Edit2, Trash2, Plus } from "lucide-react"
-import { toggleMilestone, deleteGoal, createMilestone, deleteMilestone } from '@/lib/actions'
+import { CreateTaskModal } from '@/components/tasks/TaskModals'
+import { toggleMilestone, deleteGoal, createMilestone, deleteMilestone, getSkills } from '@/lib/actions'
 import { EditGoalModal } from './GoalModals'
 import { format } from 'date-fns'
 
 export function GoalList({ goals }: { goals: any[] }) {
   const [isPending, startTransition] = useTransition()
   const [editingGoal, setEditingGoal] = useState<any>(null)
+  const [taskGoal, setTaskGoal] = useState<any>(null)
+  const [skills, setSkills] = useState<any[]>([])
   const [newMilestoneGoalId, setNewMilestoneGoalId] = useState<string | null>(null)
   const [milestoneTitle, setMilestoneTitle] = useState('')
+
+  const handleOpenTaskModal = (goal: any) => {
+    getSkills().then(s => {
+      setSkills(s)
+      setTaskGoal(goal)
+    })
+  }
 
   const handleToggleMilestone = (id: string, completed: boolean) => {
     startTransition(() => {
@@ -80,10 +90,13 @@ export function GoalList({ goals }: { goals: any[] }) {
                   </div>
                 </div>
                 <DropdownMenu>
-                  <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-10 w-10 -mr-2 -mt-2 opacity-0 group-hover:opacity-100">
+                  <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-10 w-10 -mr-2 -mt-2">
                     <MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleOpenTaskModal(goal)}>
+                      <Plus className="h-4 w-4 mr-2" /> Add Task
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setEditingGoal(goal)}>
                       <Edit2 className="h-4 w-4 mr-2" /> Edit Goal
                     </DropdownMenuItem>
@@ -184,6 +197,16 @@ export function GoalList({ goals }: { goals: any[] }) {
         isOpen={!!editingGoal} 
         onClose={() => setEditingGoal(null)} 
       />
+
+      {taskGoal && (
+        <CreateTaskModal
+          isOpen={!!taskGoal}
+          onClose={() => setTaskGoal(null)}
+          skills={skills}
+          goals={goals}
+          initialGoalId={taskGoal.id}
+        />
+      )}
     </>
   )
 }

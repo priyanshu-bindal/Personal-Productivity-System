@@ -19,11 +19,9 @@ import { signout } from '@/app/auth/actions'
 import { GlobalSearch } from '@/components/GlobalSearch'
 
 const navItems = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Today', href: '/', icon: LayoutDashboard },
   { name: 'My Skills', href: '/skills', icon: BookOpen },
-  { name: 'Tasks', href: '/tasks', icon: CheckSquare },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
-  { name: 'Goals', href: '/goals', icon: Target },
   { name: 'Progress', href: '/progress', icon: TrendingUp },
   { name: 'Notes', href: '/notes', icon: StickyNote },
   { name: 'Money', href: '/money', icon: IndianRupee },

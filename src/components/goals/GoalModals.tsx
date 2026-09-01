@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createGoal, updateGoal } from '@/lib/actions'
 import { format } from 'date-fns'
+import { useToast } from '@/components/ui/toast-provider'
+import { Loader2 } from 'lucide-react'
 
 interface CreateGoalModalProps {
   isOpen: boolean
@@ -17,25 +19,35 @@ export function CreateGoalModal({ isOpen, onClose }: CreateGoalModalProps) {
   const [title, setTitle] = useState('')
   const [target, setTarget] = useState('')
   const [deadline, setDeadline] = useState('')
-  const [isPending, startTransition] = useTransition()
+  const [isLoading, setIsLoading] = useState(false)
+  const { success, error: showError } = useToast()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    startTransition(async () => {
+    if (isLoading) return
+    setIsLoading(true)
+
+    try {
       await createGoal({
         title,
         target: target || null,
         deadline: deadline ? new Date(deadline) : null
       })
+      success("Goal added", title)
       setTitle('')
       setTarget('')
       setDeadline('')
       onClose()
-    })
+    } catch (err) {
+      console.error(err)
+      showError("Couldn't add goal", "Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isLoading && onClose()}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Create Goal</DialogTitle>
@@ -54,8 +66,14 @@ export function CreateGoalModal({ isOpen, onClose }: CreateGoalModalProps) {
             <Input id="deadline" type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
           </div>
           <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
-            <Button type="submit" disabled={isPending || !title}>Save</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
+            <Button type="submit" disabled={isLoading || !title.trim()} className="min-w-[110px]">
+              {isLoading ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...</>
+              ) : (
+                'Save Goal'
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -67,29 +85,32 @@ export function EditGoalModal({ goal, isOpen, onClose }: { goal: any, isOpen: bo
   const [title, setTitle] = useState(goal?.title || '')
   const [target, setTarget] = useState(goal?.target || '')
   const [deadline, setDeadline] = useState(goal?.deadline ? format(new Date(goal.deadline), 'yyyy-MM-dd') : '')
-  const [isPending, startTransition] = useTransition()
+  const [isLoading, setIsLoading] = useState(false)
+  const { success, error: showError } = useToast()
 
-  // Update state when goal changes
-  if (isOpen && goal?.title !== undefined && title === '') {
-    setTitle(goal.title)
-    setTarget(goal.target || '')
-    setDeadline(goal.deadline ? format(new Date(goal.deadline), 'yyyy-MM-dd') : '')
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    startTransition(async () => {
+    if (isLoading) return
+    setIsLoading(true)
+
+    try {
       await updateGoal(goal.id, {
         title,
         target: target || null,
         deadline: deadline ? new Date(deadline) : null
       })
+      success("Goal updated", title)
       onClose()
-    })
+    } catch (err) {
+      console.error(err)
+      showError("Couldn't update goal", "Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isLoading && onClose()}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit Goal</DialogTitle>
@@ -108,8 +129,14 @@ export function EditGoalModal({ goal, isOpen, onClose }: { goal: any, isOpen: bo
             <Input id="edit-deadline" type="date" value={deadline} onChange={e => setDeadline(e.target.value)} />
           </div>
           <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
-            <Button type="submit" disabled={isPending || !title}>Save Changes</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
+            <Button type="submit" disabled={isLoading || !title.trim()} className="min-w-[120px]">
+              {isLoading ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

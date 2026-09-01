@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createTask, updateTask } from '@/lib/actions'
 import { format } from 'date-fns'
 import { Textarea } from '@/components/ui/textarea'
+import { useToast } from '@/components/ui/toast-provider'
+import { Loader2 } from 'lucide-react'
 
 interface TaskModalProps {
   isOpen: boolean
@@ -35,7 +37,8 @@ export function CreateTaskModal({
   const [priority, setPriority] = useState('Medium')
   const [skillId, setSkillId] = useState<string>(initialSkillId)
   const [goalId, setGoalId] = useState<string>(initialGoalId)
-  const [isPending, startTransition] = useTransition()
+  const [isLoading, setIsLoading] = useState(false)
+  const { success, error: showError } = useToast()
 
   useEffect(() => {
     if (isOpen) {
@@ -45,9 +48,12 @@ export function CreateTaskModal({
     }
   }, [isOpen, initialSkillId, initialGoalId])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    startTransition(async () => {
+    if (isLoading) return
+    setIsLoading(true)
+
+    try {
       const scheduledDate = new Date(`${date}T${time || '09:00'}`)
       
       await createTask({
@@ -59,6 +65,9 @@ export function CreateTaskModal({
         skillId: skillId === 'none' ? null : skillId,
         goalId: goalId === 'none' ? null : goalId
       })
+
+      success("Task added successfully", title)
+
       setTitle('')
       setDescription('')
       setDate(format(new Date(), 'yyyy-MM-dd'))
@@ -68,11 +77,16 @@ export function CreateTaskModal({
       setSkillId('none')
       setGoalId('none')
       onClose()
-    })
+    } catch (err) {
+      console.error(err)
+      showError("Couldn't add task", "Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isLoading && onClose()}>
       <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Task</DialogTitle>
@@ -152,8 +166,14 @@ export function CreateTaskModal({
           </div>
 
           <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
-            <Button type="submit" disabled={isPending || !title}>Save Task</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
+            <Button type="submit" disabled={isLoading || !title.trim()} className="min-w-[110px]">
+              {isLoading ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...</>
+              ) : (
+                'Save Task'
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -169,7 +189,8 @@ export function EditTaskModal({ task, isOpen, onClose, skills }: { task: any, is
   const [duration, setDuration] = useState('60')
   const [priority, setPriority] = useState('Medium')
   const [skillId, setSkillId] = useState<string>('none')
-  const [isPending, startTransition] = useTransition()
+  const [isLoading, setIsLoading] = useState(false)
+  const { success, error: showError } = useToast()
 
   useEffect(() => {
     if (task && isOpen) {
@@ -186,9 +207,12 @@ export function EditTaskModal({ task, isOpen, onClose, skills }: { task: any, is
     }
   }, [task, isOpen])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    startTransition(async () => {
+    if (isLoading) return
+    setIsLoading(true)
+
+    try {
       const scheduledDate = date && time ? new Date(`${date}T${time}`) : null
       
       await updateTask(task.id, {
@@ -199,12 +223,18 @@ export function EditTaskModal({ task, isOpen, onClose, skills }: { task: any, is
         priority,
         skillId: skillId === 'none' ? null : skillId
       })
+      success("Task updated", title)
       onClose()
-    })
+    } catch (err) {
+      console.error(err)
+      showError("Couldn't update task", "Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !isLoading && onClose()}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Edit Task</DialogTitle>
@@ -267,8 +297,14 @@ export function EditTaskModal({ task, isOpen, onClose, skills }: { task: any, is
           </div>
 
           <DialogFooter className="pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isPending}>Cancel</Button>
-            <Button type="submit" disabled={isPending || !title}>Save Changes</Button>
+            <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
+            <Button type="submit" disabled={isLoading || !title.trim()} className="min-w-[120px]">
+              {isLoading ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+              ) : (
+                'Save Changes'
+              )}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

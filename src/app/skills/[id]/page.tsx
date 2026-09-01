@@ -54,10 +54,10 @@ async function SkillDetailsContent({ id }: { id: string }) {
     }
   }
 
-  // Calculate progress
-  const progress = skill.progressSource === 'Automatic' && skill.topics && skill.topics.length > 0
-    ? Math.round(skill.topics.reduce((acc: number, t: any) => acc + t.progress, 0) / skill.topics.length)
-    : skill.progress
+  // Calculate automatic activity progress
+  const weeklyCompleted = skill.weeklyCompleted || 0
+  const weeklyTarget = skill.weeklyTarget || 3
+  const weeklyProgress = Math.min(100, Math.round((weeklyCompleted / (weeklyTarget || 1)) * 100))
 
   // Last practiced
   const lastSession = skill.learningSessions?.[0]
@@ -75,8 +75,8 @@ async function SkillDetailsContent({ id }: { id: string }) {
             <div className="flex items-center gap-3 mb-2">
               <Badge variant="secondary" className="px-3 py-1 rounded-full">{skill.category}</Badge>
               <Badge variant="outline" className="px-3 py-1 rounded-full">{skill.level}</Badge>
-              <Badge variant="outline" className="px-3 py-1 rounded-full text-muted-foreground">
-                {skill.progressSource} progress
+              <Badge variant="outline" className="px-3 py-1 rounded-full text-emerald-500 border-emerald-500/30 bg-emerald-500/10">
+                {skill.consistencyPct || 100}% Consistency
               </Badge>
             </div>
             <h1 className="text-3xl md:text-5xl font-bold tracking-tight">{skill.name}</h1>
@@ -91,16 +91,16 @@ async function SkillDetailsContent({ id }: { id: string }) {
           </div>
           <div className="flex flex-col items-end gap-3">
             <div className="text-right">
-              <div className="text-4xl font-bold text-primary tabular-nums">{progress}%</div>
-              <div className="text-sm font-medium text-muted-foreground">Overall Progress</div>
+              <div className="text-4xl font-bold text-emerald-500 tabular-nums">{weeklyCompleted} / {weeklyTarget}</div>
+              <div className="text-sm font-medium text-muted-foreground">Sessions This Week</div>
             </div>
             <MarkPracticedInline skillId={skill.id} skillName={skill.name} />
           </div>
         </div>
       </header>
 
-      {/* Progress Bar */}
-      <Progress value={progress} className="h-3" />
+      {/* Activity Progress Bar */}
+      <Progress value={weeklyProgress} className="h-3 bg-muted" />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
