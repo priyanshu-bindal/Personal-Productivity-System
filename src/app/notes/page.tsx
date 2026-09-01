@@ -1,6 +1,5 @@
 import { Suspense } from "react"
-import { createClient } from '@/lib/supabase/server'
-import { getNotes, getSkills } from "@/lib/actions"
+import { getNotes, getSimpleSkills } from "@/lib/actions"
 import { redirect } from "next/navigation"
 import { NoteList } from "@/components/notes/NoteList"
 import { NotesHeader } from "@/components/notes/NotesHeader"
@@ -15,7 +14,7 @@ async function NotesContent() {
 
   const [notes, skills] = await Promise.all([
     getNotes(),
-    getSkills()
+    getSimpleSkills()
   ])
 
   return (

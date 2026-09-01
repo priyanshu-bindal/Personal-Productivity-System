@@ -152,17 +152,15 @@ export async function getMoneySummary() {
   const [
     { data: todayExpenses, error: e1 }, 
     { data: monthExpensesAsc, error: e2 }, 
-    { data: prevMonthExpenses, error: e3 }, 
-    { data: allMonthExpenses, error: e4 }
+    { data: prevMonthExpenses, error: e3 }
   ] = await Promise.all([
     supabase.from('expenses').select('*').eq('user_id', user.id).eq('expense_date', todayStr),
     supabase.from('expenses').select('*').eq('user_id', user.id).gte('expense_date', monthStartStr).lte('expense_date', monthEndStr).order('expense_date', { ascending: true }),
-    supabase.from('expenses').select('*').eq('user_id', user.id).gte('expense_date', prevMonthStartStr).lte('expense_date', prevMonthEndStr),
-    supabase.from('expenses').select('*').eq('user_id', user.id).gte('expense_date', monthStartStr).lte('expense_date', monthEndStr)
+    supabase.from('expenses').select('*').eq('user_id', user.id).gte('expense_date', prevMonthStartStr).lte('expense_date', prevMonthEndStr)
   ])
 
-  if (e1 || e2 || e3 || e4) {
-    console.error('getMoneySummary errors:', { e1, e2, e3, e4 })
+  if (e1 || e2 || e3) {
+    console.error('getMoneySummary errors:', { e1, e2, e3 })
   }
 
   const dbToFrontendPayment: Record<string, string> = {
@@ -179,7 +177,7 @@ export async function getMoneySummary() {
   }))
 
   const today = mapToCamel(todayExpenses || [])
-  const month = mapToCamel(allMonthExpenses || [])
+  const month = mapToCamel(monthExpensesAsc || [])
   const prevMonth = mapToCamel(prevMonthExpenses || [])
   const monthAsc = mapToCamel(monthExpensesAsc || [])
 

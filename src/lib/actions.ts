@@ -55,6 +55,25 @@ export async function autoGenerateSessions(supabase: any, userId: string) {
 }
 
 // --- SKILLS ---
+export async function getSimpleSkills() {
+  const user = await getCurrentUser()
+  if (!user) return []
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('skills')
+    .select('id, name')
+    .eq('user_id', user.id)
+    .order('name', { ascending: true })
+
+  if (error) {
+    console.error('getSimpleSkills error:', error)
+    return []
+  }
+
+  return data || []
+}
+
 export async function getSkills() {
   const user = await getCurrentUser()
   if (!user) return []
