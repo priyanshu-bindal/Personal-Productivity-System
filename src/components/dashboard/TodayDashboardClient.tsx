@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { completeLearningSession, skipLearningSession } from '@/lib/actions'
 import { useToast } from '@/components/ui/toast-provider'
-import { CheckCircle2, Clock, Flame, Calendar, BookOpen, Plus, ArrowRight, Loader2 } from 'lucide-react'
+import { CheckCircle2, Clock, Flame, Calendar, BookOpen, Plus, ArrowRight } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { SkillModal } from '@/components/skills/SkillModal'
@@ -37,10 +37,9 @@ export function TodayDashboardClient({
   const totalPlannedDuration = optimisticSessions.reduce((acc, s) => acc + (s.plannedDuration || 60), 0)
 
   const handleComplete = useCallback(async (sessionId: string, skillName: string) => {
-    if (loadingIds.has(sessionId)) return // Prevent duplicate
+    if (loadingIds.has(sessionId)) return
     setLoadingIds(prev => new Set(prev).add(sessionId))
     
-    // Optimistic update
     setOptimisticSessions({ id: sessionId, newStatus: 'completed' })
 
     try {
@@ -73,17 +72,17 @@ export function TodayDashboardClient({
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-6 sm:space-y-8 min-w-0 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Header & Greeting */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b pb-6">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wider text-primary mb-1">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b pb-6 min-w-0">
+        <div className="min-w-0">
+          <div className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-primary mb-1">
             {format(new Date(), 'EEEE, MMMM d, yyyy')}
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight break-words">
             {greeting}, {userFirstName}!
           </h1>
-          <p className="text-muted-foreground text-base md:text-lg mt-1">
+          <p className="text-muted-foreground text-xs sm:text-base md:text-lg mt-1">
             {plannedSessions.length > 0
               ? `You have ${plannedSessions.length} learning session${plannedSessions.length !== 1 ? 's' : ''} planned for today.`
               : optimisticSessions.length > 0
@@ -92,42 +91,42 @@ export function TodayDashboardClient({
           </p>
         </div>
 
-        <Button onClick={() => setIsAddSkillOpen(true)} className="gap-2 shrink-0">
+        <Button onClick={() => setIsAddSkillOpen(true)} className="gap-2 shrink-0 self-start md:self-auto text-xs sm:text-sm">
           <Plus className="h-4 w-4" /> Add Skill
         </Button>
       </header>
 
       {/* Main Today View */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 min-w-0">
         
         {/* Left Column: Today's Sessions */}
-        <div className="lg:col-span-8 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" /> Today&apos;s Learning Sessions
+        <div className="lg:col-span-8 space-y-4 sm:space-y-6 min-w-0">
+          <div className="flex items-center justify-between min-w-0">
+            <h2 className="text-lg sm:text-xl font-semibold tracking-tight flex items-center gap-2 truncate">
+              <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" /> Today&apos;s Learning Sessions
             </h2>
-            <span className="text-xs text-muted-foreground font-medium">
-              {totalPlannedDuration} mins total
+            <span className="text-xs text-muted-foreground font-medium shrink-0 ml-2">
+              {totalPlannedDuration} mins
             </span>
           </div>
 
           {optimisticSessions.length === 0 ? (
-            <Card className="border-dashed shadow-none bg-muted/20 py-12 text-center">
-              <CardContent className="space-y-3">
-                <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
-                  <BookOpen className="h-6 w-6" />
+            <Card className="border-dashed shadow-none bg-muted/20 py-8 sm:py-12 text-center min-w-0">
+              <CardContent className="space-y-3 p-4">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto">
+                  <BookOpen className="h-5 w-5 sm:h-6 sm:w-6" />
                 </div>
-                <h3 className="font-semibold text-lg">Nothing planned for today</h3>
-                <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+                <h3 className="font-semibold text-base sm:text-lg">Nothing planned for today</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground max-w-sm mx-auto">
                   Setup your skills with preferred practice days, and daily sessions will automatically appear here.
                 </p>
                 <div className="pt-2">
-                  <Button variant="outline" onClick={() => setIsAddSkillOpen(true)}>+ Add a Skill</Button>
+                  <Button variant="outline" size="sm" onClick={() => setIsAddSkillOpen(true)}>+ Add a Skill</Button>
                 </div>
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4 min-w-0">
               <AnimatePresence mode="popLayout">
                 {optimisticSessions.map((session) => {
                   const isCompleted = session.status === 'completed'
@@ -142,20 +141,21 @@ export function TodayDashboardClient({
                       initial={false}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ duration: 0.2 }}
+                      className="min-w-0"
                     >
-                      <Card className={`shadow-sm transition-all duration-300 ${isCompleted ? 'border-emerald-500/40 bg-emerald-500/5' : 'hover:border-primary/50'}`}>
-                        <CardContent className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-lg">{skill.name || 'Learning Session'}</span>
+                      <Card className={`shadow-sm transition-all duration-300 min-w-0 ${isCompleted ? 'border-emerald-500/40 bg-emerald-500/5' : 'hover:border-primary/50'}`}>
+                        <CardContent className="p-3.5 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 min-w-0">
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                              <span className="font-semibold text-base sm:text-lg truncate">{skill.name || 'Learning Session'}</span>
                               {skill.category && (
-                                <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
+                                <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium shrink-0">
                                   {skill.category}
                                 </span>
                               )}
                             </div>
 
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium pt-1">
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium pt-0.5">
                               <span className="flex items-center gap-1">
                                 <Clock className="h-3.5 w-3.5 text-primary" /> {session.plannedDuration} minutes
                               </span>
@@ -164,7 +164,7 @@ export function TodayDashboardClient({
                           </div>
 
                           {/* Direct Card Action Button */}
-                          <div className="flex items-center gap-2 pt-2 sm:pt-0">
+                          <div className="flex items-center gap-2 pt-1 sm:pt-0 shrink-0">
                             {isCompleted ? (
                               <motion.div 
                                 initial={{ scale: 0.8, opacity: 0 }}
@@ -177,11 +177,11 @@ export function TodayDashboardClient({
                             ) : isSkipped ? (
                               <span className="text-xs text-muted-foreground px-3 py-1.5 rounded-lg bg-muted">Skipped</span>
                             ) : (
-                              <>
+                              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
-                                  className="text-xs text-muted-foreground hover:text-foreground"
+                                  className="text-xs text-muted-foreground hover:text-foreground h-8 px-2.5"
                                   onClick={() => handleSkip(session.id, skill.name || 'Session')}
                                   disabled={isActionLoading}
                                 >
@@ -189,17 +189,17 @@ export function TodayDashboardClient({
                                 </Button>
                                 <Button 
                                   size="sm" 
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 font-semibold min-w-[140px]"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 font-semibold text-xs h-8 px-3"
                                   onClick={() => handleComplete(session.id, skill.name || 'Session')}
                                   disabled={isActionLoading}
                                 >
                                   {isActionLoading ? (
                                     <><TrafficLoader size="sm" /> Completing...</>
                                   ) : (
-                                    <><CheckCircle2 className="h-4 w-4" /> Complete Session</>
+                                    <><CheckCircle2 className="h-3.5 w-3.5" /> Complete</>
                                   )}
                                 </Button>
-                              </>
+                              </div>
                             )}
                           </div>
                         </CardContent>
@@ -213,23 +213,23 @@ export function TodayDashboardClient({
         </div>
 
         {/* Right Column: Skills Overview */}
-        <div className="lg:col-span-4 space-y-6">
-          <Card>
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <div className="lg:col-span-4 space-y-6 min-w-0">
+          <Card className="min-w-0">
+            <CardHeader className="p-4 pb-3 flex flex-row items-center justify-between">
               <CardTitle className="text-base font-semibold">Your Skills Overview</CardTitle>
               <Link href="/skills" className="text-xs text-primary hover:underline flex items-center gap-1">
                 View All <ArrowRight className="h-3 w-3" />
               </Link>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-4 pt-0 space-y-3">
               {skills.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">No skills created yet.</p>
+                <p className="text-xs sm:text-sm text-muted-foreground text-center py-4">No skills created yet.</p>
               ) : (
                 skills.slice(0, 4).map(skill => (
-                  <div key={skill.id} className="p-3 border rounded-xl space-y-2 bg-card">
-                    <div className="flex justify-between items-center text-sm font-medium">
-                      <span>{skill.name}</span>
-                      <span className="text-xs text-primary font-bold">{skill.consistencyPct}% consistency</span>
+                  <div key={skill.id} className="p-3 border rounded-xl space-y-1.5 bg-card min-w-0">
+                    <div className="flex justify-between items-center text-xs sm:text-sm font-medium min-w-0">
+                      <span className="truncate">{skill.name}</span>
+                      <span className="text-xs text-primary font-bold ml-2 shrink-0">{skill.consistencyPct}%</span>
                     </div>
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">

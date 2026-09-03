@@ -26,9 +26,13 @@ function SignInContent() {
       const result = await login(formData)
       if (result?.error) {
         setError(result.error)
+        setIsLoading(false)
       }
-    } finally {
-      setIsLoading(false)
+    } catch (err: any) {
+      if (err?.message !== 'NEXT_REDIRECT') {
+        setError(err?.message || 'Authentication failed. Please try again.')
+        setIsLoading(false)
+      }
     }
   }
 
@@ -43,7 +47,7 @@ function SignInContent() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form action="#" method="POST" onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input 

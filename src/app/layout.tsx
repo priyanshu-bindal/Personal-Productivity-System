@@ -28,13 +28,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.className} min-h-screen bg-background antialiased flex`}>
+      <body className={`${inter.className} min-h-screen bg-background antialiased flex w-full max-w-full overflow-x-hidden`}>
         <ToastProvider>
           <TooltipProvider>
             <NavLoadingIndicator />
             <Sidebar />
-            <div className="flex-1 flex flex-col min-h-screen pb-16 md:pb-0">
-              <main className="flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="flex-1 flex flex-col min-h-screen min-w-0 w-full max-w-full pb-16 md:pb-0">
+              <main className="flex-1 min-w-0 w-full max-w-full overflow-y-auto overflow-x-hidden">
                 {children}
               </main>
             </div>

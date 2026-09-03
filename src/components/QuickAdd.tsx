@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Target, CheckSquare, BookOpen, StickyNote, IndianRupee } from 'lucide-react'
+import { Plus, CheckSquare, BookOpen, StickyNote, IndianRupee } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,46 +29,46 @@ export function QuickAdd() {
 
   return (
     <>
-      <div className="fixed bottom-20 right-6 md:bottom-10 md:right-10 z-50">
+      <div className="fixed bottom-[calc(4rem+1rem+env(safe-area-inset-bottom,0px))] right-4 md:bottom-10 md:right-10 z-50">
         <DropdownMenu onOpenChange={setIsOpen}>
           <DropdownMenuTrigger className="focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary rounded-full">
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              className="h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90"
+              className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center hover:bg-primary/90"
             >
               <motion.div
                 animate={{ rotate: isOpen ? 45 : 0 }}
                 transition={{ type: "spring", stiffness: 260, damping: 20 }}
               >
-                <Plus className="h-6 w-6" />
+                <Plus className="h-5 w-5 sm:h-6 sm:w-6" />
               </motion.div>
             </motion.div>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" sideOffset={12} className="w-56 p-2 rounded-xl shadow-xl">
+          <DropdownMenuContent align="end" sideOffset={12} className="w-52 sm:w-56 p-2 rounded-xl shadow-xl">
             <DropdownMenuItem 
-              className="py-3 px-4 cursor-pointer gap-3 rounded-lg focus:bg-primary/10"
+              className="py-2.5 px-3.5 sm:py-3 sm:px-4 cursor-pointer gap-3 rounded-lg focus:bg-primary/10 text-xs sm:text-sm"
               onClick={() => setActiveModal('task')}
             >
               <CheckSquare className="h-4 w-4 text-primary" />
               <span className="font-medium">Add Task</span>
             </DropdownMenuItem>
             <DropdownMenuItem 
-              className="py-3 px-4 cursor-pointer gap-3 rounded-lg focus:bg-primary/10"
+              className="py-2.5 px-3.5 sm:py-3 sm:px-4 cursor-pointer gap-3 rounded-lg focus:bg-primary/10 text-xs sm:text-sm"
               onClick={() => setActiveModal('expense')}
             >
               <IndianRupee className="h-4 w-4 text-emerald-500" />
               <span className="font-medium">Add Expense</span>
             </DropdownMenuItem>
             <DropdownMenuItem 
-              className="py-3 px-4 cursor-pointer gap-3 rounded-lg focus:bg-primary/10"
+              className="py-2.5 px-3.5 sm:py-3 sm:px-4 cursor-pointer gap-3 rounded-lg focus:bg-primary/10 text-xs sm:text-sm"
               onClick={() => setActiveModal('skill')}
             >
               <BookOpen className="h-4 w-4 text-blue-500" />
               <span className="font-medium">Add Skill</span>
             </DropdownMenuItem>
             <DropdownMenuItem 
-              className="py-3 px-4 cursor-pointer gap-3 rounded-lg focus:bg-primary/10"
+              className="py-2.5 px-3.5 sm:py-3 sm:px-4 cursor-pointer gap-3 rounded-lg focus:bg-primary/10 text-xs sm:text-sm"
               onClick={() => setActiveModal('note')}
             >
               <StickyNote className="h-4 w-4 text-purple-500" />

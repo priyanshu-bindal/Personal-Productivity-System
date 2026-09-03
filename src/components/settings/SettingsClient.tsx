@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,8 +16,7 @@ import {
   Download, 
   LogOut, 
   AlertTriangle, 
-  KeyRound, 
-  CheckCircle2
+  KeyRound
 } from 'lucide-react'
 import { TrafficLoader } from '@/components/ui/traffic-loader'
 import { 
@@ -38,7 +37,6 @@ interface ProfileData {
   defaultSessionDuration: number
   practiceReminders: boolean
   dailyReminderTime: string
-
 }
 
 export function SettingsClient({ initialProfile }: { initialProfile: ProfileData }) {
@@ -162,24 +160,24 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
 
   const tabs = [
     { id: 'account', label: 'Account', icon: User },
-    { id: 'practice', label: 'Practice Preferences', icon: Clock },
+    { id: 'practice', label: 'Practice', icon: Clock },
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'data', label: 'Data & Privacy', icon: ShieldCheck },
     { id: 'danger', label: 'Danger Zone', icon: AlertTriangle },
   ] as const
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <header className="border-b pb-6">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground text-base md:text-lg mt-1">
+    <div className="space-y-6 sm:space-y-8 min-w-0 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <header className="border-b pb-6 min-w-0">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">Settings</h1>
+        <p className="text-muted-foreground text-xs sm:text-base md:text-lg mt-1">
           Manage your account and app preferences.
         </p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-        {/* Desktop Left Nav Tabs */}
-        <nav className="md:col-span-4 lg:col-span-3 space-y-1">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 min-w-0">
+        {/* Mobile: Horizontal scrollable tab bar | Desktop: Left Nav */}
+        <nav className="md:col-span-4 lg:col-span-3 flex overflow-x-auto gap-1.5 pb-2 scrollbar-none min-w-0 w-full md:flex-col md:space-y-1 md:overflow-x-visible md:pb-0">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
@@ -187,73 +185,75 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors text-left ${
+                className={`flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-3 rounded-xl text-xs sm:text-sm font-medium transition-colors text-left shrink-0 md:w-full ${
                   isActive 
                     ? 'bg-primary text-primary-foreground font-semibold shadow-sm' 
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    : 'text-muted-foreground bg-card border md:border-transparent hover:bg-muted hover:text-foreground'
                 } ${tab.id === 'danger' && !isActive ? 'hover:text-destructive' : ''}`}
               >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{tab.label}</span>
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                <span className="whitespace-nowrap">{tab.label}</span>
               </button>
             )
           })}
         </nav>
 
         {/* Content Area */}
-        <div className="md:col-span-8 lg:col-span-9 space-y-6">
+        <div className="md:col-span-8 lg:col-span-9 space-y-6 min-w-0">
           
           {/* ACCOUNT SECTION */}
           {activeTab === 'account' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5 text-primary" /> Profile Details
+            <Card className="min-w-0">
+              <CardHeader className="p-4 sm:p-6 pb-3">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <User className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" /> Profile Details
                 </CardTitle>
-                <CardDescription>Update your personal information and display name.</CardDescription>
+                <CardDescription className="text-xs sm:text-sm">Update your personal information and display name.</CardDescription>
               </CardHeader>
 
               <form onSubmit={handleSaveAccount}>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input id="email" value={initialProfile.email} disabled className="bg-muted opacity-75 cursor-not-allowed" />
-                    <p className="text-xs text-muted-foreground">Your email is managed by your authentication provider.</p>
+                <CardContent className="p-4 sm:p-6 pt-0 space-y-4 min-w-0">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email" className="text-xs sm:text-sm">Email Address</Label>
+                    <Input id="email" value={initialProfile.email} disabled className="bg-muted opacity-75 cursor-not-allowed text-xs sm:text-sm" />
+                    <p className="text-[11px] text-muted-foreground">Your email is managed by your authentication provider.</p>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">Display Name</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="fullName" className="text-xs sm:text-sm">Display Name</Label>
                     <Input 
                       id="fullName" 
                       value={fullName} 
                       onChange={e => setFullName(e.target.value)} 
                       placeholder="Your Full Name" 
                       required 
+                      className="text-xs sm:text-sm"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="avatarUrl">Avatar Image URL (Optional)</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="avatarUrl" className="text-xs sm:text-sm">Avatar Image URL (Optional)</Label>
                     <Input 
                       id="avatarUrl" 
                       value={avatarUrl} 
                       onChange={e => setAvatarUrl(e.target.value)} 
                       placeholder="https://example.com/avatar.jpg" 
+                      className="text-xs sm:text-sm"
                     />
                   </div>
                 </CardContent>
 
-                <CardFooter className="flex flex-col sm:flex-row gap-3 justify-between border-t pt-4">
+                <CardFooter className="p-4 sm:p-6 flex flex-col sm:flex-row gap-2.5 justify-between border-t">
                   <Button 
                     type="button" 
                     variant="outline" 
                     onClick={() => setIsPasswordModalOpen(true)}
-                    className="gap-2 shrink-0"
+                    className="gap-2 text-xs sm:text-sm w-full sm:w-auto"
                   >
                     <KeyRound className="h-4 w-4" /> Change Password
                   </Button>
 
-                  <Button type="submit" disabled={isSavingAccount} className="min-w-[130px]">
+                  <Button type="submit" disabled={isSavingAccount} className="w-full sm:w-auto text-xs sm:text-sm">
                     {isSavingAccount ? (
                       <><TrafficLoader size="sm" className="mr-2" /> Saving...</>
                     ) : (
@@ -267,20 +267,20 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
 
           {/* PRACTICE PREFERENCES SECTION */}
           {activeTab === 'practice' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-primary" /> Practice Preferences
+            <Card className="min-w-0">
+              <CardHeader className="p-4 sm:p-6 pb-3">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" /> Practice Preferences
                 </CardTitle>
-                <CardDescription>Customize your default learning session durations and workflow.</CardDescription>
+                <CardDescription className="text-xs sm:text-sm">Customize your default learning session durations and workflow.</CardDescription>
               </CardHeader>
 
               <form onSubmit={handleSavePracticePreferences}>
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label>Default Session Duration</Label>
+                <CardContent className="p-4 sm:p-6 pt-0 space-y-5 min-w-0">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs sm:text-sm">Default Session Duration</Label>
                     <Select value={sessionDuration} onValueChange={(val) => val && setSessionDuration(val)}>
-                      <SelectTrigger className="w-full sm:w-[260px]">
+                      <SelectTrigger className="w-full sm:w-[260px] text-xs sm:text-sm">
                         <SelectValue placeholder="Select duration" />
                       </SelectTrigger>
                       <SelectContent>
@@ -293,19 +293,19 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
                     </Select>
                   </div>
 
-                  <div className="space-y-2 pt-2 border-t">
-                    <Label className="text-base font-semibold">Weekly Planning Strategy</Label>
-                    <div className="p-4 border rounded-xl bg-muted/20 space-y-1">
-                      <div className="font-medium text-sm text-foreground">Use My Skill Schedules</div>
-                      <p className="text-xs text-muted-foreground">
+                  <div className="space-y-1.5 pt-2 border-t">
+                    <Label className="text-sm font-semibold">Weekly Planning Strategy</Label>
+                    <div className="p-3.5 border rounded-xl bg-muted/20 space-y-1">
+                      <div className="font-medium text-xs sm:text-sm text-foreground">Use My Skill Schedules</div>
+                      <p className="text-[11px] sm:text-xs text-muted-foreground">
                         FocusFlow automatically schedules daily learning sessions based on your preferred practice days per skill.
                       </p>
                     </div>
                   </div>
                 </CardContent>
 
-                <CardFooter className="border-t pt-4 flex justify-end">
-                  <Button type="submit" disabled={isSavingPreferences} className="min-w-[140px]">
+                <CardFooter className="p-4 sm:p-6 border-t flex justify-end">
+                  <Button type="submit" disabled={isSavingPreferences} className="w-full sm:w-auto text-xs sm:text-sm">
                     {isSavingPreferences ? (
                       <><TrafficLoader size="sm" className="mr-2" /> Saving...</>
                     ) : (
@@ -317,23 +317,21 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
             </Card>
           )}
 
-
-
           {/* NOTIFICATIONS SECTION */}
           {activeTab === 'notifications' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="h-5 w-5 text-primary" /> Notifications
+            <Card className="min-w-0">
+              <CardHeader className="p-4 sm:p-6 pb-3">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" /> Notifications
                 </CardTitle>
-                <CardDescription>Manage practice reminders and alert preferences.</CardDescription>
+                <CardDescription className="text-xs sm:text-sm">Manage practice reminders and alert preferences.</CardDescription>
               </CardHeader>
 
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between p-4 border rounded-xl bg-card">
-                  <div className="space-y-0.5">
-                    <p className="font-medium text-sm">Daily Practice Reminders</p>
-                    <p className="text-xs text-muted-foreground">Receive reminders for scheduled learning sessions.</p>
+              <CardContent className="p-4 sm:p-6 pt-0 space-y-4 min-w-0">
+                <div className="flex items-center justify-between p-3.5 sm:p-4 border rounded-xl bg-card min-w-0 gap-3">
+                  <div className="space-y-0.5 min-w-0">
+                    <p className="font-medium text-xs sm:text-sm">Daily Practice Reminders</p>
+                    <p className="text-[11px] sm:text-xs text-muted-foreground">Receive reminders for scheduled learning sessions.</p>
                   </div>
                   <button
                     type="button"
@@ -356,8 +354,8 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
                 </div>
 
                 {practiceReminders && (
-                  <div className="space-y-2 p-4 border rounded-xl bg-muted/20">
-                    <Label htmlFor="reminderTime">Daily Reminder Time</Label>
+                  <div className="space-y-1.5 p-3.5 sm:p-4 border rounded-xl bg-muted/20 min-w-0">
+                    <Label htmlFor="reminderTime" className="text-xs sm:text-sm">Daily Reminder Time</Label>
                     <Input 
                       id="reminderTime" 
                       type="time" 
@@ -366,7 +364,7 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
                         setDailyReminderTime(e.target.value)
                         updatePreferences({ dailyReminderTime: e.target.value }).catch(console.error)
                       }} 
-                      className="w-[180px]"
+                      className="w-full sm:w-[180px] text-xs sm:text-sm"
                     />
                   </div>
                 )}
@@ -376,26 +374,26 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
 
           {/* DATA & PRIVACY SECTION */}
           {activeTab === 'data' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-emerald-500" /> Data & Privacy
+            <Card className="min-w-0">
+              <CardHeader className="p-4 sm:p-6 pb-3">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <ShieldCheck className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 shrink-0" /> Data & Privacy
                 </CardTitle>
-                <CardDescription>Your skills, learning sessions, notes, and expenses belong entirely to your account.</CardDescription>
+                <CardDescription className="text-xs sm:text-sm">Your skills, learning sessions, notes, and expenses belong entirely to your account.</CardDescription>
               </CardHeader>
 
-              <CardContent className="space-y-6">
-                <div className="p-4 border rounded-xl bg-muted/20 space-y-2">
-                  <p className="text-sm font-medium">Account Owner</p>
-                  <p className="text-xs text-muted-foreground">Signed in as: <span className="font-semibold text-foreground">{initialProfile.email}</span></p>
+              <CardContent className="p-4 sm:p-6 pt-0 space-y-4 min-w-0">
+                <div className="p-3.5 sm:p-4 border rounded-xl bg-muted/20 space-y-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium">Account Owner</p>
+                  <p className="text-xs text-muted-foreground truncate">Signed in as: <span className="font-semibold text-foreground">{initialProfile.email}</span></p>
                 </div>
 
-                <div className="space-y-3 pt-2">
-                  <h4 className="font-semibold text-sm">Export Data Backup</h4>
-                  <p className="text-xs text-muted-foreground">
+                <div className="space-y-2 pt-1 min-w-0">
+                  <h4 className="font-semibold text-xs sm:text-sm">Export Data Backup</h4>
+                  <p className="text-[11px] sm:text-xs text-muted-foreground">
                     Download a full copy of your skills, learning history, expenses, notes, and goals in standard JSON format.
                   </p>
-                  <Button onClick={handleExportData} disabled={isExporting} variant="outline" className="gap-2">
+                  <Button onClick={handleExportData} disabled={isExporting} variant="outline" className="gap-2 text-xs sm:text-sm w-full sm:w-auto">
                     {isExporting ? <TrafficLoader size="sm" /> : <Download className="h-4 w-4" />}
                     Export My Data (JSON)
                   </Button>
@@ -406,36 +404,36 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
 
           {/* DANGER ZONE SECTION */}
           {activeTab === 'danger' && (
-            <Card className="border-destructive/40 bg-destructive/5">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-destructive">
-                  <AlertTriangle className="h-5 w-5" /> Danger Zone
+            <Card className="border-destructive/40 bg-destructive/5 min-w-0">
+              <CardHeader className="p-4 sm:p-6 pb-3">
+                <CardTitle className="flex items-center gap-2 text-destructive text-base sm:text-lg">
+                  <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 shrink-0" /> Danger Zone
                 </CardTitle>
-                <CardDescription>Irreversible actions for your FocusFlow account.</CardDescription>
+                <CardDescription className="text-xs sm:text-sm">Irreversible actions for your FocusFlow account.</CardDescription>
               </CardHeader>
 
-              <CardContent className="space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-destructive/20 rounded-xl bg-card gap-4">
-                  <div>
-                    <p className="font-semibold text-sm">Sign Out of Account</p>
-                    <p className="text-xs text-muted-foreground">Sign out of your active session on this device.</p>
+              <CardContent className="p-4 sm:p-6 pt-0 space-y-4 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 border border-destructive/20 rounded-xl bg-card gap-3 min-w-0">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-xs sm:text-sm">Sign Out of Account</p>
+                    <p className="text-[11px] sm:text-xs text-muted-foreground">Sign out of your active session on this device.</p>
                   </div>
-                  <form action={signout}>
-                    <Button type="submit" variant="outline" className="gap-2 shrink-0">
+                  <form action={signout} className="w-full sm:w-auto">
+                    <Button type="submit" variant="outline" className="gap-2 text-xs sm:text-sm w-full sm:w-auto shrink-0">
                       <LogOut className="h-4 w-4" /> Sign Out
                     </Button>
                   </form>
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border border-destructive/30 rounded-xl bg-destructive/10 gap-4">
-                  <div>
-                    <p className="font-semibold text-sm text-destructive">Delete FocusFlow Account Data</p>
-                    <p className="text-xs text-muted-foreground">Permanently delete all skills, sessions, notes, expenses, and goals associated with your account.</p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 sm:p-4 border border-destructive/30 rounded-xl bg-destructive/10 gap-3 min-w-0">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-xs sm:text-sm text-destructive">Delete FocusFlow Account Data</p>
+                    <p className="text-[11px] sm:text-xs text-muted-foreground">Permanently delete all skills, sessions, notes, expenses, and goals associated with your account.</p>
                   </div>
                   <Button 
                     variant="destructive" 
                     onClick={() => setIsDeleteModalOpen(true)}
-                    className="shrink-0"
+                    className="text-xs sm:text-sm w-full sm:w-auto shrink-0"
                   >
                     Delete Account Data
                   </Button>
@@ -450,14 +448,14 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
       {/* Change Password Dialog */}
       {isPasswordModalOpen && (
         <Dialog open={isPasswordModalOpen} onOpenChange={setIsPasswordModalOpen}>
-          <DialogContent className="sm:max-w-[400px]">
+          <DialogContent className="sm:max-w-[400px] p-4 sm:p-6">
             <DialogHeader>
-              <DialogTitle>Change Password</DialogTitle>
+              <DialogTitle className="text-base sm:text-lg">Change Password</DialogTitle>
             </DialogHeader>
 
-            <form onSubmit={handleChangePasswordSubmit} className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
+            <form onSubmit={handleChangePasswordSubmit} className="space-y-4 py-2 min-w-0">
+              <div className="space-y-1.5 min-w-0">
+                <Label htmlFor="newPassword" className="text-xs sm:text-sm">New Password</Label>
                 <Input 
                   id="newPassword" 
                   type="password" 
@@ -465,11 +463,12 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
                   onChange={e => setNewPassword(e.target.value)} 
                   minLength={6} 
                   required 
+                  className="text-xs sm:text-sm"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <div className="space-y-1.5 min-w-0">
+                <Label htmlFor="confirmPassword" className="text-xs sm:text-sm">Confirm New Password</Label>
                 <Input 
                   id="confirmPassword" 
                   type="password" 
@@ -477,14 +476,15 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
                   onChange={e => setConfirmPassword(e.target.value)} 
                   minLength={6} 
                   required 
+                  className="text-xs sm:text-sm"
                 />
               </div>
 
-              <DialogFooter className="pt-4">
-                <Button type="button" variant="outline" onClick={() => setIsPasswordModalOpen(false)} disabled={isChangingPassword}>
+              <DialogFooter className="pt-2 gap-2 flex flex-row justify-end">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsPasswordModalOpen(false)} disabled={isChangingPassword} className="text-xs">
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isChangingPassword || !newPassword || newPassword !== confirmPassword}>
+                <Button type="submit" size="sm" disabled={isChangingPassword || !newPassword || newPassword !== confirmPassword} className="text-xs">
                   {isChangingPassword ? <TrafficLoader size="sm" className="mr-2" /> : 'Update Password'}
                 </Button>
               </DialogFooter>
@@ -496,37 +496,40 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
       {/* Delete Account Confirmation Dialog */}
       {isDeleteModalOpen && (
         <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
-          <DialogContent className="sm:max-w-[425px]">
+          <DialogContent className="sm:max-w-[425px] p-4 sm:p-6">
             <DialogHeader>
-              <DialogTitle className="text-destructive flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5" /> Permanently Delete Data
+              <DialogTitle className="text-destructive flex items-center gap-2 text-base sm:text-lg">
+                <AlertTriangle className="h-5 w-5 shrink-0" /> Permanently Delete Data
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-4 text-sm">
+            <div className="space-y-3 py-2 text-xs sm:text-sm min-w-0">
               <p className="text-muted-foreground">
                 This action <strong className="text-foreground">cannot be undone</strong>. All your tracked skills, practice sessions, financial expenses, notes, and goals will be permanently deleted.
               </p>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirmDelete">Type <strong className="text-destructive font-mono">DELETE</strong> to confirm:</Label>
+              <div className="space-y-1.5 min-w-0">
+                <Label htmlFor="confirmDelete" className="text-xs sm:text-sm">Type <strong className="text-destructive font-mono">DELETE</strong> to confirm:</Label>
                 <Input 
                   id="confirmDelete" 
                   value={deleteConfirmation} 
                   onChange={e => setDeleteConfirmation(e.target.value)} 
                   placeholder="DELETE" 
+                  className="text-xs sm:text-sm"
                 />
               </div>
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDeleteModalOpen(false)} disabled={isDeletingAccount}>
+            <DialogFooter className="gap-2 flex flex-row justify-end pt-2">
+              <Button variant="outline" size="sm" onClick={() => setIsDeleteModalOpen(false)} disabled={isDeletingAccount} className="text-xs">
                 Cancel
               </Button>
               <Button 
                 variant="destructive" 
+                size="sm"
                 onClick={handleDeleteAccountSubmit} 
                 disabled={isDeletingAccount || deleteConfirmation !== 'DELETE'}
+                className="text-xs"
               >
                 {isDeletingAccount ? <TrafficLoader size="sm" className="mr-2" /> : 'Delete Everything'}
               </Button>

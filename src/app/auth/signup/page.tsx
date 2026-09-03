@@ -58,7 +58,7 @@ export default function SignUp() {
               Verify your email to continue to FocusFlow. Once verified, you will be automatically redirected to your dashboard.
             </p>
           </CardContent>
-          <CardFooter className="flex flex-col gap-2 border-t p-6">
+          <CardFooter className="flex flex-col gap-4 border-t p-6">
             <a 
               href={`mailto:${submittedEmail}`}
               target="_blank"
@@ -91,7 +91,7 @@ export default function SignUp() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form action="#" method="POST" onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="full_name">Full Name</Label>
               <Input 

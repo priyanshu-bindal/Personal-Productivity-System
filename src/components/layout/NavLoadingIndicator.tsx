@@ -9,28 +9,47 @@ function NavLoadingContent() {
   const searchParams = useSearchParams()
   const [isVisible, setIsVisible] = useState(false)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-
-  const startLoading = (delay = 120) => {
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => {
-      setIsVisible(true)
-    }, delay)
-  }
+  const maxTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const stopLoading = () => {
     if (timerRef.current) {
       clearTimeout(timerRef.current)
       timerRef.current = null
     }
+    if (maxTimeoutRef.current) {
+      clearTimeout(maxTimeoutRef.current)
+      maxTimeoutRef.current = null
+    }
     setIsVisible(false)
   }
 
-  // Hide loader as soon as pathname or searchParams change
+  const startLoading = (delay = 120) => {
+    stopLoading()
+
+    // 1. Show loader after short debounce delay
+    timerRef.current = setTimeout(() => {
+      setIsVisible(true)
+    }, delay)
+
+    // 2. Safety Fallback: Force stop loader after 3.5s to prevent infinite spinning
+    maxTimeoutRef.current = setTimeout(() => {
+      stopLoading()
+    }, 3500)
+  }
+
+  // Always stop loader whenever pathname or searchParams change
   useEffect(() => {
     stopLoading()
   }, [pathname, searchParams])
 
-  // Listen to clicks on internal <a> links to show loader on route / tab navigation
+  // Stop loader if user is on an auth route
+  useEffect(() => {
+    if (pathname?.startsWith('/auth')) {
+      stopLoading()
+    }
+  }, [pathname])
+
+  // Listen to link clicks
   useEffect(() => {
     const handleAnchorClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null
@@ -51,7 +70,12 @@ function NavLoadingContent() {
         !e.altKey
       ) {
         const currentPath = window.location.pathname
-        
+
+        // Do not trigger the global traffic loader for links clicked from auth pages (/auth/signin, /auth/signup)
+        if (currentPath.startsWith('/auth')) {
+          return
+        }
+
         // Show traffic loader when navigating to any different route or tab
         if (href !== currentPath && !href.startsWith(currentPath + '#')) {
           startLoading(120)
@@ -59,29 +83,33 @@ function NavLoadingContent() {
       }
     }
 
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        startLoading(100)
-      } else {
-        stopLoading()
-      }
+    const handlePopState = () => {
+      stopLoading()
+    }
+
+    const handlePageShow = () => {
+      stopLoading()
     }
 
     document.addEventListener('click', handleAnchorClick, { capture: true })
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('popstate', handlePopState)
+    window.addEventListener('pageshow', handlePageShow)
 
     return () => {
       document.removeEventListener('click', handleAnchorClick, { capture: true })
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-      if (timerRef.current) clearTimeout(timerRef.current)
+      window.removeEventListener('popstate', handlePopState)
+      window.removeEventListener('pageshow', handlePageShow)
+      stopLoading()
     }
   }, [])
+
+  const isAuthPage = pathname?.startsWith('/auth')
 
   return (
     <div
       aria-live="polite"
       aria-busy={isVisible}
-      className={`fixed inset-0 md:left-64 z-50 flex items-center justify-center pb-[20vh] bg-background/60 backdrop-blur-xs pointer-events-none transition-opacity duration-200 ease-in-out ${
+      className={`fixed inset-0 ${isAuthPage ? '' : 'md:left-64'} z-50 flex items-center justify-center pb-[20vh] bg-background/60 backdrop-blur-xs pointer-events-none transition-opacity duration-200 ease-in-out ${
         isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}
     >
