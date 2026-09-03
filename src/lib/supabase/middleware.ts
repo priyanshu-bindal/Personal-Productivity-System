@@ -6,21 +6,34 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
-  const isAuthRoute = request.nextUrl.pathname.startsWith('/auth') || request.nextUrl.pathname.startsWith('/api/auth')
+  const { pathname } = request.nextUrl
+  const isAuthRoute = pathname.startsWith('/auth') || pathname.startsWith('/api/auth')
   const allCookies = request.cookies.getAll()
-  const hasAuthCookie = allCookies.some(c => c.name.includes('sb-') || c.name.includes('auth-token'))
+  const hasAuthCookie = allCookies.some(c => 
+    c.name.includes('sb-') || 
+    c.name.includes('auth-token') || 
+    c.name.includes('supabase')
+  )
 
-  // Fast-path: Unauthenticated visitor accessing /auth/signin or /auth/signup requires no HTTPS user lookup
+  // Fast-path 1: Unauthenticated user accessing auth route -> Allow through instantly
   if (isAuthRoute && !hasAuthCookie) {
     return supabaseResponse
   }
 
-  // Fast-path: If user has an auth cookie and is accessing a protected route, skip the blocking `getUser()` 
-  // network call in middleware. We rely on the Server Components to securely validate the session.
-  if (hasAuthCookie && !isAuthRoute) {
+  // Fast-path 2: Unauthenticated user accessing protected route -> Redirect to signin instantly (<10ms)
+  if (!isAuthRoute && !hasAuthCookie) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/signin'
+    return NextResponse.redirect(url)
+  }
+
+  // Fast-path 3: Authenticated user accessing protected route -> Allow through instantly
+  // Server components handle user identity verification via React cache(getCurrentUser)
+  if (!isAuthRoute && hasAuthCookie) {
     return supabaseResponse
   }
 
+  // Only run network getUser() lookup if user has auth cookie AND is visiting /auth/signin or /auth/signup
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -30,7 +43,7 @@ export async function updateSession(request: NextRequest) {
           return allCookies
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({
             request,
           })
@@ -42,19 +55,11 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Verify and refresh session securely with Supabase Auth (Fallback for auth routes)
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user && !isAuthRoute) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth/signin'
-    return NextResponse.redirect(url)
-  }
-
-  // If user is already signed in and accesses /auth/signin or /auth/signup, redirect to /
-  if (user && isAuthRoute && !request.nextUrl.pathname.startsWith('/api/auth')) {
+  if (user && isAuthRoute && !pathname.startsWith('/api/auth')) {
     const url = request.nextUrl.clone()
     url.pathname = '/'
     return NextResponse.redirect(url)

@@ -91,11 +91,13 @@ function SignInContent() {
   )
 }
 
+import { TrafficLoader } from "@/components/ui/traffic-loader"
+
 export default function SignIn() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-muted/40 p-4">
-        <div className="animate-pulse h-8 w-32 bg-muted rounded"></div>
+        <TrafficLoader size="md" />
       </div>
     }>
       <SignInContent />

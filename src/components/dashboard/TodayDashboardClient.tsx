@@ -10,6 +10,7 @@ import { format } from 'date-fns'
 import Link from 'next/link'
 import { SkillModal } from '@/components/skills/SkillModal'
 import { motion, AnimatePresence } from 'framer-motion'
+import { TrafficLoader } from '@/components/ui/traffic-loader'
 
 export function TodayDashboardClient({ 
   todaySessions, 
@@ -193,7 +194,7 @@ export function TodayDashboardClient({
                                   disabled={isActionLoading}
                                 >
                                   {isActionLoading ? (
-                                    <><Loader2 className="h-4 w-4 animate-spin" /> Completing...</>
+                                    <><TrafficLoader size="sm" /> Completing...</>
                                   ) : (
                                     <><CheckCircle2 className="h-4 w-4" /> Complete Session</>
                                   )}

@@ -16,10 +16,10 @@ import {
   XCircle, 
   Clock, 
   Plus, 
-  Loader2, 
   ArrowRight,
   BookOpen
 } from 'lucide-react'
+import { TrafficLoader } from '@/components/ui/traffic-loader'
 import { 
   format, 
   addWeeks, 
@@ -464,7 +464,7 @@ export function CalendarClient({ initialSessions = [] }: { initialSessions?: Ses
                         disabled={isPending || loadingSessionId === selectedSession.id}
                       >
                         {loadingSessionId === selectedSession.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <TrafficLoader size="sm" />
                         ) : (
                           <>
                             <CheckCircle2 className="h-4 w-4" /> Complete
@@ -501,7 +501,7 @@ export function CalendarClient({ initialSessions = [] }: { initialSessions?: Ses
                     Back
                   </Button>
                   <Button type="submit" size="sm" disabled={isPending}>
-                    {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : 'Confirm Reschedule'}
+                    {isPending ? <TrafficLoader size="sm" className="mr-1" /> : 'Confirm Reschedule'}
                   </Button>
                 </DialogFooter>
               </form>

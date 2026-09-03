@@ -11,7 +11,8 @@ import { SkillModal } from '@/components/skills/SkillModal'
 import { completeLearningSession, deleteSkill, getSkillHistory, addLearningSession } from '@/lib/actions'
 import { useToast } from '@/components/ui/toast-provider'
 import * as Icons from "lucide-react"
-import { MoreVertical, Edit, CheckCircle2, Trash2, Plus, Calendar, Clock, Flame, History, Loader2, TrendingUp } from 'lucide-react'
+import { MoreVertical, Edit, CheckCircle2, Trash2, Plus, Calendar, Clock, Flame, History, TrendingUp } from 'lucide-react'
+import { TrafficLoader } from '@/components/ui/traffic-loader'
 import { format, isThisWeek, isThisMonth } from 'date-fns'
 
 export function SkillsClient({ initialSkills }: { initialSkills: any[] }) {
@@ -184,7 +185,7 @@ export function SkillsClient({ initialSkills }: { initialSkills: any[] }) {
                           disabled={isPending || loadingSessionIds.has(todaySession.id)}
                         >
                           {loadingSessionIds.has(todaySession.id) ? (
-                            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> ...</>
+                            <><TrafficLoader size="sm" /> ...</>
                           ) : (
                             <><CheckCircle2 className="h-3.5 w-3.5" /> Complete</>
                           )}
@@ -203,7 +204,7 @@ export function SkillsClient({ initialSkills }: { initialSkills: any[] }) {
                           disabled={isPending || loadingSessionIds.has(skill.id)}
                         >
                           {loadingSessionIds.has(skill.id) ? (
-                            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> ...</>
+                            <><TrafficLoader size="sm" /> ...</>
                           ) : (
                             <><CheckCircle2 className="h-3.5 w-3.5" /> Log Practice</>
                           )}
@@ -315,8 +316,8 @@ export function SkillsClient({ initialSkills }: { initialSkills: any[] }) {
 
             <div className="space-y-3 py-2">
               {isLoadingHistory ? (
-                <div className="py-8 text-center text-muted-foreground animate-pulse">
-                  Loading session history...
+                <div className="py-8 flex justify-center items-center">
+                  <TrafficLoader size="sm" />
                 </div>
               ) : filteredHistory.length === 0 ? (
                 <div className="py-8 text-center text-muted-foreground border border-dashed rounded-xl">

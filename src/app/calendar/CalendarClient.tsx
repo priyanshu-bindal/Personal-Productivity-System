@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Plus, CheckCircle2, Clock } from "lucide-react"
 import { CreateTaskModal } from "@/components/tasks/TaskModals"
+import { TrafficLoader } from "@/components/ui/traffic-loader"
 
 export default function CalendarClient() {
   const [date, setDate] = useState<Date | undefined>(new Date())
@@ -76,8 +77,8 @@ export default function CalendarClient() {
             
             <div className="space-y-3 flex-1">
               {isLoading ? (
-                <div className="py-12 text-center text-muted-foreground animate-pulse">
-                  Loading tasks...
+                <div className="py-12 flex justify-center items-center">
+                  <TrafficLoader size="sm" />
                 </div>
               ) : selectedDateTasks.length === 0 ? (
                 <div className="py-12 text-center text-muted-foreground border border-dashed rounded-xl">

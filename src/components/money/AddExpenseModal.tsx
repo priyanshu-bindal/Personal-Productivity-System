@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { addExpense } from '@/lib/money-actions'
 import { format } from 'date-fns'
 import { useToast } from '@/components/ui/toast-provider'
-import { Loader2 } from 'lucide-react'
+import { TrafficLoader } from '@/components/ui/traffic-loader'
 
 interface AddExpenseModalProps {
   isOpen: boolean
@@ -137,7 +137,7 @@ export function AddExpenseModal({ isOpen, onClose }: AddExpenseModalProps) {
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
             <Button type="submit" disabled={isLoading || !amount || !description.trim()} className="min-w-[120px]">
               {isLoading ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...</>
+                <><TrafficLoader size="sm" className="mr-2" /> Adding...</>
               ) : (
                 'Save Expense'
               )}

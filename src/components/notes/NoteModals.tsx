@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createNote, updateNote } from '@/lib/actions'
 import { useToast } from '@/components/ui/toast-provider'
-import { Loader2 } from 'lucide-react'
+import { TrafficLoader } from '@/components/ui/traffic-loader'
 
 interface NoteModalProps {
   isOpen: boolean
@@ -96,7 +96,7 @@ export function CreateNoteModal({ isOpen, onClose, skills }: NoteModalProps) {
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
             <Button type="submit" disabled={isLoading || !title.trim() || !content.trim()} className="min-w-[110px]">
               {isLoading ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+                <><TrafficLoader size="sm" className="mr-2" /> Saving...</>
               ) : (
                 'Save Note'
               )}
@@ -193,7 +193,7 @@ export function EditNoteModal({ note, isOpen, onClose, skills }: { note: any, is
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
             <Button type="submit" disabled={isLoading || !title.trim() || !content.trim()} className="min-w-[120px]">
               {isLoading ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+                <><TrafficLoader size="sm" className="mr-2" /> Saving...</>
               ) : (
                 'Save Changes'
               )}

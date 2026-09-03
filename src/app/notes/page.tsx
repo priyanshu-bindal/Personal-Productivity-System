@@ -25,9 +25,11 @@ async function NotesContent() {
   )
 }
 
+import { TrafficLoader } from "@/components/ui/traffic-loader"
+
 export default function NotesPage() {
   return (
-    <Suspense fallback={<div className="p-10 flex justify-center"><div className="animate-pulse h-8 w-32 bg-muted rounded"></div></div>}>
+    <Suspense fallback={<div className="p-10 flex justify-center items-center min-h-[40vh]"><TrafficLoader size="md" /></div>}>
       <NotesContent />
     </Suspense>
   )

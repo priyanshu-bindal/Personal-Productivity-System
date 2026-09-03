@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createSkill, updateSkill } from '@/lib/actions'
 import { useToast } from '@/components/ui/toast-provider'
-import { Loader2 } from 'lucide-react'
+import { TrafficLoader } from '@/components/ui/traffic-loader'
 
 const CATEGORIES = ["Programming", "Computer Science", "Communication", "Personal Development", "Career", "Other"]
 const LEVELS = ["Beginner", "Intermediate", "Advanced"]
@@ -171,7 +171,7 @@ export function SkillModal({ isOpen, onClose, skill }: SkillModalProps) {
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
             <Button type="submit" disabled={isLoading || !name.trim()} className="min-w-[120px]">
               {isLoading ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...</>
+                <><TrafficLoader size="sm" className="mr-2" /> {skill ? 'Saving...' : 'Adding...'}</>
               ) : (
                 skill ? 'Save Changes' : 'Create Skill'
               )}

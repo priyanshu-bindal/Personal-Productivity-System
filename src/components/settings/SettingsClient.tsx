@@ -17,9 +17,9 @@ import {
   LogOut, 
   AlertTriangle, 
   KeyRound, 
-  Loader2, 
   CheckCircle2
 } from 'lucide-react'
+import { TrafficLoader } from '@/components/ui/traffic-loader'
 import { 
   updateProfile, 
   updatePreferences, 
@@ -255,7 +255,7 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
 
                   <Button type="submit" disabled={isSavingAccount} className="min-w-[130px]">
                     {isSavingAccount ? (
-                      <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+                      <><TrafficLoader size="sm" className="mr-2" /> Saving...</>
                     ) : (
                       'Save Changes'
                     )}
@@ -307,7 +307,7 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
                 <CardFooter className="border-t pt-4 flex justify-end">
                   <Button type="submit" disabled={isSavingPreferences} className="min-w-[140px]">
                     {isSavingPreferences ? (
-                      <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+                      <><TrafficLoader size="sm" className="mr-2" /> Saving...</>
                     ) : (
                       'Save Preferences'
                     )}
@@ -396,7 +396,7 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
                     Download a full copy of your skills, learning history, expenses, notes, and goals in standard JSON format.
                   </p>
                   <Button onClick={handleExportData} disabled={isExporting} variant="outline" className="gap-2">
-                    {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    {isExporting ? <TrafficLoader size="sm" /> : <Download className="h-4 w-4" />}
                     Export My Data (JSON)
                   </Button>
                 </div>
@@ -485,7 +485,7 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
                   Cancel
                 </Button>
                 <Button type="submit" disabled={isChangingPassword || !newPassword || newPassword !== confirmPassword}>
-                  {isChangingPassword ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Update Password'}
+                  {isChangingPassword ? <TrafficLoader size="sm" className="mr-2" /> : 'Update Password'}
                 </Button>
               </DialogFooter>
             </form>
@@ -528,7 +528,7 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
                 onClick={handleDeleteAccountSubmit} 
                 disabled={isDeletingAccount || deleteConfirmation !== 'DELETE'}
               >
-                {isDeletingAccount ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 'Delete Everything'}
+                {isDeletingAccount ? <TrafficLoader size="sm" className="mr-2" /> : 'Delete Everything'}
               </Button>
             </DialogFooter>
           </DialogContent>

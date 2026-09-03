@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { createGoal, updateGoal } from '@/lib/actions'
 import { format } from 'date-fns'
 import { useToast } from '@/components/ui/toast-provider'
-import { Loader2 } from 'lucide-react'
+import { TrafficLoader } from '@/components/ui/traffic-loader'
 
 interface CreateGoalModalProps {
   isOpen: boolean
@@ -69,7 +69,7 @@ export function CreateGoalModal({ isOpen, onClose }: CreateGoalModalProps) {
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
             <Button type="submit" disabled={isLoading || !title.trim()} className="min-w-[110px]">
               {isLoading ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Adding...</>
+                <><TrafficLoader size="sm" className="mr-2" /> Adding...</>
               ) : (
                 'Save Goal'
               )}
@@ -132,7 +132,7 @@ export function EditGoalModal({ goal, isOpen, onClose }: { goal: any, isOpen: bo
             <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>Cancel</Button>
             <Button type="submit" disabled={isLoading || !title.trim()} className="min-w-[120px]">
               {isLoading ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Saving...</>
+                <><TrafficLoader size="sm" className="mr-2" /> Saving...</>
               ) : (
                 'Save Changes'
               )}

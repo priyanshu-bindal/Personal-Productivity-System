@@ -211,10 +211,12 @@ async function SkillDetailsContent({ id }: { id: string }) {
   )
 }
 
+import { TrafficLoader } from "@/components/ui/traffic-loader"
+
 export default async function SkillDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   return (
-    <Suspense fallback={<div className="p-10 flex justify-center"><div className="animate-pulse h-8 w-32 bg-muted rounded"></div></div>}>
+    <Suspense fallback={<div className="p-10 flex justify-center items-center min-h-[40vh]"><TrafficLoader size="md" /></div>}>
       <SkillDetailsContent id={id} />
     </Suspense>
   )

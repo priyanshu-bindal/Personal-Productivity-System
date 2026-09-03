@@ -1,20 +1,36 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, Suspense } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { TrafficLoader } from '@/components/ui/traffic-loader'
 
 function NavLoadingContent() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const [isNavigating, setIsNavigating] = useState(false)
+  const [isVisible, setIsVisible] = useState(false)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Hide loader as soon as pathname or searchParams change (page finished loading)
+  const startLoading = (delay = 120) => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => {
+      setIsVisible(true)
+    }, delay)
+  }
+
+  const stopLoading = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+    setIsVisible(false)
+  }
+
+  // Hide loader as soon as pathname or searchParams change
   useEffect(() => {
-    setIsNavigating(false)
+    stopLoading()
   }, [pathname, searchParams])
 
-  // Listen to clicks on internal <a> links to show loader immediately
+  // Listen to clicks on internal <a> links to show loader on route / tab navigation
   useEffect(() => {
     const handleAnchorClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement | null
@@ -35,32 +51,41 @@ function NavLoadingContent() {
         !e.altKey
       ) {
         const currentPath = window.location.pathname
+        
+        // Show traffic loader when navigating to any different route or tab
         if (href !== currentPath && !href.startsWith(currentPath + '#')) {
-          setIsNavigating(true)
+          startLoading(120)
         }
       }
     }
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        startLoading(100)
+      } else {
+        stopLoading()
+      }
+    }
+
     document.addEventListener('click', handleAnchorClick, { capture: true })
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     return () => {
       document.removeEventListener('click', handleAnchorClick, { capture: true })
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      if (timerRef.current) clearTimeout(timerRef.current)
     }
   }, [])
 
   return (
     <div
       aria-live="polite"
-      aria-busy={isNavigating}
-      className={`fixed top-4 left-1/2 -translate-x-1/2 z-[60] pointer-events-none transition-all duration-200 ease-in-out ${
-        isNavigating 
-          ? 'opacity-100 translate-y-0 scale-100' 
-          : 'opacity-0 -translate-y-2 scale-95'
+      aria-busy={isVisible}
+      className={`fixed inset-0 md:left-64 z-50 flex items-center justify-center pb-[20vh] bg-background/60 backdrop-blur-xs pointer-events-none transition-opacity duration-200 ease-in-out ${
+        isVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
       }`}
     >
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/95 border shadow-md backdrop-blur-md text-foreground">
-        <Loader2 className="w-4 h-4 text-primary animate-[spin_0.7s_linear_infinite] motion-reduce:animate-none shrink-0" />
-        <span className="text-xs font-medium text-muted-foreground">Loading...</span>
-      </div>
+      <TrafficLoader size="md" />
     </div>
   )
 }
