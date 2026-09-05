@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/widgets/lottie_fire.dart';
 import '../../providers/sessions_provider.dart';
 import '../../providers/streak_provider.dart';
 
@@ -50,13 +51,13 @@ class StreakDetailsSheet extends ConsumerWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: const Color(0xFF2A1A00),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFF3D2800)),
                 ),
-                child: const Text('🔥', style: TextStyle(fontSize: 22)),
+                child: const LottieFire(size: 32),
               ),
               const SizedBox(width: 14),
               Column(

@@ -23,6 +23,8 @@ const CategoryIcons: Record<string, any> = {
   'Other': HelpCircle
 }
 
+import { MoneyEmptyState } from './MoneyEmptyState'
+
 export function ExpenseList({ expenses, showDate = false }: { expenses: any[], showDate?: boolean }) {
   const [isPending, startTransition] = useTransition()
 
@@ -36,9 +38,14 @@ export function ExpenseList({ expenses, showDate = false }: { expenses: any[], s
 
   if (expenses.length === 0) {
     return (
-      <div className="py-8 text-center text-muted-foreground border border-dashed rounded-xl bg-card">
-        No expenses found for this period.
-      </div>
+      <MoneyEmptyState
+        iconName="Receipt"
+        title="No expenses logged yet"
+        description="Log your spending to keep track of your personal budget."
+        accentColor="green"
+        minHeight="h-[200px]"
+        showGrid={false}
+      />
     )
   }
 

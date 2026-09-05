@@ -1,12 +1,21 @@
 'use client'
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from "recharts"
+import { MoneyEmptyState } from "./MoneyEmptyState"
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#64748b']
 
 export function DailySpendingChart({ data }: { data: { date: string, amount: number }[] }) {
   if (!data || data.length === 0) {
-    return <div className="h-[220px] sm:h-[250px] flex items-center justify-center text-xs sm:text-sm text-muted-foreground">No data available</div>
+    return (
+      <MoneyEmptyState
+        iconName="BarChart3"
+        title="No spending data yet"
+        description="Start tracking your expenses to see your daily spending trends."
+        accentColor="green"
+        minHeight="h-[220px] sm:h-[250px]"
+      />
+    )
   }
 
   // Format the dates for the X-axis
@@ -44,7 +53,15 @@ export function DailySpendingChart({ data }: { data: { date: string, amount: num
 
 export function CategoryPieChart({ data }: { data: { category: string, amount: number, percentage: number }[] }) {
   if (!data || data.length === 0) {
-    return <div className="h-[220px] sm:h-[250px] flex items-center justify-center text-xs sm:text-sm text-muted-foreground">No data available</div>
+    return (
+      <MoneyEmptyState
+        iconName="PieChart"
+        title="Your spending breakdown will appear here"
+        description="Add your first expense and we'll automatically organize your spending by category."
+        accentColor="blue"
+        minHeight="h-[220px] sm:h-[250px]"
+      />
+    )
   }
 
   return (

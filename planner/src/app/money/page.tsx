@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { IndianRupee, TrendingUp, Calendar, CreditCard, ArrowUpRight, ArrowDownRight } from 'lucide-react'
 import { ExpenseList } from '@/components/money/ExpenseList'
 import { DailySpendingChart, CategoryPieChart } from '@/components/money/SpendingCharts'
+import { MoneyEmptyState } from '@/components/money/MoneyEmptyState'
 import { format } from 'date-fns'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
@@ -117,28 +118,42 @@ export default async function MoneyDashboard() {
               <CardDescription className="text-xs sm:text-sm">Top spending categories this month.</CardDescription>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 flex flex-col md:flex-row items-center gap-6 sm:gap-8">
-              <div className="w-full md:w-1/2 min-w-0">
-                <CategoryPieChart data={summary.categoryBreakdown.slice(0, 5)} />
-              </div>
-              <div className="w-full md:w-1/2 space-y-3 sm:space-y-4 min-w-0">
-                {summary.categoryBreakdown.slice(0, 5).map((cat, i) => (
-                  <div key={cat.category} className="space-y-1 min-w-0">
-                    <div className="flex justify-between text-xs sm:text-sm font-medium min-w-0">
-                      <span className="truncate">{i + 1}. {cat.category}</span>
-                      <span className="shrink-0 ml-2">₹{f(cat.amount)}</span>
-                    </div>
-                    <div className="flex justify-between text-[11px] sm:text-xs text-muted-foreground">
-                      <span>{cat.percentage}%</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary" 
-                        style={{ width: `${cat.percentage}%` }}
-                      />
-                    </div>
+              {summary.categoryBreakdown.length === 0 ? (
+                <div className="w-full">
+                  <MoneyEmptyState
+                    iconName="PieChart"
+                    title="Your spending breakdown will appear here"
+                    description="Add your first expense and we'll automatically organize your spending by category."
+                    accentColor="blue"
+                    minHeight="h-[200px]"
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="w-full md:w-1/2 min-w-0">
+                    <CategoryPieChart data={summary.categoryBreakdown.slice(0, 5)} />
                   </div>
-                ))}
-              </div>
+                  <div className="w-full md:w-1/2 space-y-3 sm:space-y-4 min-w-0">
+                    {summary.categoryBreakdown.slice(0, 5).map((cat, i) => (
+                      <div key={cat.category} className="space-y-1 min-w-0">
+                        <div className="flex justify-between text-xs sm:text-sm font-medium min-w-0">
+                          <span className="truncate">{i + 1}. {cat.category}</span>
+                          <span className="shrink-0 ml-2">₹{f(cat.amount)}</span>
+                        </div>
+                        <div className="flex justify-between text-[11px] sm:text-xs text-muted-foreground">
+                          <span>{cat.percentage}%</span>
+                        </div>
+                        <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary" 
+                            style={{ width: `${cat.percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -162,9 +177,14 @@ export default async function MoneyDashboard() {
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0 sm:pt-0">
               {summary.todayExpenses.length === 0 ? (
-                <div className="py-6 text-center text-xs sm:text-sm text-muted-foreground">
-                  No expenses recorded today.
-                </div>
+                <MoneyEmptyState
+                  iconName="Receipt"
+                  title="No expenses logged today"
+                  description="Log your spending to keep track of your daily budget."
+                  accentColor="green"
+                  minHeight="h-[140px]"
+                  showGrid={false}
+                />
               ) : (
                 <ExpenseList expenses={summary.todayExpenses} showDate={false} />
               )}
@@ -177,37 +197,43 @@ export default async function MoneyDashboard() {
               <CardTitle className="text-base font-semibold">Spending Insights</CardTitle>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
-              <ul className="space-y-2.5 text-xs sm:text-sm">
-                {summary.highestCategory.amount > 0 && (
-                  <li className="flex gap-2">
-                    <span className="text-primary shrink-0 mt-0.5">•</span>
-                    <span>You spent the most on <span className="font-medium">{summary.highestCategory.name}</span> this month.</span>
-                  </li>
-                )}
-                {summary.monthComparisonPct !== null && summary.monthComparisonPct !== 0 && (
-                  <li className="flex gap-2">
-                    <span className="text-primary shrink-0 mt-0.5">•</span>
-                    <span>Your spending {summary.monthComparisonPct > 0 ? 'increased' : 'decreased'} by <span className="font-medium">{Math.abs(summary.monthComparisonPct).toFixed(1)}%</span> compared with last month.</span>
-                  </li>
-                )}
-                {summary.highestDay.amount > 0 && (
-                  <li className="flex gap-2">
-                    <span className="text-primary shrink-0 mt-0.5">•</span>
-                    <span>Your highest spending day was <span className="font-medium">{format(new Date(summary.highestDay.date), 'MMMM do')}</span>.</span>
-                  </li>
-                )}
-                {summary.todayExpenses.length === 0 && summary.monthExpenses.length > 0 && (
-                  <li className="flex gap-2">
-                    <span className="text-emerald-500 shrink-0 mt-0.5">•</span>
-                    <span>You haven&apos;t spent any money today. Great job!</span>
-                  </li>
-                )}
-                {summary.monthExpenses.length === 0 && (
-                  <li className="flex gap-2 text-muted-foreground">
-                    Start tracking your expenses to see insights here.
-                  </li>
-                )}
-              </ul>
+              {summary.monthExpenses.length === 0 ? (
+                <MoneyEmptyState
+                  iconName="Sparkles"
+                  title="Insights are waiting for your data"
+                  description="Track a few expenses to unlock personalized spending insights."
+                  accentColor="amber"
+                  minHeight="h-[160px]"
+                  showGrid={false}
+                />
+              ) : (
+                <ul className="space-y-2.5 text-xs sm:text-sm">
+                  {summary.highestCategory.amount > 0 && (
+                    <li className="flex gap-2">
+                      <span className="text-primary shrink-0 mt-0.5">•</span>
+                      <span>You spent the most on <span className="font-medium">{summary.highestCategory.name}</span> this month.</span>
+                    </li>
+                  )}
+                  {summary.monthComparisonPct !== null && summary.monthComparisonPct !== 0 && (
+                    <li className="flex gap-2">
+                      <span className="text-primary shrink-0 mt-0.5">•</span>
+                      <span>Your spending {summary.monthComparisonPct > 0 ? 'increased' : 'decreased'} by <span className="font-medium">{Math.abs(summary.monthComparisonPct).toFixed(1)}%</span> compared with last month.</span>
+                    </li>
+                  )}
+                  {summary.highestDay.amount > 0 && (
+                    <li className="flex gap-2">
+                      <span className="text-primary shrink-0 mt-0.5">•</span>
+                      <span>Your highest spending day was <span className="font-medium">{format(new Date(summary.highestDay.date), 'MMMM do')}</span>.</span>
+                    </li>
+                  )}
+                  {summary.todayExpenses.length === 0 && summary.monthExpenses.length > 0 && (
+                    <li className="flex gap-2">
+                      <span className="text-emerald-500 shrink-0 mt-0.5">•</span>
+                      <span>You haven&apos;t spent any money today. Great job!</span>
+                    </li>
+                  )}
+                </ul>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -70,8 +70,8 @@ class StreakScreen extends ConsumerWidget {
 
                       // Soft radial gradient behind the Lottie fire
                       Container(
-                        width: 170,
-                        height: 170,
+                        width: 190,
+                        height: 190,
                         decoration: const BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
@@ -84,7 +84,7 @@ class StreakScreen extends ConsumerWidget {
                           ),
                         ),
                         child: const Center(
-                          child: LottieFire(size: 130),
+                          child: LottieFire(size: 160),
                         ),
                       )
                           .animate()

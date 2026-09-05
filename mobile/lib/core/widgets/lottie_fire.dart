@@ -1,104 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
-class LottieFire extends StatefulWidget {
+class LottieFire extends StatelessWidget {
   final double size;
   final AnimationController? controller;
+  final bool repeat;
+  final bool animate;
 
   const LottieFire({
     super.key,
     this.size = 120,
     this.controller,
+    this.repeat = true,
+    this.animate = true,
   });
 
   @override
-  State<LottieFire> createState() => _LottieFireState();
-}
-
-class _LottieFireState extends State<LottieFire> with SingleTickerProviderStateMixin {
-  late final AnimationController _fallbackController;
-  bool _useJsonFallback = false;
-
-  AnimationController get _effectiveController =>
-      widget.controller ?? _fallbackController;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.controller == null) {
-      _fallbackController = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 1600),
-      )..repeat();
-    }
-  }
-
-  @override
-  void dispose() {
-    if (widget.controller == null) {
-      _fallbackController.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_useJsonFallback) {
-      return Lottie.asset(
-        'assets/animations/Fire.json',
-        controller: _effectiveController,
-        width: widget.size,
-        height: widget.size,
-        fit: BoxFit.contain,
-        onLoaded: (composition) {
-          if (widget.controller == null && _fallbackController.duration != composition.duration) {
-            _fallbackController.duration = composition.duration;
-            _fallbackController.repeat();
-          }
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return SizedBox(
-            width: widget.size,
-            height: widget.size,
-          );
-        },
-      );
-    }
-
-    return Lottie.asset(
-      'assets/animations/Fire.lottie',
-      controller: _effectiveController,
-      width: widget.size,
-      height: widget.size,
-      fit: BoxFit.contain,
-      onLoaded: (composition) {
-        if (widget.controller == null && _fallbackController.duration != composition.duration) {
-          _fallbackController.duration = composition.duration;
-          _fallbackController.repeat();
-        }
-      },
-      errorBuilder: (context, error, stackTrace) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && !_useJsonFallback) {
-            setState(() {
-              _useJsonFallback = true;
-            });
-          }
-        });
-        return Lottie.asset(
-          'assets/animations/Fire.json',
-          controller: _effectiveController,
-          width: widget.size,
-          height: widget.size,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) {
-            return SizedBox(
-              width: widget.size,
-              height: widget.size,
-            );
-          },
-        );
-      },
+    return RepaintBoundary(
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Center(
+          child: Lottie.asset(
+            'assets/animations/fire.json',
+            controller: controller,
+            repeat: repeat,
+            animate: animate,
+            width: size,
+            height: size,
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
+            onLoaded: (composition) {
+              debugPrint('[LottieFire] Fire animation loaded successfully (${composition.duration})');
+            },
+            errorBuilder: (context, error, stackTrace) {
+              debugPrint('[LottieFire ERROR] Failed to load assets/animations/fire.json: $error\n$stackTrace');
+              return Icon(
+                Icons.local_fire_department_rounded,
+                size: size * 0.75,
+                color: const Color(0xFFFFB020),
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 }

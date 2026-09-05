@@ -207,8 +207,19 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
               height: 50,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: AppColors.cardHi,
                 borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.5),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.15),
+                    blurRadius: 12,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               child: const Center(
                 child: Text(
@@ -216,7 +227,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),

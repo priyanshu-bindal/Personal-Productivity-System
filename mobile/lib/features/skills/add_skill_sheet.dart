@@ -255,13 +255,17 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet> {
               height: 50,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: AppColors.cardHi,
                 borderRadius: BorderRadius.circular(14),
-                boxShadow: const [
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.5),
+                  width: 1.2,
+                ),
+                boxShadow: [
                   BoxShadow(
-                    color: AppColors.primaryGlow,
+                    color: AppColors.primary.withValues(alpha: 0.15),
                     blurRadius: 12,
-                    offset: Offset(0, 4),
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
@@ -271,7 +275,7 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet> {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),

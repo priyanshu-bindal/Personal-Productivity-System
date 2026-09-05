@@ -2,6 +2,7 @@ import { getMoneySummary } from '@/lib/money-actions'
 import { MoneyNav } from '@/components/money/MoneyNav'
 import { DashboardActionButtons } from '@/components/money/DashboardActionButtons'
 import { CategoryPieChart } from '@/components/money/SpendingCharts'
+import { MoneyEmptyState } from '@/components/money/MoneyEmptyState'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
@@ -53,9 +54,13 @@ export default async function CategoriesPage() {
           </CardHeader>
           <CardContent>
             {summary.categoryBreakdown.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground">
-                No spending data for this month yet.
-              </div>
+              <MoneyEmptyState
+                iconName="PieChart"
+                title="No categories yet"
+                description="Start logging expenses and your spending categories will appear here."
+                accentColor="blue"
+                minHeight="h-[220px]"
+              />
             ) : (
               <div className="space-y-6">
                 {summary.categoryBreakdown.map((cat, i) => (

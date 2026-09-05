@@ -78,25 +78,30 @@ class SkillsScreen extends ConsumerWidget {
                         PressableScale(
                           onTap: () => _openAddSkillModal(context, ref),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: const [
+                              color: AppColors.cardHi,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: AppColors.primary.withValues(alpha: 0.45),
+                                width: 1.2,
+                              ),
+                              boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primaryGlow,
-                                  blurRadius: 10,
-                                  offset: Offset(0, 3),
+                                  color: AppColors.primary.withValues(alpha: 0.15),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(LucideIcons.plus, color: Colors.white, size: 18),
+                                const Icon(LucideIcons.plus, color: AppColors.primary, size: 18),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Add Skill',
-                                  style: AppTextStyles.buttonText.copyWith(color: Colors.white),
+                                  style: AppTextStyles.buttonText.copyWith(color: AppColors.textPrimary),
                                 ),
                               ],
                             ),
@@ -139,10 +144,37 @@ class SkillsScreen extends ConsumerWidget {
                               style: AppTextStyles.bodySecondary,
                             ),
                             const SizedBox(height: 24),
-                            ElevatedButton.icon(
-                              onPressed: () => _openAddSkillModal(context, ref),
-                              icon: const Icon(LucideIcons.plus, size: 18),
-                              label: const Text('Add Skill Now'),
+                            PressableScale(
+                              onTap: () => _openAddSkillModal(context, ref),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: AppColors.cardHi,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppColors.primary.withValues(alpha: 0.45),
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.primary.withValues(alpha: 0.15),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(LucideIcons.plus, color: AppColors.primary, size: 18),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Add Skill Now',
+                                      style: AppTextStyles.buttonText.copyWith(color: AppColors.textPrimary),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),

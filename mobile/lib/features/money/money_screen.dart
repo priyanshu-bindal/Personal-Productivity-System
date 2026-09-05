@@ -9,6 +9,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/animated_card.dart';
 import '../../core/widgets/custom_bottom_sheet.dart';
+import '../../core/widgets/money_empty_state.dart';
 import '../../core/widgets/traffic_loader.dart';
 import '../../models/expense.dart';
 import '../../providers/money_provider.dart';
@@ -92,12 +93,23 @@ class MoneyScreen extends ConsumerWidget {
               ),
               child: TabBar(
                 indicator: BoxDecoration(
-                  color: AppColors.primary,
+                  color: AppColors.cardHi,
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.6),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.18),
+                      blurRadius: 10,
+                      spreadRadius: 0,
+                    ),
+                  ],
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: Colors.transparent,
-                labelColor: Colors.white,
+                labelColor: AppColors.textPrimary,
                 unselectedLabelColor: AppColors.textSecondary,
                 labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
@@ -197,36 +209,45 @@ class _OverviewTab extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           Container(
-            height: 180,
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+            constraints: const BoxConstraints(minHeight: 180),
             decoration: BoxDecoration(
               color: AppColors.card,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.border),
             ),
             child: summary.dailyChartData.isEmpty
-                ? const Center(child: Text('No expense data yet', style: TextStyle(color: AppColors.textMuted)))
-                : LineChart(
-                    LineChartData(
-                      gridData: const FlGridData(show: false),
-                      titlesData: const FlTitlesData(show: false),
-                      borderData: FlBorderData(show: false),
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: summary.dailyChartData.asMap().entries.map((e) {
-                            return FlSpot(e.key.toDouble(), (e.value['amount'] as double));
-                          }).toList(),
-                          isCurved: true,
-                          color: AppColors.primary,
-                          barWidth: 3,
-                          isStrokeCapRound: true,
-                          dotData: const FlDotData(show: false),
-                          belowBarData: BarAreaData(
-                            show: true,
-                            color: AppColors.primary.withValues(alpha: 0.15),
+                ? const MoneyEmptyState(
+                    icon: LucideIcons.barChart3,
+                    title: 'No spending data yet',
+                    description: 'Start tracking your expenses to see your daily spending trends.',
+                    accentColor: AppColors.primary,
+                    minHeight: 180,
+                  )
+                : Container(
+                    height: 180,
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+                    child: LineChart(
+                      LineChartData(
+                        gridData: const FlGridData(show: false),
+                        titlesData: const FlTitlesData(show: false),
+                        borderData: FlBorderData(show: false),
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: summary.dailyChartData.asMap().entries.map((e) {
+                              return FlSpot(e.key.toDouble(), (e.value['amount'] as double));
+                            }).toList(),
+                            isCurved: true,
+                            color: AppColors.primary,
+                            barWidth: 3,
+                            isStrokeCapRound: true,
+                            dotData: const FlDotData(show: false),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              color: AppColors.primary.withValues(alpha: 0.15),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
           ),
@@ -243,7 +264,13 @@ class _OverviewTab extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           if (summary.categoryBreakdown.isEmpty)
-            const Text('No categories spent yet', style: TextStyle(color: AppColors.textMuted))
+            const MoneyEmptyState(
+              icon: LucideIcons.pieChart,
+              title: 'Your spending breakdown will appear here',
+              description: 'Add your first expense and we\'ll automatically organize your spending by category.',
+              accentColor: AppColors.secondary,
+              minHeight: 160,
+            )
           else
             Column(
               children: summary.categoryBreakdown.map((item) {
@@ -327,7 +354,17 @@ class _ExpensesTab extends ConsumerWidget {
           child: expensesAsync.isLoading && filtered.isEmpty
               ? const Center(child: TrafficLoader(message: 'Loading expenses...'))
               : filtered.isEmpty
-                  ? const Center(child: Text('No expenses recorded', style: TextStyle(color: AppColors.textSecondary)))
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 20),
+                      child: MoneyEmptyState(
+                        icon: LucideIcons.receipt,
+                        title: 'No expenses logged yet',
+                        description: 'Log your spending to keep track of your personal budget.',
+                        accentColor: AppColors.primary,
+                        minHeight: 200,
+                        showGrid: false,
+                      ),
+                    )
                   : ListView.builder(
                       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                       itemCount: filtered.length,
@@ -509,7 +546,17 @@ class _BudgetsTab extends ConsumerWidget {
         ),
         Expanded(
           child: budgets.isEmpty
-              ? const Center(child: Text('No monthly category budgets set yet.', style: TextStyle(color: AppColors.textSecondary)))
+              ? const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: MoneyEmptyState(
+                    icon: LucideIcons.target,
+                    title: 'No category budgets set',
+                    description: 'Set monthly spending limits for categories to manage your budget.',
+                    accentColor: AppColors.secondary,
+                    minHeight: 200,
+                    showGrid: false,
+                  ),
+                )
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                   itemCount: budgets.length,
