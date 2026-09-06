@@ -1,6 +1,7 @@
 {
-  "buildCommand": "cd planner && npm install && npm run build",
-  "outputDirectory": "planner/.next",
-  "installCommand": "cd planner && npm install",
-  "framework": "nextjs"
+  "src": "planner",
+  "installCommand": "npm install",
+  "buildCommand": "npm install && npm run build",
+  "framework": "nextjs",
+  "outputDirectory": ".vercel/output"
 }
