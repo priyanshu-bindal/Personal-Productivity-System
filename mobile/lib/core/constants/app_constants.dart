@@ -23,7 +23,8 @@ class AppConstants {
     'Music',
     'Fitness',
     'Business',
-    'General'
+    'Career',
+    'General',
   ];
 
   static const List<String> expenseCategories = [

@@ -12,7 +12,8 @@ class AddExpenseSheet extends StatefulWidget {
   State<AddExpenseSheet> createState() => _AddExpenseSheetState();
 }
 
-class _AddExpenseSheetState extends State<AddExpenseSheet> {
+class _AddExpenseSheetState extends State<AddExpenseSheet>
+    with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
@@ -21,12 +22,44 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
   late String _selectedPaymentMethod;
   late DateTime _selectedDate;
 
+  bool _isSubmitting = false;
+  bool _showSuccess = false;
+
+  // Success animation controllers
+  late AnimationController _successScaleCtrl;
+  late AnimationController _successFadeCtrl;
+  late AnimationController _checkCtrl;
+  late Animation<double> _successScale;
+  late Animation<double> _successFade;
+
   @override
   void initState() {
     super.initState();
     _selectedCategory = AppConstants.expenseCategories.first;
     _selectedPaymentMethod = AppConstants.paymentMethods.first;
     _selectedDate = DateTime.now();
+
+    _successScaleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _successFadeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _checkCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+
+    _successScale = CurvedAnimation(
+      parent: _successScaleCtrl,
+      curve: Curves.easeOutBack,
+    );
+    _successFade = CurvedAnimation(
+      parent: _successFadeCtrl,
+      curve: Curves.easeIn,
+    );
   }
 
   @override
@@ -34,11 +67,15 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
     _amountController.dispose();
     _descController.dispose();
     _noteController.dispose();
+    _successScaleCtrl.dispose();
+    _successFadeCtrl.dispose();
+    _checkCtrl.dispose();
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_isSubmitting) return;
 
     final amount = double.tryParse(_amountController.text.trim());
     if (amount == null || amount <= 0) {
@@ -51,35 +88,144 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
       return;
     }
 
+    setState(() => _isSubmitting = true);
+
     final result = {
       'amount': amount,
       'description': _descController.text.trim(),
       'category': _selectedCategory,
       'paymentMethod': _selectedPaymentMethod,
       'date': _selectedDate,
-      'note': _noteController.text.trim().isNotEmpty ? _noteController.text.trim() : null,
+      'note': _noteController.text.trim().isNotEmpty
+          ? _noteController.text.trim()
+          : null,
     };
 
-    Navigator.of(context).pop(result);
+    // Show success state
+    setState(() => _showSuccess = true);
+
+    // Staggered animation sequence
+    await Future.delayed(const Duration(milliseconds: 150));
+    _successScaleCtrl.forward();
+    await Future.delayed(const Duration(milliseconds: 150));
+    _checkCtrl.forward();
+    await Future.delayed(const Duration(milliseconds: 200));
+    _successFadeCtrl.forward();
+
+    // Hold success state for ~2s total, then close
+    await Future.delayed(const Duration(milliseconds: 1400));
+
+    if (mounted) {
+      Navigator.of(context).pop(result);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: animation,
+        child: child,
+      ),
+      child: _showSuccess ? _buildSuccess() : _buildForm(),
+    );
+  }
+
+  Widget _buildSuccess() {
+    return SizedBox(
+      key: const ValueKey('success'),
+      height: 260,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Checkmark circle with glow
+            ScaleTransition(
+              scale: _successScale,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  border: Border.all(
+                    color: AppColors.primary.withValues(alpha: 0.45),
+                    width: 2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.25),
+                      blurRadius: 24,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Icon(
+                    LucideIcons.checkCircle2,
+                    color: AppColors.primary,
+                    size: 40,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Title
+            FadeTransition(
+              opacity: _successFade,
+              child: Column(
+                children: [
+                  const Text(
+                    'Expense Added Successfully',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Your expense has been recorded',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textDim,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForm() {
     return Form(
       key: _formKey,
       child: Column(
+        key: const ValueKey('form'),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Amount Field
           TextFormField(
             controller: _amountController,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 20,
+                fontWeight: FontWeight.bold),
             decoration: const InputDecoration(
               labelText: 'Amount (₹)',
-              prefixIcon: Icon(LucideIcons.indianRupee, color: AppColors.primary, size: 22),
+              prefixIcon:
+                  Icon(LucideIcons.indianRupee, color: AppColors.primary, size: 22),
             ),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter amount' : null,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Please enter amount' : null,
           ),
           const SizedBox(height: 16),
 
@@ -90,9 +236,11 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
             decoration: const InputDecoration(
               labelText: 'Description',
               hintText: 'e.g. Lunch with team, Groceries',
-              prefixIcon: Icon(LucideIcons.fileText, color: AppColors.textMuted, size: 20),
+              prefixIcon:
+                  Icon(LucideIcons.fileText, color: AppColors.textMuted, size: 20),
             ),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter description' : null,
+            validator: (v) =>
+                (v == null || v.trim().isEmpty) ? 'Please enter description' : null,
           ),
           const SizedBox(height: 16),
 
@@ -106,7 +254,8 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                   style: const TextStyle(color: AppColors.textPrimary),
                   decoration: const InputDecoration(
                     labelText: 'Category',
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   ),
                   items: AppConstants.expenseCategories.map((c) {
                     final label = c[0].toUpperCase() + c.substring(1);
@@ -125,7 +274,8 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                   style: const TextStyle(color: AppColors.textPrimary),
                   decoration: const InputDecoration(
                     labelText: 'Payment',
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   ),
                   items: AppConstants.paymentMethods.map((m) {
                     final label = m.replaceAll('_', ' ').toUpperCase();
@@ -174,15 +324,18 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                 children: [
                   Row(
                     children: [
-                      const Icon(LucideIcons.calendar, color: AppColors.textMuted, size: 20),
+                      const Icon(LucideIcons.calendar,
+                          color: AppColors.textMuted, size: 20),
                       const SizedBox(width: 12),
                       Text(
                         'Date: ${DateFormat('MMMM d, yyyy').format(_selectedDate)}',
-                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                        style: const TextStyle(
+                            color: AppColors.textPrimary, fontSize: 14),
                       ),
                     ],
                   ),
-                  const Icon(LucideIcons.chevronDown, color: AppColors.textMuted, size: 18),
+                  const Icon(LucideIcons.chevronDown,
+                      color: AppColors.textMuted, size: 18),
                 ],
               ),
             ),
@@ -195,41 +348,59 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
             style: const TextStyle(color: AppColors.textPrimary),
             decoration: const InputDecoration(
               labelText: 'Additional Note (Optional)',
-              prefixIcon: Icon(LucideIcons.stickyNote, color: AppColors.textMuted, size: 20),
+              prefixIcon: Icon(LucideIcons.stickyNote,
+                  color: AppColors.textMuted, size: 20),
             ),
           ),
           const SizedBox(height: 24),
 
-          // Submit
+          // Submit — disabled while submitting
           PressableScale(
-            onTap: _submit,
-            child: Container(
+            onTap: _isSubmitting ? null : _submit,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
               height: 50,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: AppColors.cardHi,
+                color: _isSubmitting
+                    ? AppColors.cardHi.withValues(alpha: 0.6)
+                    : AppColors.cardHi,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.5),
+                  color: _isSubmitting
+                      ? AppColors.border
+                      : AppColors.primary.withValues(alpha: 0.45),
                   width: 1.2,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.15),
-                    blurRadius: 12,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
+                boxShadow: _isSubmitting
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.18),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
               ),
-              child: const Center(
-                child: Text(
-                  'Add Expense',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
+              child: Center(
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.primary),
+                        ),
+                      )
+                    : const Text(
+                        'Add Expense',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
               ),
             ),
           ),

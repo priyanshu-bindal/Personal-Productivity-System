@@ -18,13 +18,16 @@ class OceanTheme {
   static const Color textDim = Color(0xFF7E93A8);
   static const Color textFaint = Color(0xFF4C5E70);
 
-  // Primary Accent (Green / Success / Active Tab / Completed Sessions)
-  static const Color primary = Color(0xFF00E5A0);
-  static const Color primaryDim = Color(0xFF0A2E24);
+  // Primary Accent — Premium Emerald-Teal #14C8A8
+  // Less neon, more sophisticated, consistent throughout app
+  static const Color primary = Color(0xFF14C8A8);
+  static const Color primaryHover = Color(0xFF20D6B5);
+  static const Color primaryDim = Color(0xFF0A2E2A);
 
-  // Secondary Accent (Blue / Scheduled / Active Sessions)
+  // Secondary Accent — Sapphire Blue #3B82F6
   static const Color secondary = Color(0xFF3B82F6);
-  static const Color secondaryDim = Color(0xFF132038);
+  static const Color secondaryHighlight = Color(0xFF60A5FA);
+  static const Color secondaryDim = Color(0xFF13284A);
 
   // Amber (Streaks / Highlights Only)
   static const Color amber = Color(0xFFFFB020);

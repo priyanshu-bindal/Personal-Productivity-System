@@ -25,18 +25,22 @@ class AppColors {
   static const Color textMuted = OceanTheme.textFaint;
   static const Color textFaint = OceanTheme.textFaint;
 
-  // Primary Accent (Green #00E5A0)
+  // Primary Accent — Premium Emerald-Teal #14C8A8
   static const Color primary = OceanTheme.primary;
-  static const Color primaryBright = Color(0xFF35E6C2);
+  static const Color primaryBright = OceanTheme.primaryHover;
   static const Color primaryDark = OceanTheme.primaryDim;
-  static const Color primaryHover = Color(0xFF00C78B);
-  static const Color primaryGlow = Color(0x3300E5A0);
+  static const Color primaryHover = OceanTheme.primaryHover;
+  // Soft glow: rgba(20, 200, 168, 0.18)
+  static const Color primaryGlow = Color(0x2E14C8A8);
+  // Subtle glow for box shadows: rgba(20,200,168,0.15)
+  static const Color primaryGlowSoft = Color(0x2614C8A8);
   static const Color primaryBg = OceanTheme.primaryDim;
   static const Color primaryForeground = OceanTheme.bg;
 
-  // Secondary Accent (Blue #3B82F6)
+  // Secondary Accent — Sapphire Blue #3B82F6
   static const Color secondary = OceanTheme.secondary;
   static const Color blue = OceanTheme.secondary;
+  static const Color blueHighlight = OceanTheme.secondaryHighlight;
   static const Color blueDim = OceanTheme.secondaryDim;
   static const Color secondaryBg = OceanTheme.secondaryDim;
   static const Color secondaryForeground = OceanTheme.textPrimary;
@@ -56,16 +60,19 @@ class AppColors {
   static const Color success = OceanTheme.primary;
   static const Color successBg = OceanTheme.primaryDim;
   static const Color warning = OceanTheme.amber;
-  static const Color error = Color(0xFFE55353); // Muted coral red
-  static const Color coralRed = Color(0xFFE55353);
+  static const Color error = Color(0xFFEF5B5B);
+  static const Color errorBg = Color(0x1AEF5B5B);   // rgba(239,91,91,0.10)
+  static const Color errorBorder = Color(0x59EF5B5B); // rgba(239,91,91,0.35)
+  static const Color coralRed = Color(0xFFEF5B5B);
   static const Color info = OceanTheme.secondary;
   static const Color infoBg = OceanTheme.secondaryDim;
 
   static const Color accentEmerald = OceanTheme.primary;
-  static const Color accentRose = Color(0xFFE55353);
+  static const Color accentRose = Color(0xFFEF5B5B);
   static const Color accentBlue = OceanTheme.secondary;
   static const Color accentPurple = OceanTheme.secondary;
   static const Color accentCyan = OceanTheme.primary;
 
-  static const BoxDecoration backgroundGradientDecoration = OceanTheme.backgroundGradientDecoration;
+  static const BoxDecoration backgroundGradientDecoration =
+      OceanTheme.backgroundGradientDecoration;
 }

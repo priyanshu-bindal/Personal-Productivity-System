@@ -21,18 +21,81 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
   bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+
+  // Inline errors
+  String? _nameError;
+  String? _emailError;
+  String? _passwordError;
+  String? _confirmError;
+  String? _generalError;
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmController.dispose();
     super.dispose();
   }
 
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
+        .hasMatch(email);
+  }
+
+  bool _validateFields() {
+    setState(() {
+      _nameError = null;
+      _emailError = null;
+      _passwordError = null;
+      _confirmError = null;
+      _generalError = null;
+    });
+
+    bool valid = true;
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final confirm = _confirmController.text;
+
+    if (name.isEmpty) {
+      setState(() => _nameError = 'Please enter your name.');
+      valid = false;
+    }
+
+    if (email.isEmpty) {
+      setState(() => _emailError = 'Please enter your email address.');
+      valid = false;
+    } else if (!_isValidEmail(email)) {
+      setState(() => _emailError = 'Please enter a valid email address.');
+      valid = false;
+    }
+
+    if (password.isEmpty) {
+      setState(() => _passwordError = 'Please enter a password.');
+      valid = false;
+    } else if (password.length < 6) {
+      setState(
+          () => _passwordError = 'Password must contain at least 6 characters.');
+      valid = false;
+    }
+
+    if (confirm.isEmpty) {
+      setState(() => _confirmError = 'Please confirm your password.');
+      valid = false;
+    } else if (password != confirm) {
+      setState(() => _confirmError = 'Passwords do not match.');
+      valid = false;
+    }
+
+    return valid;
+  }
+
   Future<void> _handleRegister() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_validateFields()) return;
 
     try {
       final res = await ref.read(authControllerProvider.notifier).signUp(
@@ -44,20 +107,23 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (!mounted) return;
 
       if (res.session == null && res.user != null) {
+        // Email confirmation required
         context.go('/email-verification', extra: _emailController.text.trim());
       } else {
         context.go('/today');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ErrorFormatter.format(e)),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+      if (!mounted) return;
+      final msg = ErrorFormatter.format(e);
+
+      if (msg.toLowerCase().contains('already exists') ||
+          msg.toLowerCase().contains('already registered')) {
+        setState(() => _emailError = msg);
+      } else if (msg.toLowerCase().contains('connect') ||
+          msg.toLowerCase().contains('internet')) {
+        setState(() => _generalError = msg);
+      } else {
+        setState(() => _generalError = msg);
       }
     }
   }
@@ -101,16 +167,36 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Name
+                  // General error banner
+                  if (_generalError != null) ...[
+                    _ErrorBanner(message: _generalError!),
+                    const SizedBox(height: 12),
+                  ],
+
+                  // Full Name
                   TextFormField(
                     controller: _nameController,
                     style: const TextStyle(color: AppColors.textPrimary),
-                    decoration: const InputDecoration(
+                    onChanged: (_) {
+                      if (_nameError != null) setState(() => _nameError = null);
+                    },
+                    decoration: InputDecoration(
                       labelText: 'Full Name',
-                      prefixIcon: Icon(LucideIcons.user, color: AppColors.textMuted, size: 20),
+                      prefixIcon: const Icon(LucideIcons.user,
+                          color: AppColors.textMuted, size: 20),
+                      enabledBorder: _nameError != null
+                          ? OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                  color: AppColors.error, width: 1.2),
+                            )
+                          : null,
                     ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your name' : null,
                   ),
+                  if (_nameError != null) ...[
+                    const SizedBox(height: 6),
+                    _FieldError(message: _nameError!),
+                  ],
                   const SizedBox(height: 16),
 
                   // Email
@@ -118,12 +204,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     style: const TextStyle(color: AppColors.textPrimary),
-                    decoration: const InputDecoration(
+                    onChanged: (_) {
+                      if (_emailError != null) setState(() => _emailError = null);
+                    },
+                    decoration: InputDecoration(
                       labelText: 'Email Address',
-                      prefixIcon: Icon(LucideIcons.mail, color: AppColors.textMuted, size: 20),
+                      prefixIcon: const Icon(LucideIcons.mail,
+                          color: AppColors.textMuted, size: 20),
+                      enabledBorder: _emailError != null
+                          ? OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                  color: AppColors.error, width: 1.2),
+                            )
+                          : null,
                     ),
-                    validator: (v) => (v == null || !v.contains('@')) ? 'Please enter a valid email' : null,
                   ),
+                  if (_emailError != null) ...[
+                    const SizedBox(height: 6),
+                    _FieldError(message: _emailError!),
+                  ],
                   const SizedBox(height: 16),
 
                   // Password
@@ -131,44 +231,115 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     style: const TextStyle(color: AppColors.textPrimary),
+                    onChanged: (_) {
+                      if (_passwordError != null) {
+                        setState(() => _passwordError = null);
+                      }
+                      // Clear confirm error if passwords might now match
+                      if (_confirmError != null) {
+                        setState(() => _confirmError = null);
+                      }
+                    },
                     decoration: InputDecoration(
                       labelText: 'Password',
-                      prefixIcon: const Icon(LucideIcons.lock, color: AppColors.textMuted, size: 20),
+                      prefixIcon: const Icon(LucideIcons.lock,
+                          color: AppColors.textMuted, size: 20),
                       suffixIcon: IconButton(
                         icon: Icon(
-                          _obscurePassword ? LucideIcons.eyeOff : LucideIcons.eye,
+                          _obscurePassword
+                              ? LucideIcons.eyeOff
+                              : LucideIcons.eye,
                           color: AppColors.textMuted,
                           size: 20,
                         ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword),
                       ),
+                      enabledBorder: _passwordError != null
+                          ? OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                  color: AppColors.error, width: 1.2),
+                            )
+                          : null,
                     ),
-                    validator: (v) => (v == null || v.length < 6) ? 'Password must be at least 6 characters' : null,
                   ),
+                  if (_passwordError != null) ...[
+                    const SizedBox(height: 6),
+                    _FieldError(message: _passwordError!),
+                  ],
+                  const SizedBox(height: 16),
+
+                  // Confirm Password
+                  TextFormField(
+                    controller: _confirmController,
+                    obscureText: _obscureConfirm,
+                    style: const TextStyle(color: AppColors.textPrimary),
+                    onChanged: (_) {
+                      if (_confirmError != null) {
+                        setState(() => _confirmError = null);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Confirm Password',
+                      prefixIcon: const Icon(LucideIcons.lock,
+                          color: AppColors.textMuted, size: 20),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirm
+                              ? LucideIcons.eyeOff
+                              : LucideIcons.eye,
+                          color: AppColors.textMuted,
+                          size: 20,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscureConfirm = !_obscureConfirm),
+                      ),
+                      enabledBorder: _confirmError != null
+                          ? OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: const BorderSide(
+                                  color: AppColors.error, width: 1.2),
+                            )
+                          : null,
+                    ),
+                  ),
+                  if (_confirmError != null) ...[
+                    const SizedBox(height: 6),
+                    _FieldError(message: _confirmError!),
+                  ],
                   const SizedBox(height: 28),
 
-                  // Submit Button
+                  // Create Account Button
                   PressableScale(
                     onTap: isLoading ? null : _handleRegister,
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
                       height: 52,
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
+                        color: isLoading
+                            ? AppColors.primaryDark
+                            : AppColors.primary,
                         borderRadius: BorderRadius.circular(14),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: AppColors.primaryGlow,
-                            blurRadius: 16,
-                            offset: Offset(0, 4),
-                          ),
-                        ],
+                        boxShadow: isLoading
+                            ? null
+                            : [
+                                BoxShadow(
+                                  color: AppColors.primaryGlow,
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
                       ),
                       child: Center(
                         child: isLoading
                             ? const TrafficLoader(size: 8)
                             : Text(
                                 'Create Account',
-                                style: AppTextStyles.buttonText.copyWith(color: Colors.white, fontSize: 15),
+                                style: AppTextStyles.buttonText.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                ),
                               ),
                       ),
                     ),
@@ -199,6 +370,74 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _FieldError extends StatelessWidget {
+  final String message;
+  const _FieldError({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.errorBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.errorBorder),
+      ),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.alertCircle, color: AppColors.error, size: 14),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: AppColors.error,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.errorBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.errorBorder),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(LucideIcons.alertTriangle,
+              color: AppColors.error, size: 16),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: AppColors.error,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
