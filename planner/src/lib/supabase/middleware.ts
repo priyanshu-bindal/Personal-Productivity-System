@@ -22,9 +22,7 @@ export async function updateSession(request: NextRequest) {
 
   // Fast-path 2: Unauthenticated user accessing protected route -> Redirect to signin instantly (<10ms)
   if (!isAuthRoute && !hasAuthCookie) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth/signin'
-    return NextResponse.redirect(url)
+    return NextResponse.redirect(new URL('/auth/signin', request.url))
   }
 
   // Fast-path 3: Authenticated user accessing protected route -> Allow through instantly
@@ -60,9 +58,7 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   if (user && isAuthRoute && !pathname.startsWith('/api/auth')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/'
-    return NextResponse.redirect(url)
+    return NextResponse.redirect(new URL('/', request.url))
   }
 
   return supabaseResponse
