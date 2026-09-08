@@ -100,10 +100,10 @@ function SignInContent() {
             {/* Email Field */}
             <div className="space-y-1.5">
               <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
+              <Input
+                id="email"
                 name="email"
-                type="email" 
+                type="email"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value)
@@ -111,7 +111,7 @@ function SignInContent() {
                     setFieldErrors((prev) => ({ ...prev, email: undefined }))
                   }
                 }}
-                placeholder="you@domain.com"
+                placeholder="yourname@gmail.com"
                 className={`h-12 ${fieldErrors.email ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 disabled={isLoading}
               />
@@ -126,10 +126,10 @@ function SignInContent() {
             {/* Password Field */}
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input 
-                id="password" 
+              <Input
+                id="password"
                 name="password"
-                type="password" 
+                type="password"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value)

@@ -158,7 +158,7 @@ export default function SignUp() {
                     setFieldErrors((prev) => ({ ...prev, email: undefined }))
                   }
                 }}
-                placeholder="you@domain.com"
+                placeholder="yourname@gmail.com"
                 className={`h-12 ${fieldErrors.email ? "border-destructive focus-visible:ring-destructive" : ""}`}
                 disabled={isLoading}
               />
