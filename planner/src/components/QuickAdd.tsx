@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { Plus, CheckSquare, BookOpen, StickyNote, IndianRupee } from 'lucide-react'
 import {
   DropdownMenu,
@@ -16,6 +17,7 @@ import { AddExpenseModal } from './money/AddExpenseModal'
 import { getSkills } from '@/lib/actions'
 
 export function QuickAdd() {
+  const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
   const [activeModal, setActiveModal] = useState<'task' | 'expense' | 'skill' | 'note' | null>(null)
   const [skills, setSkills] = useState<any[]>([])
@@ -26,6 +28,10 @@ export function QuickAdd() {
       getSkills().then(setSkills).catch(console.error)
     }
   }, [activeModal])
+
+  if (pathname?.startsWith('/messages')) {
+    return null
+  }
 
   return (
     <>
