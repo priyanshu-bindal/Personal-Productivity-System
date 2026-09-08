@@ -16,7 +16,7 @@ import {
   SheetContent,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { BookOpen, Settings, LogOut, Target, TrendingUp, StickyNote } from 'lucide-react'
+import { BookOpen, Settings, LogOut, Target, TrendingUp, StickyNote, MessageSquare } from 'lucide-react'
 import { signout } from '@/app/auth/actions'
 import { GlobalSearch } from '@/components/GlobalSearch'
 
@@ -30,6 +30,7 @@ const rightNavItems = [
 ]
 
 const moreNavItems = [
+  { name: 'Messages', href: '/messages', icon: MessageSquare },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Progress', href: '/progress', icon: TrendingUp },
   { name: 'Notes', href: '/notes', icon: StickyNote },

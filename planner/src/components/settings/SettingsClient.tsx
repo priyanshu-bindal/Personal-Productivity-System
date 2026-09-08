@@ -16,7 +16,10 @@ import {
   Download, 
   LogOut, 
   AlertTriangle, 
-  KeyRound
+  KeyRound,
+  MessageSquare,
+  Copy,
+  Check
 } from 'lucide-react'
 import { TrafficLoader } from '@/components/ui/traffic-loader'
 import { 
@@ -28,6 +31,9 @@ import {
 } from '@/lib/settings-actions'
 import { signout } from '@/app/auth/actions'
 import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import { ensureFirebaseAuth } from '@/lib/firebase/authBridge'
+import { ensureUserChatId } from '@/lib/firebase/chatService'
 
 interface ProfileData {
   id: string
@@ -41,6 +47,32 @@ interface ProfileData {
 
 export function SettingsClient({ initialProfile }: { initialProfile: ProfileData }) {
   const [activeTab, setActiveTab] = useState<'account' | 'practice' | 'notifications' | 'data' | 'danger'>('account')
+  
+  // Chat ID state
+  const [chatId, setChatId] = useState<string | null>(null)
+  const [isCopied, setIsCopied] = useState(false)
+
+  useEffect(() => {
+    async function loadChatId() {
+      try {
+        // ensureFirebaseAuth returns the Firebase bridge UID which must be used for Firestore paths
+        // (Firestore rules check request.auth.uid, which is the Firebase UID, not the Supabase UID)
+        const firebaseUid = await ensureFirebaseAuth(initialProfile.id, initialProfile.email)
+        const id = await ensureUserChatId(firebaseUid)
+        setChatId(id)
+      } catch (err) {
+        console.error('Failed to load Chat ID in settings:', err)
+      }
+    }
+    loadChatId()
+  }, [initialProfile.id, initialProfile.email])
+
+  const handleCopyChatId = () => {
+    if (!chatId) return
+    navigator.clipboard.writeText(chatId)
+    setIsCopied(true)
+    setTimeout(() => setIsCopied(false), 2000)
+  }
   
   // Account state
   const [fullName, setFullName] = useState(initialProfile.fullName)
@@ -217,6 +249,33 @@ export function SettingsClient({ initialProfile }: { initialProfile: ProfileData
                     <Label htmlFor="email" className="text-xs sm:text-sm">Email Address</Label>
                     <Input id="email" value={initialProfile.email} disabled className="bg-muted opacity-75 cursor-not-allowed text-xs sm:text-sm" />
                     <p className="text-[11px] text-muted-foreground">Your email is managed by your authentication provider.</p>
+                  </div>
+
+                  <div className="p-4 border rounded-xl bg-primary/5 border-primary/20 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-primary" />
+                        <span className="text-xs sm:text-sm font-semibold">Your Chat ID</span>
+                      </div>
+                      {chatId && (
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={handleCopyChatId}
+                          className="h-8 gap-1.5 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                        >
+                          {isCopied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                          {isCopied ? 'Copied' : 'Copy'}
+                        </Button>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-lg font-bold tracking-widest text-primary">
+                        {chatId || 'Loading...'}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">Share with others to start direct 1-to-1 chats</span>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">

@@ -12,7 +12,8 @@ import {
   StickyNote, 
   Settings,
   LogOut,
-  IndianRupee
+  IndianRupee,
+  MessageSquare
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { signout } from '@/app/auth/actions'
@@ -20,6 +21,7 @@ import { GlobalSearch } from '@/components/GlobalSearch'
 
 const navItems = [
   { name: 'Today', href: '/', icon: LayoutDashboard },
+  { name: 'Messages', href: '/messages', icon: MessageSquare },
   { name: 'My Skills', href: '/skills', icon: BookOpen },
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Progress', href: '/progress', icon: TrendingUp },
