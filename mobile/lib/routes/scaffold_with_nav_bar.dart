@@ -34,17 +34,6 @@ class ScaffoldWithNavBar extends StatelessWidget {
       child: Column(
         children: [
           _MoreMenuItem(
-            icon: LucideIcons.messageSquare,
-            color: AppColors.primary,
-            title: 'Messages',
-            subtitle: 'Direct 1-to-1 focus chat',
-            onTap: () {
-              Navigator.pop(context);
-              context.push('/messages');
-            },
-          ),
-          const SizedBox(height: 12),
-          _MoreMenuItem(
             icon: LucideIcons.fileText,
             color: AppColors.accentCyan,
             title: 'Notes',

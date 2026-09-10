@@ -9,8 +9,6 @@ import '../../core/widgets/custom_bottom_sheet.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../services/supabase_service.dart';
-import '../../services/chat_service.dart';
-import 'package:flutter/services.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -182,56 +180,6 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                         ),
                       ],
-                    ),
-                    const Divider(height: 24),
-                    FutureBuilder<String?>(
-                      future: SupabaseService.currentUserId != null 
-                        ? ChatService.getUserShortId(SupabaseService.currentUserId!)
-                        : Future.value(null),
-                      builder: (context, snapshot) {
-                        final chatId = snapshot.data ?? 'Loading...';
-                        return Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text('Your Chat ID', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    chatId,
-                                    style: const TextStyle(
-                                      fontFamily: 'monospace',
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.primary,
-                                      letterSpacing: 1.2,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              IconButton(
-                                icon: const Icon(LucideIcons.copy, color: AppColors.primary, size: 18),
-                                onPressed: snapshot.hasData && snapshot.data != null
-                                    ? () {
-                                        Clipboard.setData(ClipboardData(text: snapshot.data!));
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Chat ID copied to clipboard!')),
-                                        );
-                                      }
-                                    : null,
-                              ),
-                            ],
-                          ),
-                        );
-                      },
                     ),
                     const Divider(height: 24),
                     ListTile(
