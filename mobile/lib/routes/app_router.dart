@@ -16,6 +16,9 @@ import '../features/notes/notes_screen.dart';
 import '../features/money/money_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/streak/streak_screen.dart';
+import '../features/messages/messages_screen.dart';
+import '../features/messages/new_message_screen.dart';
+import '../features/messages/chat_screen.dart';
 import 'scaffold_with_nav_bar.dart';
 
 /// Bridges a Stream into a [Listenable] so GoRouter can react to auth changes.
@@ -137,6 +140,28 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/money',
         builder: (context, state) => const MoneyScreen(),
+      ),
+      GoRoute(
+        path: '/messages',
+        builder: (context, state) => const MessagesScreen(),
+        routes: [
+          GoRoute(
+            path: 'new',
+            builder: (context, state) => const NewMessageScreen(),
+          ),
+          GoRoute(
+            path: 'chat/:id',
+            builder: (context, state) {
+              final id = state.pathParameters['id']!;
+              final extra = state.extra as Map<String, dynamic>?;
+              return ChatScreen(
+                conversationId: id,
+                otherChatId: extra?['otherChatId'] as String?,
+                otherDisplayName: extra?['otherDisplayName'] as String?,
+              );
+            },
+          ),
+        ],
       ),
       GoRoute(
         path: '/settings',

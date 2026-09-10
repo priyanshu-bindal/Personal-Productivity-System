@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'routes/app_router.dart';
 import 'services/supabase_service.dart';
+import 'services/firebase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +26,9 @@ void main() async {
 
   // Initialize Supabase SDK
   await SupabaseService.initialize();
+
+  // Initialize Firebase SDK (for chat system)
+  await FirebaseService.initialize();
 
   runApp(
     const ProviderScope(

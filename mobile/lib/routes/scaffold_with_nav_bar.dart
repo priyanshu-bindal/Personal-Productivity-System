@@ -1,11 +1,13 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../core/theme/app_colors.dart';
 import '../core/widgets/custom_bottom_sheet.dart';
+import '../providers/chat_provider.dart';
 
-class ScaffoldWithNavBar extends StatelessWidget {
+class ScaffoldWithNavBar extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
   const ScaffoldWithNavBar({
@@ -30,49 +32,68 @@ class ScaffoldWithNavBar extends StatelessWidget {
     CustomBottomSheet.show(
       context: context,
       title: 'More Features',
-      subtitle: 'Personal notes, expenses & account settings',
-      child: Column(
-        children: [
-          _MoreMenuItem(
-            icon: LucideIcons.fileText,
-            color: AppColors.accentCyan,
-            title: 'Notes',
-            subtitle: 'Personal learning notes & tags',
-            onTap: () {
-              Navigator.pop(context);
-              context.push('/notes');
-            },
-          ),
-          const SizedBox(height: 12),
-          _MoreMenuItem(
-            icon: LucideIcons.wallet,
-            color: AppColors.primary,
-            title: 'Money Tracker',
-            subtitle: 'Personal expenses & monthly budgets',
-            onTap: () {
-              Navigator.pop(context);
-              context.push('/money');
-            },
-          ),
-          const SizedBox(height: 12),
-          _MoreMenuItem(
-            icon: LucideIcons.settings,
-            color: AppColors.secondary,
-            title: 'Settings',
-            subtitle: 'Practice defaults & account preferences',
-            onTap: () {
-              Navigator.pop(context);
-              context.push('/settings');
-            },
-          ),
-        ],
+      subtitle: 'Messages, notes, expenses & settings',
+      child: Consumer(
+        builder: (context, ref, _) {
+          final unreadChatCount = ref.watch(totalUnreadChatCountProvider).value ?? 0;
+
+          return Column(
+            children: [
+              _MoreMenuItem(
+                icon: LucideIcons.messageSquare,
+                color: const Color(0xFF3B82F6),
+                title: 'Messages',
+                subtitle: '1-to-1 private chat & discussions',
+                badgeCount: unreadChatCount,
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/messages');
+                },
+              ),
+              const SizedBox(height: 12),
+              _MoreMenuItem(
+                icon: LucideIcons.fileText,
+                color: AppColors.accentCyan,
+                title: 'Notes',
+                subtitle: 'Personal learning notes & tags',
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/notes');
+                },
+              ),
+              const SizedBox(height: 12),
+              _MoreMenuItem(
+                icon: LucideIcons.wallet,
+                color: AppColors.primary,
+                title: 'Money Tracker',
+                subtitle: 'Personal expenses & monthly budgets',
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/money');
+                },
+              ),
+              const SizedBox(height: 12),
+              _MoreMenuItem(
+                icon: LucideIcons.settings,
+                color: AppColors.secondary,
+                title: 'Settings',
+                subtitle: 'Practice defaults & account preferences',
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/settings');
+                },
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final currentIndex = navigationShell.currentIndex;
+    final totalUnread = ref.watch(totalUnreadChatCountProvider).value ?? 0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -166,6 +187,7 @@ class ScaffoldWithNavBar extends StatelessWidget {
                               icon: LucideIcons.moreHorizontal,
                               label: 'More',
                               isSelected: false,
+                              hasBadge: totalUnread > 0,
                               onTap: () => _onTap(context, 4),
                             ),
                           ],
@@ -187,12 +209,14 @@ class _NavBarItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool isSelected;
+  final bool hasBadge;
   final VoidCallback onTap;
 
   const _NavBarItem({
     required this.icon,
     required this.label,
     required this.isSelected,
+    this.hasBadge = false,
     required this.onTap,
   });
 
@@ -208,14 +232,38 @@ class _NavBarItem extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            AnimatedScale(
-              duration: const Duration(milliseconds: 250),
-              scale: isSelected ? 1.05 : 1.0,
-              child: Icon(
-                icon,
-                size: 19,
-                color: isSelected ? activeColor : inactiveColor,
-              ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedScale(
+                  duration: const Duration(milliseconds: 250),
+                  scale: isSelected ? 1.05 : 1.0,
+                  child: Icon(
+                    icon,
+                    size: 19,
+                    color: isSelected ? activeColor : inactiveColor,
+                  ),
+                ),
+                if (hasBadge)
+                  Positioned(
+                    top: -1,
+                    right: -2,
+                    child: Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF3B82F6),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color(0x663B82F6),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 4),
             AnimatedDefaultTextStyle(
@@ -240,6 +288,7 @@ class _MoreMenuItem extends StatelessWidget {
   final Color color;
   final String title;
   final String subtitle;
+  final int badgeCount;
   final VoidCallback onTap;
 
   const _MoreMenuItem({
@@ -247,6 +296,7 @@ class _MoreMenuItem extends StatelessWidget {
     required this.color,
     required this.title,
     required this.subtitle,
+    this.badgeCount = 0,
     required this.onTap,
   });
 
@@ -296,6 +346,25 @@ class _MoreMenuItem extends StatelessWidget {
                 ],
               ),
             ),
+            if (badgeCount > 0) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0x333B5B8C),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0x593B5B8C)),
+                ),
+                child: Text(
+                  badgeCount > 99 ? '99+' : badgeCount.toString(),
+                  style: const TextStyle(
+                    color: Color(0xFF7E9ED4),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
             const Icon(LucideIcons.chevronRight, color: AppColors.textMuted, size: 18),
           ],
         ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/ocean_theme.dart';
@@ -53,6 +54,10 @@ class TodayScreen extends ConsumerWidget {
 
     final skills = skillsAsync.value ?? [];
 
+    // Determine whether to show an inline profile error banner.
+    final bool showProfileError =
+        profileAsync.hasError && !profileAsync.hasValue;
+
     return Container(
       decoration: OceanTheme.backgroundGradientDecoration,
       child: Scaffold(
@@ -60,6 +65,7 @@ class TodayScreen extends ConsumerWidget {
         body: SafeArea(
           child: RefreshIndicator(
             onRefresh: () async {
+              ref.read(profileProvider.notifier).fetchProfile();
               await ref.read(sessionsProvider.notifier).fetchSessions();
               await ref.read(skillsProvider.notifier).fetchSkills();
             },
@@ -125,6 +131,17 @@ class TodayScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 24),
+
+                  // ── Profile error banner ──────────────────────────────────
+                  // Shown only when profile fetch fails AND no cached data
+                  // exists. Does NOT crash the screen — rest of UI still works.
+                  if (showProfileError)
+                    _ProfileErrorBanner(
+                      error: profileAsync.error!,
+                      onRetry: () =>
+                          ref.read(profileProvider.notifier).fetchProfile(),
+                    ),
+                  if (showProfileError) const SizedBox(height: 16),
 
                   // Today Total Completed Time Hero Card (Stopwatch Icon #3B82F6 on #132038)
                   Container(
@@ -533,6 +550,66 @@ class _SkillOverviewCompactCard extends StatelessWidget {
               backgroundColor: OceanTheme.cardHi, // #132038
               valueColor: const AlwaysStoppedAnimation<Color>(OceanTheme.secondary), // #3B82F6 Blue fill
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Profile Error Banner ─────────────────────────────────────────────────────
+// Shown inside TodayScreen when profileProvider is in error state.
+// Friendly — no raw PostgrestException text is displayed to the user.
+
+class _ProfileErrorBanner extends StatelessWidget {
+  const _ProfileErrorBanner({required this.error, required this.onRetry});
+
+  final Object error;
+  final VoidCallback onRetry;
+
+  String get _friendlyMessage {
+    final e = error;
+    if (e is PostgrestException) {
+      if (e.code == 'PGRST303' ||
+          e.message.toLowerCase().contains('jwt issued at future')) {
+        return 'Your session is being refreshed. Tap Retry to try again.';
+      }
+      if (e.code == 'PGRST401' || e.message.toLowerCase().contains('permission')) {
+        return 'Permission error loading your profile. Please sign out and back in.';
+      }
+    }
+    return 'Unable to load your profile. Check your connection and tap Retry.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1012),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0x66EF4444), width: 1),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _friendlyMessage,
+              style: const TextStyle(color: Color(0xFFFFB3B3), fontSize: 13),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: onRetry,
+            style: TextButton.styleFrom(
+              foregroundColor: OceanTheme.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Retry', style: TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),

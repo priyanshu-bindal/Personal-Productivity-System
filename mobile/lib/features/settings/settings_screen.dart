@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -8,6 +9,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/widgets/custom_bottom_sheet.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
+import '../../providers/chat_provider.dart';
 import '../../services/supabase_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -180,6 +182,67 @@ class SettingsScreen extends ConsumerWidget {
                           ),
                         ),
                       ],
+                    ),
+                    const Divider(height: 24),
+                    Consumer(
+                      builder: (context, ref, _) {
+                        final chatIdAsync = ref.watch(currentChatUserShortIdProvider);
+                        final chatId = chatIdAsync.value ?? '···';
+
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0x14FFFFFF),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0x26FFFFFF)),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'YOUR FOCUS ID',
+                                    style: TextStyle(
+                                      color: AppColors.textMuted,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '#$chatId',
+                                    style: const TextStyle(
+                                      fontFamily: 'monospace',
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFBFDBFE),
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              IconButton(
+                                icon: const Icon(LucideIcons.copy, color: Color(0xFF93C5FD), size: 16),
+                                onPressed: chatId != '···'
+                                    ? () {
+                                        Clipboard.setData(ClipboardData(text: chatId));
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Focus ID copied to clipboard'),
+                                            behavior: SnackBarBehavior.floating,
+                                            duration: Duration(seconds: 2),
+                                          ),
+                                        );
+                                      }
+                                    : null,
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                     const Divider(height: 24),
                     ListTile(
