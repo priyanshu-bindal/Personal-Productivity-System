@@ -12,6 +12,8 @@ final expensesProvider = StateNotifierProvider<ExpensesNotifier, AsyncValue<List
 });
 
 class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
+  static int _uuidCounter = 0;
+
   ExpensesNotifier() : super(const AsyncValue.loading()) {
     fetchExpenses();
   }
@@ -31,13 +33,97 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
           .order('expense_date', ascending: false);
 
       final list = (res as List).map((e) => Expense.fromJson(e as Map<String, dynamic>)).toList();
-      state = AsyncValue.data(list);
+      
+      // Preserve any in-flight optimistic expenses that haven't reconciled yet
+      final current = state.value ?? [];
+      final inFlightOptimistic = current.where((e) => e.isOptimistic).toList();
+      if (inFlightOptimistic.isNotEmpty) {
+        state = AsyncValue.data([...inFlightOptimistic, ...list]);
+      } else {
+        state = AsyncValue.data(list);
+      }
     } catch (e, st) {
-      state = AsyncValue.error(e, st);
+      if (state.value == null) {
+        state = AsyncValue.error(e, st);
+      }
     }
   }
 
-  Future<void> addExpense({
+  Future<Expense?> addExpense({
+    required double amount,
+    required String description,
+    required String category,
+    required String paymentMethod,
+    required DateTime date,
+    String? note,
+  }) async {
+    final userId = SupabaseService.currentUserId;
+    if (userId == null) return null;
+
+    final dateStr = DateFormat('yyyy-MM-dd').format(date);
+    final tempId = 'opt_${DateTime.now().microsecondsSinceEpoch}_${_uuidCounter++}';
+
+    // 1. Immediate optimistic insertion
+    final optimisticExpense = Expense(
+      id: tempId,
+      userId: userId,
+      amount: amount,
+      description: description,
+      category: category.toLowerCase(),
+      paymentMethod: paymentMethod.toLowerCase().replaceAll(' ', '_'),
+      expenseDate: dateStr,
+      note: note,
+      createdAt: DateTime.now(),
+      isOptimistic: true,
+    );
+
+    final currentList = state.value ?? [];
+    state = AsyncValue.data([optimisticExpense, ...currentList]);
+
+    try {
+      // 2. Single database roundtrip (INSERT + SELECT)
+      final res = await SupabaseService.client
+          .from('expenses')
+          .insert({
+            'user_id': userId,
+            'amount': amount,
+            'description': description,
+            'category': category.toLowerCase(),
+            'payment_method': paymentMethod.toLowerCase().replaceAll(' ', '_'),
+            'expense_date': dateStr,
+            'note': note,
+          })
+          .select()
+          .single();
+
+      final confirmedExpense = Expense.fromJson(res);
+
+      // 3. Concurrency-safe reconciliation: replace strictly by unique tempId
+      final latestList = state.value ?? [];
+      final index = latestList.indexWhere((e) => e.id == tempId);
+      if (index != -1) {
+        final updatedList = List<Expense>.from(latestList);
+        updatedList[index] = confirmedExpense;
+        state = AsyncValue.data(updatedList);
+      } else {
+        // In case tempId wasn't found, ensure confirmed item is present without duplication
+        final exists = latestList.any((e) => e.id == confirmedExpense.id);
+        if (!exists) {
+          state = AsyncValue.data([confirmedExpense, ...latestList]);
+        }
+      }
+      return confirmedExpense;
+    } catch (e) {
+      // 4. Rollback: remove the specific optimistic item without disturbing other transactions
+      final latestList = state.value ?? [];
+      final updatedList = latestList.where((e) => e.id != tempId).toList();
+      state = AsyncValue.data(updatedList);
+      rethrow;
+    }
+  }
+
+  Future<void> updateExpense({
+    required String expenseId,
     required double amount,
     required String description,
     required String category,
@@ -48,25 +134,82 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
     final userId = SupabaseService.currentUserId;
     if (userId == null) return;
 
+    final currentList = state.value ?? [];
+    final index = currentList.indexWhere((e) => e.id == expenseId);
+    if (index == -1) return;
+    final originalItem = currentList[index];
+
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
-    await SupabaseService.client.from('expenses').insert({
-      'user_id': userId,
-      'amount': amount,
-      'description': description,
-      'category': category.toLowerCase(),
-      'payment_method': paymentMethod.toLowerCase().replaceAll(' ', '_'),
-      'expense_date': dateStr,
-      'note': note,
-    });
-    await fetchExpenses();
+    final optimisticUpdated = originalItem.copyWith(
+      amount: amount,
+      description: description,
+      category: category.toLowerCase(),
+      paymentMethod: paymentMethod.toLowerCase().replaceAll(' ', '_'),
+      expenseDate: dateStr,
+      note: note,
+      isOptimistic: true,
+    );
+
+    final updatedList = List<Expense>.from(currentList);
+    updatedList[index] = optimisticUpdated;
+    state = AsyncValue.data(updatedList);
+
+    try {
+      final res = await SupabaseService.client
+          .from('expenses')
+          .update({
+            'amount': amount,
+            'description': description,
+            'category': category.toLowerCase(),
+            'payment_method': paymentMethod.toLowerCase().replaceAll(' ', '_'),
+            'expense_date': dateStr,
+            'note': note,
+          })
+          .eq('id', expenseId)
+          .select()
+          .single();
+
+      final confirmed = Expense.fromJson(res);
+      final latestList = List<Expense>.from(state.value ?? []);
+      final latestIndex = latestList.indexWhere((e) => e.id == expenseId);
+      if (latestIndex != -1) {
+        latestList[latestIndex] = confirmed;
+        state = AsyncValue.data(latestList);
+      }
+    } catch (e) {
+      final latestList = List<Expense>.from(state.value ?? []);
+      final latestIndex = latestList.indexWhere((e) => e.id == expenseId);
+      if (latestIndex != -1) {
+        latestList[latestIndex] = originalItem;
+        state = AsyncValue.data(latestList);
+      }
+      rethrow;
+    }
   }
 
   Future<void> deleteExpense(String expenseId) async {
     final userId = SupabaseService.currentUserId;
     if (userId == null) return;
 
-    await SupabaseService.client.from('expenses').delete().eq('id', expenseId);
-    await fetchExpenses();
+    final currentList = state.value ?? [];
+    final index = currentList.indexWhere((e) => e.id == expenseId);
+    if (index == -1) return;
+    final removedItem = currentList[index];
+
+    // Optimistically remove
+    final updatedList = List<Expense>.from(currentList)..removeAt(index);
+    state = AsyncValue.data(updatedList);
+
+    try {
+      await SupabaseService.client.from('expenses').delete().eq('id', expenseId);
+    } catch (e) {
+      // Rollback
+      final latestList = List<Expense>.from(state.value ?? []);
+      final insertIndex = index.clamp(0, latestList.length);
+      latestList.insert(insertIndex, removedItem);
+      state = AsyncValue.data(latestList);
+      rethrow;
+    }
   }
 }
 

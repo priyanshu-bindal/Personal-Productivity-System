@@ -8,6 +8,7 @@ class Expense {
   final String expenseDate; // YYYY-MM-DD
   final String? note;
   final DateTime createdAt;
+  final bool isOptimistic;
 
   Expense({
     required this.id,
@@ -19,7 +20,34 @@ class Expense {
     required this.expenseDate,
     this.note,
     required this.createdAt,
+    this.isOptimistic = false,
   });
+
+  Expense copyWith({
+    String? id,
+    String? userId,
+    double? amount,
+    String? description,
+    String? category,
+    String? paymentMethod,
+    String? expenseDate,
+    String? note,
+    DateTime? createdAt,
+    bool? isOptimistic,
+  }) {
+    return Expense(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      amount: amount ?? this.amount,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      expenseDate: expenseDate ?? this.expenseDate,
+      note: note ?? this.note,
+      createdAt: createdAt ?? this.createdAt,
+      isOptimistic: isOptimistic ?? this.isOptimistic,
+    );
+  }
 
   factory Expense.fromJson(Map<String, dynamic> json) {
     return Expense(
@@ -32,6 +60,7 @@ class Expense {
       expenseDate: json['expense_date'] as String? ?? DateTime.now().toIso8601String().split('T')[0],
       note: json['note'] as String?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : DateTime.now(),
+      isOptimistic: false,
     );
   }
 

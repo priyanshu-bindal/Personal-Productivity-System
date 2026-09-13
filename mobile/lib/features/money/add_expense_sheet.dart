@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/widgets/pressable_scale.dart';
+import '../../core/theme/ocean_theme.dart';
+import 'widgets/financial_dropdown_field.dart';
+import 'widgets/transaction_list_item.dart';
 
 class AddExpenseSheet extends StatefulWidget {
   const AddExpenseSheet({super.key});
@@ -12,25 +15,21 @@ class AddExpenseSheet extends StatefulWidget {
   State<AddExpenseSheet> createState() => _AddExpenseSheetState();
 }
 
-class _AddExpenseSheetState extends State<AddExpenseSheet>
-    with TickerProviderStateMixin {
+class _AddExpenseSheetState extends State<AddExpenseSheet> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
   final _noteController = TextEditingController();
+  final _amountFocusNode = FocusNode();
+
   late String _selectedCategory;
   late String _selectedPaymentMethod;
   late DateTime _selectedDate;
 
   bool _isSubmitting = false;
-  bool _showSuccess = false;
+  bool _isAmountFocused = false;
 
-  // Success animation controllers
-  late AnimationController _successScaleCtrl;
-  late AnimationController _successFadeCtrl;
-  late AnimationController _checkCtrl;
-  late Animation<double> _successScale;
-  late Animation<double> _successFade;
+  final List<double> _quickAmounts = [100, 250, 500, 1000, 2000];
 
   @override
   void initState() {
@@ -39,27 +38,13 @@ class _AddExpenseSheetState extends State<AddExpenseSheet>
     _selectedPaymentMethod = AppConstants.paymentMethods.first;
     _selectedDate = DateTime.now();
 
-    _successScaleCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _successFadeCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 250),
-    );
-    _checkCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 250),
-    );
-
-    _successScale = CurvedAnimation(
-      parent: _successScaleCtrl,
-      curve: Curves.easeOutBack,
-    );
-    _successFade = CurvedAnimation(
-      parent: _successFadeCtrl,
-      curve: Curves.easeIn,
-    );
+    _amountFocusNode.addListener(() {
+      if (mounted) {
+        setState(() {
+          _isAmountFocused = _amountFocusNode.hasFocus;
+        });
+      }
+    });
   }
 
   @override
@@ -67,21 +52,63 @@ class _AddExpenseSheetState extends State<AddExpenseSheet>
     _amountController.dispose();
     _descController.dispose();
     _noteController.dispose();
-    _successScaleCtrl.dispose();
-    _successFadeCtrl.dispose();
-    _checkCtrl.dispose();
+    _amountFocusNode.dispose();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+  void _addQuickAmount(double val) {
+    final current = double.tryParse(_amountController.text.trim()) ?? 0.0;
+    final total = (current + val).toStringAsFixed(0);
+    _amountController.text = total;
+    _amountController.selection = TextSelection.fromPosition(
+      TextPosition(offset: _amountController.text.length),
+    );
+    setState(() {});
+  }
+
+  static IconData _getPaymentIcon(String method) {
+    switch (method.toLowerCase()) {
+      case 'cash':
+        return Icons.payments_outlined;
+      case 'upi':
+        return Icons.qr_code_2_rounded;
+      case 'debit_card':
+        return Icons.credit_card_outlined;
+      case 'credit_card':
+        return Icons.credit_card;
+      case 'bank_transfer':
+        return Icons.account_balance_outlined;
+      default:
+        return Icons.more_horiz;
+    }
+  }
+
+  static String _getPaymentLabel(String method) {
+    switch (method.toLowerCase()) {
+      case 'cash':
+        return 'CASH';
+      case 'upi':
+        return 'UPI';
+      case 'debit_card':
+        return 'DEBIT CARD';
+      case 'credit_card':
+        return 'CREDIT CARD';
+      case 'bank_transfer':
+        return 'BANK TRANSFER';
+      default:
+        return 'OTHER';
+    }
+  }
+
+  void _submit() {
     if (_isSubmitting) return;
+    if (!_formKey.currentState!.validate()) return;
 
     final amount = double.tryParse(_amountController.text.trim());
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please enter a valid expense amount'),
+          content: Text('Amount must be greater than ₹0.'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -90,9 +117,13 @@ class _AddExpenseSheetState extends State<AddExpenseSheet>
 
     setState(() => _isSubmitting = true);
 
+    final desc = _descController.text.trim().isNotEmpty
+        ? _descController.text.trim()
+        : '${_selectedCategory[0].toUpperCase()}${_selectedCategory.substring(1)} expense';
+
     final result = {
       'amount': amount,
-      'description': _descController.text.trim(),
+      'description': desc,
       'category': _selectedCategory,
       'paymentMethod': _selectedPaymentMethod,
       'date': _selectedDate,
@@ -101,310 +132,386 @@ class _AddExpenseSheetState extends State<AddExpenseSheet>
           : null,
     };
 
-    // Show success state
-    setState(() => _showSuccess = true);
-
-    // Staggered animation sequence
-    await Future.delayed(const Duration(milliseconds: 150));
-    _successScaleCtrl.forward();
-    await Future.delayed(const Duration(milliseconds: 150));
-    _checkCtrl.forward();
-    await Future.delayed(const Duration(milliseconds: 200));
-    _successFadeCtrl.forward();
-
-    // Hold success state for ~2s total, then close
-    await Future.delayed(const Duration(milliseconds: 1400));
-
-    if (mounted) {
-      Navigator.of(context).pop(result);
-    }
+    // Instant pop without any artificial delays!
+    Navigator.of(context).pop(result);
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
-      transitionBuilder: (child, animation) => FadeTransition(
-        opacity: animation,
-        child: child,
-      ),
-      child: _showSuccess ? _buildSuccess() : _buildForm(),
-    );
-  }
+    // Build category items
+    final categoryItems = AppConstants.expenseCategories.map((c) {
+      final label = c[0].toUpperCase() + c.substring(1);
+      final icon = TransactionListItem.getCategoryIcon(c);
+      final iconColor = TransactionListItem.getCategoryColor(c);
+      return FinancialDropdownItem<String>(
+        value: c,
+        label: label,
+        icon: icon,
+        iconColor: iconColor,
+      );
+    }).toList();
 
-  Widget _buildSuccess() {
-    return SizedBox(
-      key: const ValueKey('success'),
-      height: 260,
-      child: Center(
+    // Build payment items
+    final paymentItems = AppConstants.paymentMethods.map((m) {
+      return FinancialDropdownItem<String>(
+        value: m,
+        label: _getPaymentLabel(m),
+        icon: _getPaymentIcon(m),
+        iconColor: AppColors.secondary,
+      );
+    }).toList();
+
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Form(
+        key: _formKey,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Checkmark circle with glow
-            ScaleTransition(
-              scale: _successScale,
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.primary.withValues(alpha: 0.15),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.45),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.25),
-                      blurRadius: 24,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Icon(
-                    LucideIcons.checkCircle2,
-                    color: AppColors.primary,
-                    size: 40,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Title
-            FadeTransition(
-              opacity: _successFade,
-              child: Column(
-                children: [
-                  const Text(
-                    'Expense Added Successfully',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Your expense has been recorded',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textDim,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildForm() {
-    return Form(
-      key: _formKey,
-      child: Column(
-        key: const ValueKey('form'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Amount Field
-          TextFormField(
-            controller: _amountController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.bold),
-            decoration: const InputDecoration(
-              labelText: 'Amount (₹)',
-              prefixIcon:
-                  Icon(LucideIcons.indianRupee, color: AppColors.primary, size: 22),
-            ),
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Please enter amount' : null,
-          ),
-          const SizedBox(height: 16),
-
-          // Description
-          TextFormField(
-            controller: _descController,
-            style: const TextStyle(color: AppColors.textPrimary),
-            decoration: const InputDecoration(
-              labelText: 'Description',
-              hintText: 'e.g. Lunch with team, Groceries',
-              prefixIcon:
-                  Icon(LucideIcons.fileText, color: AppColors.textMuted, size: 20),
-            ),
-            validator: (v) =>
-                (v == null || v.trim().isEmpty) ? 'Please enter description' : null,
-          ),
-          const SizedBox(height: 16),
-
-          // Category & Payment Method
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedCategory,
-                  dropdownColor: AppColors.card,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  decoration: const InputDecoration(
-                    labelText: 'Category',
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  ),
-                  items: AppConstants.expenseCategories.map((c) {
-                    final label = c[0].toUpperCase() + c.substring(1);
-                    return DropdownMenuItem(value: c, child: Text(label));
-                  }).toList(),
-                  onChanged: (v) {
-                    if (v != null) setState(() => _selectedCategory = v);
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonFormField<String>(
-                  initialValue: _selectedPaymentMethod,
-                  dropdownColor: AppColors.card,
-                  style: const TextStyle(color: AppColors.textPrimary),
-                  decoration: const InputDecoration(
-                    labelText: 'Payment',
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  ),
-                  items: AppConstants.paymentMethods.map((m) {
-                    final label = m.replaceAll('_', ' ').toUpperCase();
-                    return DropdownMenuItem(value: m, child: Text(label));
-                  }).toList(),
-                  onChanged: (v) {
-                    if (v != null) setState(() => _selectedPaymentMethod = v);
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Date Picker Tile
-          InkWell(
-            onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _selectedDate,
-                firstDate: DateTime(2020),
-                lastDate: DateTime.now().add(const Duration(days: 365)),
-                builder: (context, child) {
-                  return Theme(
-                    data: ThemeData.dark().copyWith(
-                      colorScheme: const ColorScheme.dark(
-                        primary: AppColors.primary,
-                        surface: AppColors.card,
-                      ),
-                    ),
-                    child: child!,
-                  );
-                },
-              );
-              if (picked != null) setState(() => _selectedDate = picked);
-            },
-            child: Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(LucideIcons.calendar,
-                          color: AppColors.textMuted, size: 20),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Date: ${DateFormat('MMMM d, yyyy').format(_selectedDate)}',
-                        style: const TextStyle(
-                            color: AppColors.textPrimary, fontSize: 14),
-                      ),
-                    ],
-                  ),
-                  const Icon(LucideIcons.chevronDown,
-                      color: AppColors.textMuted, size: 18),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Note (Optional)
-          TextFormField(
-            controller: _noteController,
-            style: const TextStyle(color: AppColors.textPrimary),
-            decoration: const InputDecoration(
-              labelText: 'Additional Note (Optional)',
-              prefixIcon: Icon(LucideIcons.stickyNote,
-                  color: AppColors.textMuted, size: 20),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Submit — disabled while submitting
-          PressableScale(
-            onTap: _isSubmitting ? null : _submit,
-            child: AnimatedContainer(
+            // UNIFIED AMOUNT INPUT COMPONENT (Single clean border with smooth focus animation)
+            AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              height: 50,
-              width: double.infinity,
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: _isSubmitting
-                    ? AppColors.cardHi.withValues(alpha: 0.6)
-                    : AppColors.cardHi,
-                borderRadius: BorderRadius.circular(14),
+                color: _isAmountFocused
+                    ? OceanTheme.cardHi.withValues(alpha: 0.85)
+                    : OceanTheme.card.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: _isSubmitting
-                      ? AppColors.border
-                      : AppColors.primary.withValues(alpha: 0.45),
-                  width: 1.2,
+                  color: _isAmountFocused
+                      ? AppColors.secondary.withValues(alpha: 0.8)
+                      : AppColors.border,
+                  width: _isAmountFocused ? 1.4 : 1.0,
                 ),
-                boxShadow: _isSubmitting
-                    ? null
-                    : [
+                boxShadow: _isAmountFocused
+                    ? [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.18),
-                          blurRadius: 12,
+                          color: AppColors.secondary.withValues(alpha: 0.14),
+                          blurRadius: 14,
                           offset: const Offset(0, 3),
+                        ),
+                      ]
+                    : const [
+                        BoxShadow(
+                          color: Color(0x20000000),
+                          blurRadius: 6,
+                          offset: Offset(0, 2),
                         ),
                       ],
               ),
-              child: Center(
-                child: _isSubmitting
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'AMOUNT',
+                    style: TextStyle(
+                      color: AppColors.textDim,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        '₹ ',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w700,
+                          color: _isAmountFocused
+                              ? AppColors.blueHighlight
+                              : AppColors.secondary,
+                        ),
+                      ),
+                      Expanded(
+                        child: TextFormField(
+                          controller: _amountController,
+                          focusNode: _amountFocusNode,
+                          autofocus: true,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
+                          decoration: const InputDecoration(
+                            hintText: '0',
+                            hintStyle: TextStyle(
+                              color: AppColors.textFaint,
+                              fontSize: 32,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            errorBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                            focusedErrorBorder: InputBorder.none,
+                            filled: false,
+                            fillColor: Colors.transparent,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) {
+                              return 'Enter an amount.';
+                            }
+                            final parsed = double.tryParse(v.trim());
+                            if (parsed == null) {
+                              return 'Enter a valid amount.';
+                            }
+                            if (parsed <= 0) {
+                              return 'Amount must be greater than ₹0.';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    height: 1,
+                    color: _isAmountFocused
+                        ? AppColors.secondary.withValues(alpha: 0.35)
+                        : AppColors.border.withValues(alpha: 0.6),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Quick Amount Selector Chips
+            SizedBox(
+              height: 32,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _quickAmounts.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 8),
+                itemBuilder: (context, index) {
+                  final amt = _quickAmounts[index];
+                  return InkWell(
+                    onTap: () => _addQuickAmount(amt),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: OceanTheme.cardHi,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '+₹${amt.toInt()}',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Description Input
+            TextFormField(
+              controller: _descController,
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                labelText: 'Description',
+                hintText: 'e.g. Groceries, Team Lunch, Books',
+                hintStyle: const TextStyle(color: AppColors.textFaint, fontSize: 13),
+                prefixIcon: const Icon(LucideIcons.fileText, color: AppColors.textDim, size: 18),
+                filled: true,
+                fillColor: OceanTheme.bg.withValues(alpha: 0.35),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.8)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Premium Custom Dropdown Row: Category & Payment
+            Row(
+              children: [
+                Expanded(
+                  child: FinancialDropdownField<String>(
+                    label: 'Category',
+                    value: _selectedCategory,
+                    items: categoryItems,
+                    onChanged: (val) {
+                      setState(() => _selectedCategory = val);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FinancialDropdownField<String>(
+                    label: 'Payment',
+                    value: _selectedPaymentMethod,
+                    items: paymentItems,
+                    onChanged: (val) {
+                      setState(() => _selectedPaymentMethod = val);
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+
+            // Date Selector
+            InkWell(
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _selectedDate,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                  builder: (context, child) {
+                    return Theme(
+                      data: ThemeData.dark().copyWith(
+                        colorScheme: const ColorScheme.dark(
+                          primary: AppColors.primary,
+                          surface: OceanTheme.card,
+                        ),
+                      ),
+                      child: child!,
+                    );
+                  },
+                );
+                if (picked != null) setState(() => _selectedDate = picked);
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: OceanTheme.bg.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(LucideIcons.calendar, color: AppColors.textDim, size: 16),
+                        const SizedBox(width: 10),
+                        Text(
+                          DateFormat('MMMM d, yyyy').format(_selectedDate),
+                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                    const Icon(LucideIcons.chevronDown, color: AppColors.textDim, size: 16),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Note Field (Optional)
+            TextFormField(
+              controller: _noteController,
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                labelText: 'Note (Optional)',
+                hintText: 'Add context or tags',
+                hintStyle: const TextStyle(color: AppColors.textFaint, fontSize: 13),
+                prefixIcon: const Icon(LucideIcons.stickyNote, color: AppColors.textDim, size: 18),
+                filled: true,
+                fillColor: OceanTheme.bg.withValues(alpha: 0.35),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.8)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+
+            // Premium Financial CTA Button
+            InkWell(
+              onTap: _isSubmitting ? null : _submit,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                height: 52,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF14C8A8),
+                      Color(0xFF0F9F86),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.28),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: _isSubmitting
                     ? const SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                              AppColors.primary),
+                          strokeWidth: 2.2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
-                    : const Text(
-                        'Add Expense',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(LucideIcons.plusCircle, color: Colors.white, size: 18),
+                          SizedBox(width: 8),
+                          Text(
+                            'Add Expense',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
                       ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
