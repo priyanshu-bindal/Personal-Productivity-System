@@ -7,6 +7,8 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/animated_card.dart';
 import '../../core/widgets/custom_bottom_sheet.dart';
+import '../../core/widgets/micro_interactions/animated_delete.dart';
+import '../../core/widgets/micro_interactions/branded_refresh_indicator.dart';
 import '../../core/widgets/traffic_loader.dart';
 import '../../models/note.dart';
 import '../../providers/notes_provider.dart';
@@ -107,7 +109,7 @@ class NotesScreen extends ConsumerWidget {
         child: const Icon(LucideIcons.plus, color: Colors.white),
       ),
       body: SafeArea(
-        child: RefreshIndicator(
+        child: BrandedRefreshIndicator(
           onRefresh: () async {
             await ref.read(notesProvider.notifier).fetchNotes();
           },
@@ -168,78 +170,80 @@ class NotesScreen extends ConsumerWidget {
                             itemCount: notes.length,
                             itemBuilder: (context, index) {
                               final note = notes[index];
-                              return AnimatedCard(
-                                index: index,
-                                onTap: () => _openAddNoteModal(context, ref, note),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            note.title,
-                                            style: const TextStyle(
-                                              fontSize: 17,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.textPrimary,
+                              return AnimatedDelete.builder(
+                                onDeleteConfirmed: () async =>
+                                    ref.read(notesProvider.notifier).deleteNote(note.id),
+                                builder: (context, startDelete) => AnimatedCard(
+                                  index: index,
+                                  onTap: () => _openAddNoteModal(context, ref, note),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              note.title,
+                                              style: const TextStyle(
+                                                fontSize: 17,
+                                                fontWeight: FontWeight.bold,
+                                                color: AppColors.textPrimary,
+                                              ),
                                             ),
                                           ),
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(LucideIcons.trash2, color: AppColors.textMuted, size: 18),
-                                          onPressed: () {
-                                            ref.read(notesProvider.notifier).deleteNote(note.id);
-                                          },
-                                          visualDensity: VisualDensity.compact,
+                                          IconButton(
+                                            icon: const Icon(LucideIcons.trash2, color: AppColors.textMuted, size: 18),
+                                            onPressed: startDelete,
+                                            visualDensity: VisualDensity.compact,
+                                          ),
+                                        ],
+                                      ),
+                                      if (note.content != null && note.content!.isNotEmpty) ...[
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          note.content!,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            color: AppColors.textSecondary,
+                                            height: 1.4,
+                                          ),
                                         ),
                                       ],
-                                    ),
-                                    if (note.content != null && note.content!.isNotEmpty) ...[
-                                      const SizedBox(height: 6),
-                                      Text(
-                                        note.content!,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          color: AppColors.textSecondary,
-                                          height: 1.4,
-                                        ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          if (note.tags.isNotEmpty)
+                                            Wrap(
+                                              spacing: 6,
+                                              children: note.tags.take(3).map((tag) {
+                                                return Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.surface,
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(color: AppColors.border),
+                                                  ),
+                                                  child: Text(
+                                                    '#$tag',
+                                                    style: const TextStyle(fontSize: 11, color: AppColors.accentCyan),
+                                                  ),
+                                                );
+                                              }).toList(),
+                                            )
+                                          else
+                                            const SizedBox.shrink(),
+                                          Text(
+                                            'Updated ${_formatTimeAgo(note.updatedAt)}',
+                                            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                                          ),
+                                        ],
                                       ),
                                     ],
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        if (note.tags.isNotEmpty)
-                                          Wrap(
-                                            spacing: 6,
-                                            children: note.tags.take(3).map((tag) {
-                                              return Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.surface,
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: AppColors.border),
-                                                ),
-                                                child: Text(
-                                                  '#$tag',
-                                                  style: const TextStyle(fontSize: 11, color: AppColors.accentCyan),
-                                                ),
-                                              );
-                                            }).toList(),
-                                          )
-                                        else
-                                          const SizedBox.shrink(),
-                                        Text(
-                                          'Updated ${_formatTimeAgo(note.updatedAt)}',
-                                          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               );
                             },

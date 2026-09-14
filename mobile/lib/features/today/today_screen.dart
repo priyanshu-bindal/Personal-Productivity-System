@@ -1,4 +1,6 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/ocean_theme.dart';
 import '../../core/widgets/animated_card.dart';
+import '../../core/widgets/micro_interactions/branded_refresh_indicator.dart';
 import '../../core/widgets/pressable_scale.dart';
 import '../../core/widgets/streak_button.dart';
 import '../../core/widgets/traffic_loader.dart';
@@ -63,7 +66,7 @@ class TodayScreen extends ConsumerWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
-          child: RefreshIndicator(
+          child: BrandedRefreshIndicator(
             onRefresh: () async {
               ref.read(profileProvider.notifier).fetchProfile();
               await ref.read(sessionsProvider.notifier).fetchSessions();
@@ -339,7 +342,7 @@ class TodayScreen extends ConsumerWidget {
   }
 }
 
-class _TodaySessionCard extends StatelessWidget {
+class _TodaySessionCard extends StatefulWidget {
   final LearningSession session;
   final int index;
   final VoidCallback onComplete;
@@ -352,121 +355,281 @@ class _TodaySessionCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final isCompleted = session.status == 'completed';
+  State<_TodaySessionCard> createState() => _TodaySessionCardState();
+}
 
-    return AnimatedCard(
-      index: index,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      backgroundColor: OceanTheme.card,
-      border: Border.all(
-        color: OceanTheme.border,
-        width: 1.2,
+class _ConfettiPainter extends CustomPainter {
+  final double progress; // 0.0 → 1.0, driven by the confetti AnimationController
+  final List<Color> colors;
+
+  _ConfettiPainter({required this.progress, required this.colors});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0 || progress >= 1) return;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    const dotCount = 8;
+    const maxDistance = 26.0;
+
+    final distance = progress * maxDistance;
+    final opacity = (1 - progress).clamp(0.0, 1.0);
+    final dotRadius = 3.0 * (1 - progress * 0.6); // dots shrink slightly as they fly out
+
+    for (int i = 0; i < dotCount; i++) {
+      final angle = (i / dotCount) * 2 * math.pi;
+      final offset = Offset(math.cos(angle) * distance, math.sin(angle) * distance);
+      final paint = Paint()
+        ..color = colors[i % colors.length].withValues(alpha: opacity)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(center + offset, dotRadius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConfettiPainter oldDelegate) => oldDelegate.progress != progress;
+}
+
+class _TodaySessionCardState extends State<_TodaySessionCard>
+    with TickerProviderStateMixin {
+  bool _isProcessing = false;
+
+  late final AnimationController _popController;
+  late final Animation<double> _popScale;
+  late final AnimationController _confettiController;
+
+  static const List<Color> _confettiColors = [
+    OceanTheme.primary,
+    OceanTheme.secondary,
+    OceanTheme.amber,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _popController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _popScale = TweenSequence<double>([
+      TweenSequenceItem(
+        weight: 35,
+        tween: Tween(begin: 1.0, end: 1.035).chain(CurveTween(curve: Curves.easeOut)),
       ),
-      child: Row(
-        children: [
-          // Icon Container:
-          // Completed: Icon #3B82F6 (Blue) on #132038 container
-          // Active/Scheduled: Icon #00E5A0 (Green) on #0A2E24 container
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: isCompleted ? OceanTheme.secondaryDim : OceanTheme.primaryDim,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Center(
-              child: Icon(
-                isCompleted ? LucideIcons.check : LucideIcons.bookOpen,
-                color: isCompleted ? OceanTheme.secondary : OceanTheme.primary,
-                size: 20,
-              ),
-            ),
+      TweenSequenceItem(
+        weight: 65,
+        tween: Tween(begin: 1.035, end: 1.0).chain(CurveTween(curve: Curves.easeOutBack)),
+      ),
+    ]).animate(_popController);
+
+    _confettiController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _TodaySessionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session.status != widget.session.status) {
+      if (_isProcessing) {
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _popController.dispose();
+    _confettiController.dispose();
+    super.dispose();
+  }
+
+  void _handleComplete() {
+    if (_isProcessing) return;
+    HapticFeedback.mediumImpact();
+    setState(() => _isProcessing = true);
+    _popController.forward(from: 0);
+    _confettiController.forward(from: 0);
+    widget.onComplete();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isCompleted = widget.session.status == 'completed';
+    final showDone = isCompleted || _isProcessing;
+
+    return ScaleTransition(
+      scale: _popScale,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeOut,
+        opacity: showDone ? 0.85 : 1.0,
+        child: AnimatedCard(
+          index: widget.index,
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          backgroundColor: OceanTheme.card,
+          border: Border.all(
+            color: showDone ? OceanTheme.secondary.withValues(alpha: 0.25) : OceanTheme.border,
+            width: 1.2,
           ),
-          const SizedBox(width: 14),
-          // Session Info:
-          // Completed text: Blue #3B82F6
-          // Scheduled text: Green #00E5A0
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  session.skillName ?? 'Skill Practice',
-                  style: AppTextStyles.bodyStrong,
-                ),
-                const SizedBox(height: 4),
-                Row(
+          child: Row(
+            children: [
+              // ── Icon box with confetti overlay ─────────────────────────
+              SizedBox(
+                width: 44,
+                height: 44,
+                child: Stack(
+                  clipBehavior: Clip.none, // lets confetti paint outside the 44x44 box
+                  alignment: Alignment.center,
                   children: [
-                    Text(
-                      '${session.plannedDuration} minutes',
-                      style: AppTextStyles.bodySecondary.copyWith(
-                        color: isCompleted ? OceanTheme.secondary : OceanTheme.primary,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: Text(
-                        '•',
-                        style: AppTextStyles.bodySecondary.copyWith(
-                          color: isCompleted ? OceanTheme.secondary : OceanTheme.primary,
+                    Positioned(
+                      left: -12,
+                      top: -12,
+                      child: AnimatedBuilder(
+                        animation: _confettiController,
+                        builder: (context, _) => CustomPaint(
+                          size: const Size(68, 68),
+                          painter: _ConfettiPainter(
+                            progress: _confettiController.value,
+                            colors: _confettiColors,
+                          ),
                         ),
                       ),
                     ),
-                    Text(
-                      isCompleted ? 'Completed' : 'Scheduled',
-                      style: AppTextStyles.bodySecondary.copyWith(
-                        color: isCompleted ? OceanTheme.secondary : OceanTheme.primary,
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 380),
+                      curve: Curves.easeOutCubic,
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: showDone ? OceanTheme.secondaryDim : OceanTheme.primaryDim,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 320),
+                          switchInCurve: Curves.easeOutBack,
+                          switchOutCurve: Curves.easeIn,
+                          transitionBuilder: (child, animation) => ScaleTransition(
+                            scale: animation,
+                            child: RotationTransition(
+                              turns: Tween<double>(begin: 0.12, end: 0).animate(animation),
+                              child: FadeTransition(opacity: animation, child: child),
+                            ),
+                          ),
+                          child: Icon(
+                            showDone ? LucideIcons.check : LucideIcons.bookOpen,
+                            key: ValueKey(showDone),
+                            color: showDone ? OceanTheme.secondary : OceanTheme.primary,
+                            size: 20,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Right Status / Action:
-          // Completed: "✓ Done" in Blue #3B82F6
-          // Active/Scheduled: "Complete" button solid Green #00E5A0 fill, dark text #06090F
-          if (isCompleted)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(LucideIcons.check, color: OceanTheme.secondary, size: 16),
-                const SizedBox(width: 4),
-                Text(
-                  'Done',
-                  style: AppTextStyles.bodySecondary.copyWith(
-                    color: OceanTheme.secondary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            )
-          else
-            PressableScale(
-              onTap: onComplete,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                decoration: BoxDecoration(
-                  color: OceanTheme.primary, // #00E5A0
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x3300E5A0),
-                      blurRadius: 10,
-                      offset: Offset(0, 2),
+              ),
+              const SizedBox(width: 14),
+
+              // ── Session info ─────────────────────────────────────────────
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(widget.session.skillName ?? 'Skill Practice', style: AppTextStyles.bodyStrong),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 350),
+                          curve: Curves.easeOutCubic,
+                          style: AppTextStyles.bodySecondary.copyWith(
+                            color: showDone ? OceanTheme.secondary : OceanTheme.primary,
+                          ),
+                          child: Text('${widget.session.plannedDuration} minutes'),
+                        ),
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 350),
+                          curve: Curves.easeOutCubic,
+                          style: AppTextStyles.bodySecondary.copyWith(
+                            color: showDone ? OceanTheme.secondary : OceanTheme.primary,
+                          ),
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 6),
+                            child: Text('•'),
+                          ),
+                        ),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          switchInCurve: Curves.easeOut,
+                          switchOutCurve: Curves.easeIn,
+                          transitionBuilder: (child, animation) => FadeTransition(opacity: animation, child: child),
+                          child: AnimatedDefaultTextStyle(
+                            key: ValueKey(showDone),
+                            duration: const Duration(milliseconds: 350),
+                            curve: Curves.easeOutCubic,
+                            style: AppTextStyles.bodySecondary.copyWith(
+                              color: showDone ? OceanTheme.secondary : OceanTheme.primary,
+                            ),
+                            child: Text(showDone ? 'Completed' : 'Scheduled'),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                child: Text(
-                  'Complete',
-                  style: AppTextStyles.buttonText,
-                ),
               ),
-            ),
-        ],
+              const SizedBox(width: 12),
+
+              // ── Complete button / Done badge ───────────────────────────────
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 360),
+                switchInCurve: Curves.easeOutBack,
+                switchOutCurve: Curves.easeInCubic,
+                transitionBuilder: (child, animation) => SlideTransition(
+                  position: Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(animation),
+                  child: ScaleTransition(
+                    scale: Tween<double>(begin: 0.82, end: 1.0).animate(animation),
+                    child: FadeTransition(opacity: animation, child: child),
+                  ),
+                ),
+                child: showDone
+                    ? Row(
+                        key: const ValueKey('done'),
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(LucideIcons.check, color: OceanTheme.secondary, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Done',
+                            style: AppTextStyles.bodySecondary.copyWith(
+                              color: OceanTheme.secondary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      )
+                    : PressableScale(
+                        key: const ValueKey('complete'),
+                        onTap: _handleComplete,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: OceanTheme.primary,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: const [
+                              BoxShadow(color: Color(0x3300E5A0), blurRadius: 10, offset: Offset(0, 2)),
+                            ],
+                          ),
+                          child: Text('Complete', style: AppTextStyles.buttonText),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

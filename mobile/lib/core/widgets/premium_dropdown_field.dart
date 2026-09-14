@@ -44,6 +44,10 @@ class _PremiumDropdownFieldState<T> extends State<PremiumDropdownField<T>>
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+  // Pre-built slide animations — created once in initState, never inside
+  // the OverlayEntry builder which runs on every animation tick.
+  late final Animation<Offset> _slideDownAnimation; // follower opens downward
+  late final Animation<Offset> _slideUpAnimation;   // follower opens upward
 
   bool _isOpen = false;
 
@@ -56,6 +60,7 @@ class _PremiumDropdownFieldState<T> extends State<PremiumDropdownField<T>>
       reverseDuration: const Duration(milliseconds: 160),
     );
 
+    // Single CurvedAnimation shared by all child animations — never recreated.
     final curved = CurvedAnimation(
       parent: _animController,
       curve: Curves.easeOutCubic,
@@ -64,6 +69,12 @@ class _PremiumDropdownFieldState<T> extends State<PremiumDropdownField<T>>
 
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(curved);
     _scaleAnimation = Tween<double>(begin: 0.96, end: 1.0).animate(curved);
+    _slideDownAnimation =
+        Tween<Offset>(begin: const Offset(0, -0.05), end: Offset.zero)
+            .animate(curved);
+    _slideUpAnimation =
+        Tween<Offset>(begin: const Offset(0, 0.05), end: Offset.zero)
+            .animate(curved);
   }
 
   @override
@@ -133,14 +144,135 @@ class _PremiumDropdownFieldState<T> extends State<PremiumDropdownField<T>>
   }
 
   OverlayEntry _createOverlayEntry(Size targetSize, bool openUpward) {
+    // Pick the correct pre-built slide animation — no allocation at call site.
+    final slideAnimation =
+        openUpward ? _slideUpAnimation : _slideDownAnimation;
+
+    // Build the static dropdown content *outside* the OverlayEntry builder so
+    // it becomes the immutable `child` argument of AnimatedBuilder.  Flutter
+    // will then reuse this subtree on every animation tick instead of calling
+    // itemBuilder again, eliminating the per-frame rebuild cost.
+    final dropdownContent = RepaintBoundary(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          constraints: const BoxConstraints(maxHeight: 240),
+          decoration: BoxDecoration(
+            color: OceanTheme.cardHi,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.border.withValues(alpha: 0.9),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.65),
+                blurRadius: 22,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: AppColors.secondary.withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                OceanTheme.cardHi,
+                OceanTheme.card,
+              ],
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              shrinkWrap: true,
+              physics: const BouncingScrollPhysics(),
+              itemCount: widget.items.length,
+              itemBuilder: (context, index) {
+                final item = widget.items[index];
+                final isSelected = item.value == widget.value;
+
+                return InkWell(
+                  onTap: () {
+                    _closeDropdown(
+                      animate: true,
+                      onComplete: () {
+                        widget.onChanged(item.value);
+                      },
+                    );
+                  },
+                  splashColor: AppColors.secondary.withValues(alpha: 0.15),
+                  highlightColor: AppColors.secondary.withValues(alpha: 0.10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.secondary.withValues(alpha: 0.14)
+                          : Colors.transparent,
+                    ),
+                    child: Row(
+                      children: [
+                        // Checkmark on the left for selected item
+                        SizedBox(
+                          width: 18,
+                          child: isSelected
+                              ? const Icon(
+                                  LucideIcons.check,
+                                  color: AppColors.blueHighlight,
+                                  size: 15,
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 8),
+
+                        // Optional item icon
+                        if (item.icon != null) ...[
+                          Icon(
+                            item.icon,
+                            size: 16,
+                            color: item.iconColor ??
+                                (isSelected
+                                    ? AppColors.blueHighlight
+                                    : AppColors.textSecondary),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+
+                        // Label
+                        Expanded(
+                          child: Text(
+                            item.label,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary,
+                              fontSize: 13,
+                              fontWeight: isSelected
+                                  ? FontWeight.bold
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
     return OverlayEntry(
       builder: (context) {
-        final curved = CurvedAnimation(
-          parent: _animController,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
-
         return Stack(
           children: [
             // Barrier to dismiss on tap outside
@@ -158,19 +290,20 @@ class _PremiumDropdownFieldState<T> extends State<PremiumDropdownField<T>>
               child: CompositedTransformFollower(
                 link: _layerLink,
                 showWhenUnlinked: false,
-                targetAnchor: openUpward ? Alignment.topLeft : Alignment.bottomLeft,
-                followerAnchor: openUpward ? Alignment.bottomLeft : Alignment.topLeft,
+                targetAnchor:
+                    openUpward ? Alignment.topLeft : Alignment.bottomLeft,
+                followerAnchor:
+                    openUpward ? Alignment.bottomLeft : Alignment.topLeft,
                 offset: Offset(0, openUpward ? -4 : 4),
+                // dropdownContent is the pre-built `child` — AnimatedBuilder
+                // passes it straight through without calling builder() on it.
                 child: AnimatedBuilder(
                   animation: _animController,
                   builder: (context, child) {
                     return FadeTransition(
                       opacity: _fadeAnimation,
                       child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: Offset(0, openUpward ? 0.05 : -0.05),
-                          end: Offset.zero,
-                        ).animate(curved),
+                        position: slideAnimation,
                         child: ScaleTransition(
                           scale: _scaleAnimation,
                           alignment: openUpward
@@ -181,122 +314,7 @@ class _PremiumDropdownFieldState<T> extends State<PremiumDropdownField<T>>
                       ),
                     );
                   },
-                  child: Material(
-                    color: Colors.transparent,
-                    child: Container(
-                      constraints: const BoxConstraints(maxHeight: 240),
-                      decoration: BoxDecoration(
-                        color: OceanTheme.cardHi,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: AppColors.border.withValues(alpha: 0.9),
-                          width: 1.2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.65),
-                            blurRadius: 22,
-                            offset: const Offset(0, 8),
-                          ),
-                          BoxShadow(
-                            color: AppColors.secondary.withValues(alpha: 0.08),
-                            blurRadius: 16,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            OceanTheme.cardHi,
-                            OceanTheme.card,
-                          ],
-                        ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          shrinkWrap: true,
-                          physics: const BouncingScrollPhysics(),
-                          itemCount: widget.items.length,
-                          itemBuilder: (context, index) {
-                            final item = widget.items[index];
-                            final isSelected = item.value == widget.value;
-
-                            return InkWell(
-                              onTap: () {
-                                _closeDropdown(
-                                  animate: true,
-                                  onComplete: () {
-                                    widget.onChanged(item.value);
-                                  },
-                                );
-                              },
-                              splashColor: AppColors.secondary.withValues(alpha: 0.15),
-                              highlightColor: AppColors.secondary.withValues(alpha: 0.10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? AppColors.secondary.withValues(alpha: 0.14)
-                                      : Colors.transparent,
-                                ),
-                                child: Row(
-                                  children: [
-                                    // Checkmark on the left for selected item
-                                    SizedBox(
-                                      width: 18,
-                                      child: isSelected
-                                          ? const Icon(
-                                              LucideIcons.check,
-                                              color: AppColors.blueHighlight,
-                                              size: 15,
-                                            )
-                                          : null,
-                                    ),
-                                    const SizedBox(width: 8),
-
-                                    // Optional item icon
-                                    if (item.icon != null) ...[
-                                      Icon(
-                                        item.icon,
-                                        size: 16,
-                                        color: item.iconColor ??
-                                            (isSelected
-                                                ? AppColors.blueHighlight
-                                                : AppColors.textSecondary),
-                                      ),
-                                      const SizedBox(width: 10),
-                                    ],
-
-                                    // Label
-                                    Expanded(
-                                      child: Text(
-                                        item.label,
-                                        style: TextStyle(
-                                          color: isSelected
-                                              ? AppColors.textPrimary
-                                              : AppColors.textSecondary,
-                                          fontSize: 13,
-                                          fontWeight: isSelected
-                                              ? FontWeight.bold
-                                              : FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
+                  child: dropdownContent,
                 ),
               ),
             ),

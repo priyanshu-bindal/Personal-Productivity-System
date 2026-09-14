@@ -4,6 +4,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/ocean_theme.dart';
+import '../../../core/widgets/micro_interactions/animated_delete.dart';
 import '../../../models/expense.dart';
 
 class TransactionListItem extends StatelessWidget {
@@ -104,138 +105,123 @@ class TransactionListItem extends StatelessWidget {
       }
     }
 
-    final child = Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: OceanTheme.card,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: expense.isOptimistic
-              ? AppColors.primary.withValues(alpha: 0.35)
-              : AppColors.border,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
+    Widget buildBody(VoidCallback? handleDelete) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: OceanTheme.card,
           borderRadius: BorderRadius.circular(14),
-          onTap: () {},
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Row(
-              children: [
-                // Category Icon with subtle tinted background
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: catColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: catColor.withValues(alpha: 0.25),
-                      width: 1,
+          border: Border.all(
+            color: expense.isOptimistic
+                ? AppColors.primary.withValues(alpha: 0.35)
+                : AppColors.border,
+            width: 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () {},
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  // Category Icon with subtle tinted background
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: catColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: catColor.withValues(alpha: 0.25),
+                        width: 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(catIcon, color: catColor, size: 20),
                     ),
                   ),
-                  child: Center(
-                    child: Icon(catIcon, color: catColor, size: 20),
-                  ),
-                ),
-                const SizedBox(width: 14),
+                  const SizedBox(width: 14),
 
-                // Title & Category/Date Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              expense.description,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          if (expense.isOptimistic) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.accentAmber.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: AppColors.accentAmber.withValues(alpha: 0.35),
+                  // Title & Category/Date Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                expense.description,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 8,
-                                    height: 8,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 1.5,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        AppColors.accentAmber,
+                            ),
+                            if (expense.isOptimistic) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentAmber.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: AppColors.accentAmber.withValues(alpha: 0.35),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 8,
+                                      height: 8,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.5,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          AppColors.accentAmber,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Text(
-                                    'Processing',
-                                    style: TextStyle(
-                                      color: AppColors.accentAmber,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'Processing',
+                                      style: TextStyle(
+                                        color: AppColors.accentAmber,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Text(
+                              catName,
+                              style: TextStyle(
+                                color: catColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                          ],
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Text(
-                            catName,
-                            style: TextStyle(
-                              color: catColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const Text(
-                            ' • ',
-                            style: TextStyle(
-                              color: AppColors.textDim,
-                              fontSize: 12,
-                            ),
-                          ),
-                          Text(
-                            dateDisplay,
-                            style: const TextStyle(
-                              color: AppColors.textDim,
-                              fontSize: 12,
-                            ),
-                          ),
-                          if (expense.paymentMethod.isNotEmpty &&
-                              expense.paymentMethod != 'other') ...[
                             const Text(
                               ' • ',
                               style: TextStyle(
@@ -244,54 +230,81 @@ class TransactionListItem extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              expense.paymentMethod.toUpperCase(),
+                              dateDisplay,
                               style: const TextStyle(
-                                color: AppColors.textFaint,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
+                                color: AppColors.textDim,
+                                fontSize: 12,
                               ),
                             ),
+                            if (expense.paymentMethod.isNotEmpty &&
+                                expense.paymentMethod != 'other') ...[
+                              const Text(
+                                ' • ',
+                                style: TextStyle(
+                                  color: AppColors.textDim,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Text(
+                                expense.paymentMethod.toUpperCase(),
+                                style: const TextStyle(
+                                  color: AppColors.textFaint,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+
+                  // Amount & Delete Button
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '-${currency.format(expense.amount)}',
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
+                      if (onDelete != null && !expense.isOptimistic) ...[
+                        const SizedBox(width: 4),
+                        IconButton(
+                          icon: const Icon(
+                            LucideIcons.trash2,
+                            color: AppColors.textDim,
+                            size: 15,
+                          ),
+                          splashRadius: 18,
+                          visualDensity: VisualDensity.compact,
+                          onPressed: handleDelete,
+                        ),
+                      ],
                     ],
                   ),
-                ),
-                const SizedBox(width: 10),
-
-                // Amount & Delete Button
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      '-${currency.format(expense.amount)}',
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (onDelete != null && !expense.isOptimistic) ...[
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(
-                          LucideIcons.trash2,
-                          color: AppColors.textDim,
-                          size: 15,
-                        ),
-                        splashRadius: 18,
-                        visualDensity: VisualDensity.compact,
-                        onPressed: onDelete,
-                      ),
-                    ],
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
-    );
+      );
+    }
+
+    Widget childWidget;
+    if (onDelete != null && !expense.isOptimistic) {
+      childWidget = AnimatedDelete.builder(
+        onDeleteConfirmed: () async => onDelete?.call(),
+        builder: (context, startDelete) => buildBody(startDelete),
+      );
+    } else {
+      childWidget = buildBody(onDelete);
+    }
 
     if (animateEntrance) {
       return TweenAnimationBuilder<double>(
@@ -307,10 +320,10 @@ class TransactionListItem extends StatelessWidget {
             ),
           );
         },
-        child: child,
+        child: childWidget,
       );
     }
 
-    return child;
+    return childWidget;
   }
 }

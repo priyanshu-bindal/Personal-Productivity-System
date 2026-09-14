@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/animated_card.dart';
 import '../../core/widgets/custom_bottom_sheet.dart';
+import '../../core/widgets/micro_interactions/branded_refresh_indicator.dart';
 import '../../core/widgets/pressable_scale.dart';
 import '../../core/widgets/traffic_loader.dart';
 import '../../models/skill.dart';
@@ -45,7 +46,7 @@ class SkillsScreen extends ConsumerWidget {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
-          child: RefreshIndicator(
+          child: BrandedRefreshIndicator(
             onRefresh: () async {
               await ref.read(skillsProvider.notifier).fetchSkills();
             },

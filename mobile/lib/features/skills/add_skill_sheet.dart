@@ -39,6 +39,9 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
   late String _selectedLevel;
   late int _sessionDuration;
   late Set<String> _selectedDays;
+  // Pre-built once in initState — never rebuilt on every build() call.
+  late final List<PremiumDropdownItem<String>> _categoryItems;
+  late final List<PremiumDropdownItem<String>> _levelItems;
   bool _isSubmitting = false;
   bool _isNameFocused = false;
 
@@ -143,6 +146,25 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
       widget.initialDays ?? ['Monday', 'Wednesday', 'Friday'],
     );
 
+    // Build item lists once — avoids recreating them on every build() call.
+    final categories = AppConstants.skillCategories.toSet().toList();
+    _categoryItems = categories
+        .map((c) => PremiumDropdownItem<String>(
+              value: c,
+              label: c,
+              icon: _getCategoryIcon(c),
+              iconColor: _getCategoryColor(c),
+            ))
+        .toList();
+    _levelItems = AppConstants.skillLevels
+        .map((l) => PremiumDropdownItem<String>(
+              value: l,
+              label: l,
+              icon: _getLevelIcon(l),
+              iconColor: AppColors.primary,
+            ))
+        .toList();
+
     _nameFocusNode.addListener(() {
       if (mounted) {
         setState(() {
@@ -216,26 +238,6 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
 
   @override
   Widget build(BuildContext context) {
-    final categories = AppConstants.skillCategories.toSet().toList();
-
-    final categoryItems = categories.map((c) {
-      return PremiumDropdownItem<String>(
-        value: c,
-        label: c,
-        icon: _getCategoryIcon(c),
-        iconColor: _getCategoryColor(c),
-      );
-    }).toList();
-
-    final levelItems = AppConstants.skillLevels.map((l) {
-      return PremiumDropdownItem<String>(
-        value: l,
-        label: l,
-        icon: _getLevelIcon(l),
-        iconColor: AppColors.primary,
-      );
-    }).toList();
-
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Form(
@@ -307,7 +309,7 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
                   child: PremiumDropdownField<String>(
                     label: 'Category',
                     value: _selectedCategory,
-                    items: categoryItems,
+                    items: _categoryItems,
                     onChanged: (val) {
                       setState(() => _selectedCategory = val);
                     },
@@ -318,7 +320,7 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
                   child: PremiumDropdownField<String>(
                     label: 'Level',
                     value: _selectedLevel,
-                    items: levelItems,
+                    items: _levelItems,
                     onChanged: (val) {
                       setState(() => _selectedLevel = val);
                     },
