@@ -12,6 +12,8 @@ import '../../core/widgets/custom_bottom_sheet.dart';
 import '../../core/widgets/money_empty_state.dart';
 import '../../models/expense.dart';
 import '../../providers/money_provider.dart';
+import '../../providers/trash_provider.dart';
+import '../../core/widgets/trash_confirmation_overlay.dart';
 import 'add_expense_sheet.dart';
 import 'category_transactions_screen.dart';
 import 'set_budget_sheet.dart';
@@ -154,6 +156,11 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen>
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.trash2, color: AppColors.textSecondary, size: 20),
+            tooltip: 'Trash',
+            onPressed: () => context.push('/money/trash'),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: InkWell(
@@ -523,8 +530,29 @@ class _OverviewTab extends ConsumerWidget {
                   key: ValueKey(expense.id),
                   expense: expense,
                   animateEntrance: expense.isOptimistic,
-                  onDelete: () {
-                    ref.read(expensesProvider.notifier).deleteExpense(expense.id);
+                  onDelete: () async {
+                    final deletedItem = expense;
+                    try {
+                      await ref.read(expensesProvider.notifier).deleteExpense(expense.id);
+                      ref.invalidate(trashedExpensesProvider);
+                      if (context.mounted) {
+                        TrashConfirmationOverlay.show(
+                          context: context,
+                          message: 'Moved to Trash',
+                          onUndo: () async {
+                            await ref.read(expensesProvider.notifier).restoreExpense(deletedItem);
+                            ref.invalidate(trashedExpensesProvider);
+                          },
+                        );
+                      }
+                    } catch (_) {
+                      if (context.mounted) {
+                        TrashConfirmationOverlay.showError(
+                          context: context,
+                          message: "Couldn't delete expense. Restored.",
+                        );
+                      }
+                    }
                   },
                 );
               }).toList(),
@@ -741,16 +769,25 @@ class _ExpensesTab extends ConsumerWidget {
                           expense: expense,
                           animateEntrance: expense.isOptimistic,
                           onDelete: () async {
+                            final deletedItem = expense;
                             try {
                               await ref.read(expensesProvider.notifier).deleteExpense(expense.id);
+                              ref.invalidate(trashedExpensesProvider);
+                              if (context.mounted) {
+                                TrashConfirmationOverlay.show(
+                                  context: context,
+                                  message: 'Moved to Trash',
+                                  onUndo: () async {
+                                    await ref.read(expensesProvider.notifier).restoreExpense(deletedItem);
+                                    ref.invalidate(trashedExpensesProvider);
+                                  },
+                                );
+                              }
                             } catch (_) {
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text("Couldn't delete expense. Restored."),
-                                    backgroundColor: AppColors.error,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
+                                TrashConfirmationOverlay.showError(
+                                  context: context,
+                                  message: "Couldn't delete expense. Restored.",
                                 );
                               }
                             }

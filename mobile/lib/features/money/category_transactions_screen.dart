@@ -9,6 +9,8 @@ import '../../core/theme/ocean_theme.dart';
 import '../../core/widgets/custom_bottom_sheet.dart';
 import '../../core/widgets/money_empty_state.dart';
 import '../../providers/money_provider.dart';
+import '../../providers/trash_provider.dart';
+import '../../core/widgets/trash_confirmation_overlay.dart';
 import 'add_expense_sheet.dart';
 import 'widgets/transaction_list_item.dart';
 
@@ -420,19 +422,27 @@ class _CategoryTransactionsScreenState
                         animateEntrance: expense.isOptimistic,
                         showNote: true,
                         onDelete: () async {
+                          final deletedItem = expense;
                           try {
                             await ref
                                 .read(expensesProvider.notifier)
                                 .deleteExpense(expense.id);
+                            ref.invalidate(trashedExpensesProvider);
+                            if (context.mounted) {
+                              TrashConfirmationOverlay.show(
+                                context: context,
+                                message: 'Moved to Trash',
+                                onUndo: () async {
+                                  await ref.read(expensesProvider.notifier).restoreExpense(deletedItem);
+                                  ref.invalidate(trashedExpensesProvider);
+                                },
+                              );
+                            }
                           } catch (_) {
                             if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content:
-                                      Text("Couldn't delete expense. Restored."),
-                                  backgroundColor: AppColors.error,
-                                  behavior: SnackBarBehavior.floating,
-                                ),
+                              TrashConfirmationOverlay.showError(
+                                context: context,
+                                message: "Couldn't delete expense. Restored.",
                               );
                             }
                           }

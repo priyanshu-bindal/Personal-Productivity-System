@@ -30,13 +30,14 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
           .from('expenses')
           .select('*')
           .eq('user_id', userId)
+          .isFilter('deleted_at', null)
           .order('expense_date', ascending: false);
 
       final list = (res as List).map((e) => Expense.fromJson(e as Map<String, dynamic>)).toList();
       
-      // Preserve any in-flight optimistic expenses that haven't reconciled yet
+      // Preserve any in-flight optimistic expenses that haven't reconciled yet and are not deleted
       final current = state.value ?? [];
-      final inFlightOptimistic = current.where((e) => e.isOptimistic).toList();
+      final inFlightOptimistic = current.where((e) => e.isOptimistic && e.deletedAt == null).toList();
       if (inFlightOptimistic.isNotEmpty) {
         state = AsyncValue.data([...inFlightOptimistic, ...list]);
       } else {
@@ -196,18 +197,48 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
     if (index == -1) return;
     final removedItem = currentList[index];
 
-    // Optimistically remove
+    // Optimistically remove from active list
     final updatedList = List<Expense>.from(currentList)..removeAt(index);
     state = AsyncValue.data(updatedList);
 
     try {
-      await SupabaseService.client.from('expenses').delete().eq('id', expenseId);
+      final nowUtc = DateTime.now().toUtc();
+      await SupabaseService.client
+          .from('expenses')
+          .update({'deleted_at': nowUtc.toIso8601String()})
+          .eq('id', expenseId);
     } catch (e) {
       // Rollback
       final latestList = List<Expense>.from(state.value ?? []);
       final insertIndex = index.clamp(0, latestList.length);
       latestList.insert(insertIndex, removedItem);
       state = AsyncValue.data(latestList);
+      rethrow;
+    }
+  }
+
+  Future<void> restoreExpense(Expense expense) async {
+    final userId = SupabaseService.currentUserId;
+    if (userId == null) return;
+
+    final restoredItem = expense.copyWith(clearDeletedAt: true, isOptimistic: false);
+
+    // Optimistically insert back into active list if not already present
+    final currentList = state.value ?? [];
+    final existingIndex = currentList.indexWhere((e) => e.id == expense.id);
+    if (existingIndex == -1) {
+      state = AsyncValue.data([restoredItem, ...currentList]);
+    }
+
+    try {
+      await SupabaseService.client
+          .from('expenses')
+          .update({'deleted_at': null})
+          .eq('id', expense.id);
+    } catch (e) {
+      // Rollback optimistic restoration
+      final latestList = state.value ?? [];
+      state = AsyncValue.data(latestList.where((e) => e.id != expense.id).toList());
       rethrow;
     }
   }

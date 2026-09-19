@@ -648,4 +648,7 @@ class FakeExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>>
 
   @override
   Future<void> deleteExpense(String expenseId) async {}
+
+  @override
+  Future<void> restoreExpense(Expense expense) async {}
 }

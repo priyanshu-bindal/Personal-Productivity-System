@@ -323,11 +323,23 @@ class SettingsScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppColors.border),
                 ),
-                child: ListTile(
-                  leading: const Icon(LucideIcons.download, color: AppColors.textSecondary, size: 20),
-                  title: const Text('Export Personal Data', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Export skills, sessions & expenses to JSON', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                  onTap: () => _exportData(context),
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(LucideIcons.download, color: AppColors.textSecondary, size: 20),
+                      title: const Text('Export Personal Data', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+                      subtitle: const Text('Export skills, sessions & expenses to JSON', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                      onTap: () => _exportData(context),
+                    ),
+                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    ListTile(
+                      leading: const Icon(LucideIcons.trash2, color: AppColors.textSecondary, size: 20),
+                      title: const Text('Trash', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+                      subtitle: const Text('View and restore deleted expenses (kept for 30 days)', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                      trailing: const Icon(LucideIcons.chevronRight, color: AppColors.textMuted, size: 16),
+                      onTap: () => context.push('/money/trash'),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),

@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 
-/// Controller to trigger [AnimatedDelete] programmatically if preferred.
+/// Controller to trigger [AnimatedDelete] programmatically.
 class AnimatedDeleteController {
   _AnimatedDeleteState? _state;
 
@@ -12,41 +12,57 @@ class AnimatedDeleteController {
   Future<void> delete() async {
     await _state?.triggerDelete();
   }
+
+  /// Smoothly collapses the item (fade + scale + size transition).
+  Future<void> collapse() async {
+    await _state?.collapse();
+  }
+
+  /// Reverses the collapse animation if an operation failed.
+  void reset() {
+    _state?.reset();
+  }
 }
 
 /// A wrapper widget that provides a smooth, premium collapse transition when an
-/// item is deleted, preventing abrupt visual disappearance in standard ListViews.
+/// item is deleted or removed, preventing abrupt visual disappearance in standard ListViews.
 ///
 /// Animation steps:
 /// 1. Enters deleting state (rejects further taps)
-/// 2. Scale: 1.0 -> 0.96
+/// 2. Scale: 1.0 -> 0.97
 /// 3. Opacity: 1.0 -> 0.0
 /// 4. Height: full height -> 0 (via [SizeTransition])
-/// 5. Calls [onDeleteConfirmed] once the animation completes
+/// 5. Calls [onDeleteConfirmed] once the animation completes (if provided)
 class AnimatedDelete extends StatefulWidget {
   final Widget? child;
   final Widget Function(BuildContext context, VoidCallback startDelete)? builder;
-  final FutureOr<void> Function() onDeleteConfirmed;
+  final FutureOr<void> Function()? onDeleteConfirmed;
   final AnimatedDeleteController? controller;
   final Duration duration;
   final Curve curve;
+  final double scaleBegin;
+  final double scaleEnd;
 
   const AnimatedDelete({
     super.key,
     required Widget this.child,
-    required this.onDeleteConfirmed,
+    this.onDeleteConfirmed,
     this.controller,
-    this.duration = const Duration(milliseconds: 220),
+    this.duration = const Duration(milliseconds: 260),
     this.curve = Curves.easeOutCubic,
+    this.scaleBegin = 1.0,
+    this.scaleEnd = 0.97,
   }) : builder = null;
 
   const AnimatedDelete.builder({
     super.key,
     required Widget Function(BuildContext context, VoidCallback startDelete) this.builder,
-    required this.onDeleteConfirmed,
+    this.onDeleteConfirmed,
     this.controller,
-    this.duration = const Duration(milliseconds: 220),
+    this.duration = const Duration(milliseconds: 260),
     this.curve = Curves.easeOutCubic,
+    this.scaleBegin = 1.0,
+    this.scaleEnd = 0.97,
   }) : child = null;
 
   /// Trigger deletion on the nearest enclosing [AnimatedDelete].
@@ -89,7 +105,7 @@ class _AnimatedDeleteState extends State<AnimatedDelete>
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
 
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.96).animate(
+    _scaleAnimation = Tween<double>(begin: widget.scaleBegin, end: widget.scaleEnd).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
   }
@@ -110,7 +126,32 @@ class _AnimatedDeleteState extends State<AnimatedDelete>
     super.dispose();
   }
 
-  /// Triggers the collapse animation, then calls [widget.onDeleteConfirmed].
+  /// Collapses the item smoothly (fade + scale + size collapse).
+  Future<void> collapse() async {
+    if (!mounted) return;
+    setState(() => _isDeleting = true);
+
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (!reduceMotion) {
+      try {
+        await _controller.forward().orCancel;
+      } catch (_) {}
+    } else {
+      _controller.value = 1.0;
+    }
+  }
+
+  /// Reverses the collapse animation if an operation failed.
+  void reset() {
+    if (!mounted) return;
+    setState(() {
+      _isDeleting = false;
+      _hasTriggeredCallback = false;
+    });
+    _controller.reverse();
+  }
+
+  /// Triggers the collapse animation, then calls [widget.onDeleteConfirmed] (if provided).
   Future<void> triggerDelete() async {
     if (_isDeleting || _hasTriggeredCallback) return;
 
@@ -126,18 +167,18 @@ class _AnimatedDeleteState extends State<AnimatedDelete>
       } catch (_) {
         // Handled if disposed during animation
       }
+    } else {
+      _controller.value = 1.0;
     }
 
     if (mounted && !_hasTriggeredCallback) {
       _hasTriggeredCallback = true;
       try {
-        await widget.onDeleteConfirmed();
+        await widget.onDeleteConfirmed?.call();
       } catch (_) {
         // If the delete fails on provider side, reset visual state if still mounted
         if (mounted) {
-          _hasTriggeredCallback = false;
-          _isDeleting = false;
-          _controller.reverse();
+          reset();
         }
         rethrow;
       }

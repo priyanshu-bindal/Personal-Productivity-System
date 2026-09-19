@@ -9,6 +9,7 @@ class Expense {
   final String? note;
   final DateTime createdAt;
   final bool isOptimistic;
+  final DateTime? deletedAt;
 
   Expense({
     required this.id,
@@ -21,6 +22,7 @@ class Expense {
     this.note,
     required this.createdAt,
     this.isOptimistic = false,
+    this.deletedAt,
   });
 
   Expense copyWith({
@@ -34,6 +36,8 @@ class Expense {
     String? note,
     DateTime? createdAt,
     bool? isOptimistic,
+    DateTime? deletedAt,
+    bool clearDeletedAt = false,
   }) {
     return Expense(
       id: id ?? this.id,
@@ -46,6 +50,7 @@ class Expense {
       note: note ?? this.note,
       createdAt: createdAt ?? this.createdAt,
       isOptimistic: isOptimistic ?? this.isOptimistic,
+      deletedAt: clearDeletedAt ? null : (deletedAt ?? this.deletedAt),
     );
   }
 
@@ -61,6 +66,7 @@ class Expense {
       note: json['note'] as String?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : DateTime.now(),
       isOptimistic: false,
+      deletedAt: json['deleted_at'] != null ? DateTime.tryParse(json['deleted_at'] as String) : null,
     );
   }
 
