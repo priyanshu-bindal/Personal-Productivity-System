@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:focus_flow/features/money/category_transactions_screen.dart';
+import 'package:focus_flow/features/money/money_screen.dart';
 import 'package:focus_flow/features/money/widgets/animated_balance_ticker.dart';
 import 'package:focus_flow/features/money/widgets/financial_dropdown_field.dart';
+import 'package:focus_flow/models/budget.dart';
 import 'package:focus_flow/models/expense.dart';
 import 'package:focus_flow/providers/money_provider.dart';
 
@@ -401,6 +404,216 @@ void main() {
       expect(find.text('Budgets'), findsOneWidget);
     });
   });
+
+  group('Category Transactions Drill-Down & Screen Tests', () {
+    testWidgets('Renders category header stats and filtered transactions sorted newest first', (tester) async {
+      final now = DateTime.now();
+      final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final earlierStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
+
+      final testExpenses = [
+        Expense(
+          id: 'exp1',
+          userId: 'u1',
+          amount: 250.0,
+          description: 'Coffee',
+          category: 'food',
+          paymentMethod: 'upi',
+          expenseDate: earlierStr,
+          note: 'Cafe visit',
+          createdAt: DateTime(2026, 9, 1, 10, 0),
+        ),
+        Expense(
+          id: 'exp2',
+          userId: 'u1',
+          amount: 500.0,
+          description: 'Uber ride',
+          category: 'transport',
+          paymentMethod: 'card',
+          expenseDate: todayStr,
+          createdAt: DateTime(2026, 9, 19, 11, 0),
+        ),
+        Expense(
+          id: 'exp3',
+          userId: 'u1',
+          amount: 1000.0,
+          description: 'Team Dinner',
+          category: 'food',
+          paymentMethod: 'card',
+          expenseDate: todayStr,
+          note: 'Italian restaurant',
+          createdAt: DateTime(2026, 9, 19, 20, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            expensesProvider.overrideWith((ref) => FakeExpensesNotifier(testExpenses)),
+          ],
+          child: const MaterialApp(
+            home: CategoryTransactionsScreen(category: 'food'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Header asserts
+      expect(find.text('Food'), findsWidgets);
+      expect(find.text('2 transactions'), findsOneWidget);
+      expect(find.text('₹1,250'), findsOneWidget);
+      expect(find.text('TRANSACTIONS (2)'), findsOneWidget);
+
+      // Filtered transactions asserts (Food only)
+      expect(find.text('Team Dinner'), findsOneWidget);
+      expect(find.text('Coffee'), findsOneWidget);
+      expect(find.text('Uber ride'), findsNothing);
+
+      // Note display assert
+      expect(find.text('Italian restaurant'), findsOneWidget);
+      expect(find.text('Cafe visit'), findsOneWidget);
+    });
+
+    testWidgets('Renders polished empty state and ₹0 when category has no transactions', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            expensesProvider.overrideWith((ref) => FakeExpensesNotifier([])),
+          ],
+          child: const MaterialApp(
+            home: CategoryTransactionsScreen(category: 'education'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Education'), findsWidgets);
+      expect(find.text('0 transactions'), findsOneWidget);
+      expect(find.text('₹0'), findsOneWidget);
+      expect(find.text('0% of month total'), findsOneWidget);
+      expect(find.text('No Education transactions yet'), findsOneWidget);
+    });
+
+    testWidgets('Correctly orders multiple transactions on the same date by createdAt descending', (tester) async {
+      final now = DateTime.now();
+      final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      final testExpenses = [
+        Expense(
+          id: 'morning',
+          userId: 'u1',
+          amount: 100.0,
+          description: 'Morning Snack',
+          category: 'food',
+          paymentMethod: 'cash',
+          expenseDate: todayStr,
+          createdAt: DateTime(2026, 9, 19, 8, 0),
+        ),
+        Expense(
+          id: 'lunch',
+          userId: 'u1',
+          amount: 350.0,
+          description: 'Lunch Bowl',
+          category: 'food',
+          paymentMethod: 'upi',
+          expenseDate: todayStr,
+          createdAt: DateTime(2026, 9, 19, 13, 0),
+        ),
+        Expense(
+          id: 'night',
+          userId: 'u1',
+          amount: 550.0,
+          description: 'Dinner Feast',
+          category: 'food',
+          paymentMethod: 'card',
+          expenseDate: todayStr,
+          createdAt: DateTime(2026, 9, 19, 21, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            expensesProvider.overrideWith((ref) => FakeExpensesNotifier(testExpenses)),
+          ],
+          child: const MaterialApp(
+            home: CategoryTransactionsScreen(category: 'food'),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Topmost item should be night (21:00), followed by lunch (13:00), followed by morning (08:00)
+      final nightY = tester.getTopLeft(find.text('Dinner Feast')).dy;
+      final lunchY = tester.getTopLeft(find.text('Lunch Bowl')).dy;
+      final morningY = tester.getTopLeft(find.text('Morning Snack')).dy;
+
+      expect(nightY < lunchY, isTrue);
+      expect(lunchY < morningY, isTrue);
+    });
+
+    testWidgets('Tapping category card in MoneyScreen navigates to CategoryTransactionsScreen', (tester) async {
+      final now = DateTime.now();
+      final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      final testExpenses = [
+        Expense(
+          id: 'food_exp',
+          userId: 'u1',
+          amount: 250.0,
+          description: 'Coffee',
+          category: 'food',
+          paymentMethod: 'upi',
+          expenseDate: todayStr,
+          createdAt: DateTime(2026, 9, 19, 10, 0),
+        ),
+      ];
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            expensesProvider.overrideWith((ref) => FakeExpensesNotifier(testExpenses)),
+            budgetsProvider.overrideWith((ref) => FakeBudgetsNotifier()),
+          ],
+          child: const MaterialApp(
+            home: MoneyScreen(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Switch to Categories tab
+      await tester.tap(find.text('Categories'));
+      await tester.pumpAndSettle();
+
+      // Tap on Food category card
+      await tester.tap(find.text('Food'));
+      await tester.pumpAndSettle();
+
+      // Should now be on CategoryTransactionsScreen
+      expect(find.byType(CategoryTransactionsScreen), findsOneWidget);
+      expect(find.text('TRANSACTIONS (1)'), findsOneWidget);
+      expect(find.text('Coffee'), findsOneWidget);
+    });
+  });
+}
+
+class FakeBudgetsNotifier extends StateNotifier<AsyncValue<List<Budget>>>
+    implements BudgetsNotifier {
+  FakeBudgetsNotifier() : super(const AsyncValue.data([]));
+
+  @override
+  Future<void> fetchBudgets() async {}
+
+  @override
+  Future<void> setBudget({required String category, required double monthlyLimit}) async {}
+
+  @override
+  Future<void> deleteBudget(String budgetId) async {}
 }
 
 class FakeExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>>

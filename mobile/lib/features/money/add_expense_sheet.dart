@@ -10,7 +10,12 @@ import 'widgets/financial_dropdown_field.dart';
 import 'widgets/transaction_list_item.dart';
 
 class AddExpenseSheet extends StatefulWidget {
-  const AddExpenseSheet({super.key});
+  final String? initialCategory;
+
+  const AddExpenseSheet({
+    super.key,
+    this.initialCategory,
+  });
 
   @override
   State<AddExpenseSheet> createState() => _AddExpenseSheetState();
@@ -35,7 +40,14 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
   @override
   void initState() {
     super.initState();
-    _selectedCategory = AppConstants.expenseCategories.first;
+    final initCat = widget.initialCategory?.trim().toLowerCase();
+    if (initCat != null &&
+        AppConstants.expenseCategories
+            .any((c) => c.toLowerCase() == initCat)) {
+      _selectedCategory = initCat;
+    } else {
+      _selectedCategory = AppConstants.expenseCategories.first;
+    }
     _selectedPaymentMethod = AppConstants.paymentMethods.first;
     _selectedDate = DateTime.now();
 

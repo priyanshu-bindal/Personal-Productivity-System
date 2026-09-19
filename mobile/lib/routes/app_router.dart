@@ -14,6 +14,7 @@ import '../features/calendar/calendar_screen.dart';
 import '../features/progress/progress_screen.dart';
 import '../features/notes/notes_screen.dart';
 import '../features/money/money_screen.dart';
+import '../features/money/category_transactions_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/streak/streak_screen.dart';
 import '../features/messages/messages_screen.dart';
@@ -140,6 +141,39 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/money',
         builder: (context, state) => const MoneyScreen(),
+        routes: [
+          GoRoute(
+            path: 'category/:category',
+            pageBuilder: (context, state) {
+              final category = state.pathParameters['category'] ?? '';
+              return CustomTransitionPage(
+                key: state.pageKey,
+                child: CategoryTransactionsScreen(category: category),
+                transitionsBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                  final curved = CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                    reverseCurve: Curves.easeInCubic,
+                  );
+                  return FadeTransition(
+                    opacity:
+                        Tween<double>(begin: 0.0, end: 1.0).animate(curved),
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.06, 0),
+                        end: Offset.zero,
+                      ).animate(curved),
+                      child: child,
+                    ),
+                  );
+                },
+                transitionDuration: const Duration(milliseconds: 250),
+                reverseTransitionDuration: const Duration(milliseconds: 220),
+              );
+            },
+          ),
+        ],
       ),
       GoRoute(
         path: '/messages',

@@ -13,6 +13,7 @@ import '../../core/widgets/money_empty_state.dart';
 import '../../models/expense.dart';
 import '../../providers/money_provider.dart';
 import 'add_expense_sheet.dart';
+import 'category_transactions_screen.dart';
 import 'set_budget_sheet.dart';
 import 'widgets/financial_balance_card.dart';
 import 'widgets/transaction_list_item.dart';
@@ -25,7 +26,7 @@ class MoneyScreen extends ConsumerStatefulWidget {
 }
 
 class _MoneyScreenState extends ConsumerState<MoneyScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late TabController _tabController;
   late AnimationController _entranceController;
   late Animation<double> _fadeAnimation;
@@ -767,6 +768,40 @@ class _ExpensesTab extends ConsumerWidget {
 class _CategoriesTab extends ConsumerWidget {
   const _CategoriesTab();
 
+  void _openCategoryTransactions(BuildContext context, String catKey) {
+    try {
+      context.push('/money/category/$catKey');
+    } catch (_) {
+      Navigator.of(context).push(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              CategoryTransactionsScreen(category: catKey),
+          transitionsBuilder:
+              (context, animation, secondaryAnimation, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return FadeTransition(
+              opacity:
+                  Tween<double>(begin: 0.0, end: 1.0).animate(curved),
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.06, 0),
+                  end: Offset.zero,
+                ).animate(curved),
+                child: child,
+              ),
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 250),
+          reverseTransitionDuration: const Duration(milliseconds: 220),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currency = NumberFormat.currency(symbol: '₹', decimalDigits: 0, locale: 'en_IN');
@@ -811,58 +846,84 @@ class _CategoriesTab extends ConsumerWidget {
 
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
             color: OceanTheme.card,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: AppColors.border),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: catColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () => _openCategoryTransactions(context, catKey),
+              splashColor: catColor.withValues(alpha: 0.12),
+              highlightColor: catColor.withValues(alpha: 0.06),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Hero(
+                          tag: 'category_icon_$catKey',
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: catColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(catIcon, color: catColor, size: 18),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              catName,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$pct% of month total',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textDim,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    child: Icon(catIcon, color: catColor, size: 18),
-                  ),
-                  const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        catName,
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          currency.format(amount),
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '$pct% of month total',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textDim,
+                        const SizedBox(width: 6),
+                        const Icon(
+                          LucideIcons.chevronRight,
+                          color: AppColors.textFaint,
+                          size: 16,
                         ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Text(
-                currency.format(amount),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         );
       },

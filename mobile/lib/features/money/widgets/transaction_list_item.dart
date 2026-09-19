@@ -11,12 +11,14 @@ class TransactionListItem extends StatelessWidget {
   final Expense expense;
   final VoidCallback? onDelete;
   final bool animateEntrance;
+  final bool showNote;
 
   const TransactionListItem({
     super.key,
     required this.expense,
     this.onDelete,
     this.animateEntrance = false,
+    this.showNote = true,
   });
 
   static IconData getCategoryIcon(String category) {
@@ -256,6 +258,32 @@ class TransactionListItem extends StatelessWidget {
                             ],
                           ],
                         ),
+                        if (showNote &&
+                            expense.note != null &&
+                            expense.note!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              const Icon(
+                                LucideIcons.stickyNote,
+                                size: 11,
+                                color: AppColors.textDim,
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  expense.note!.trim(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textDim,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
