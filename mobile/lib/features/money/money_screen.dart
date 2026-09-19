@@ -772,12 +772,32 @@ class _CategoriesTab extends ConsumerWidget {
     final currency = NumberFormat.currency(symbol: '₹', decimalDigits: 0, locale: 'en_IN');
     final summary = ref.watch(moneySummaryProvider);
 
+    // Helper to look up the spent amount for a given category key.
+    double amountFor(String catKey) {
+      final item = summary.categoryBreakdown
+          .where((i) => (i['category'] as String).toLowerCase() == catKey)
+          .firstOrNull;
+      return (item?['amount'] as num?)?.toDouble() ?? 0.0;
+    }
+
+    // Stable descending sort: categories with equal amounts preserve their
+    // original AppConstants.expenseCategories order.
+    final sortedCategories = AppConstants.expenseCategories
+        .asMap()
+        .entries
+        .toList()
+      ..sort((a, b) {
+          final diff = amountFor(b.value).compareTo(amountFor(a.value));
+          if (diff != 0) return diff; // different amounts: higher first
+          return a.key.compareTo(b.key); // same amount: keep original index order
+        });
+
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-      itemCount: AppConstants.expenseCategories.length,
+      itemCount: sortedCategories.length,
       itemBuilder: (context, index) {
-        final catKey = AppConstants.expenseCategories[index];
+        final catKey = sortedCategories[index].value;
         final catName = catKey[0].toUpperCase() + catKey.substring(1);
         final catColor = TransactionListItem.getCategoryColor(catKey);
         final catIcon = TransactionListItem.getCategoryIcon(catKey);

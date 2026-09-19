@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -326,6 +327,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
             TextFormField(
               controller: _descController,
               style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+              inputFormatters: [_TitleCaseFormatter()],
               decoration: InputDecoration(
                 labelText: 'Description',
                 hintText: 'e.g. Groceries, Team Lunch, Books',
@@ -512,6 +514,49 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Capitalises the first letter of every word while the user types.
+///
+/// Rules:
+/// - The very first character is always uppercased.
+/// - The character immediately after a space is uppercased.
+/// - All other characters are left exactly as typed (no forced lowercase).
+/// - Cursor position and selection are preserved through the transformation.
+class _TitleCaseFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) return newValue;
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      final ch = text[i];
+      // Capitalise if this is the very first character, or if the preceding
+      // character is a space (i.e. we are at the start of a new word).
+      final shouldCapitalise = i == 0 || text[i - 1] == ' ';
+      buffer.write(shouldCapitalise ? ch.toUpperCase() : ch);
+    }
+
+    final formatted = buffer.toString();
+
+    // If nothing changed, return the new value untouched to avoid a
+    // pointless rebuild that would reset the IME composing region.
+    if (formatted == text) return newValue;
+
+    // Clamp the selection/composing extents to the (same-length) new string.
+    return newValue.copyWith(
+      text: formatted,
+      selection: newValue.selection.copyWith(
+        baseOffset: newValue.selection.baseOffset.clamp(0, formatted.length),
+        extentOffset:
+            newValue.selection.extentOffset.clamp(0, formatted.length),
       ),
     );
   }
