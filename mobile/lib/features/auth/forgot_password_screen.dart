@@ -2,41 +2,67 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/error_formatter.dart';
-import '../../core/widgets/traffic_loader.dart';
-import '../../core/widgets/pressable_scale.dart';
 import '../../providers/auth_provider.dart';
+import 'widgets/liquid_theme.dart';
+import 'widgets/liquid_background.dart';
+import 'widgets/liquid_glass_card.dart';
+import 'widgets/liquid_glass_input.dart';
+import 'widgets/liquid_glass_button.dart';
+import 'widgets/focusflow_logo.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
+    with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
   bool _submitted = false;
+  String? _emailError;
+
+  late final AnimationController _fadeController;
+  late final Animation<double> _fadeIn;
+  late final Animation<double> _slideIn;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+    _fadeIn = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+    _slideIn = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOutCubic,
+    );
+    _fadeController.forward();
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
   Future<void> _handleReset() async {
     final email = _emailController.text.trim();
-    if (email.isEmpty || !email.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please enter a valid email address'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
+
+    setState(() => _emailError = null);
+
+    if (email.isEmpty) {
+      setState(() => _emailError = 'Please enter your email address.');
+      return;
+    }
+    if (!RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
+        .hasMatch(email)) {
+      setState(() => _emailError = 'Please enter a valid email address.');
       return;
     }
 
@@ -47,14 +73,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ErrorFormatter.format(e)),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        setState(() => _emailError = ErrorFormatter.format(e));
       }
     }
   }
@@ -63,109 +82,245 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading;
+    final reducedMotion = MediaQuery.of(context).disableAnimations;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimary),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: _submitted
-              ? Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Icon(LucideIcons.checkCircle2, size: 48, color: AppColors.primary),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Check your inbox',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.displayHero.copyWith(
-                        fontSize: 24,
-                        letterSpacing: -0.5,
+      backgroundColor: LiquidTheme.background,
+      body: Stack(
+        children: [
+          // Animated liquid background
+          Positioned.fill(
+            child: LiquidBackground(reducedMotion: reducedMotion),
+          ),
+
+          // Safe area content
+          SafeArea(
+            child: AnimatedBuilder(
+              animation: _fadeController,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: _fadeIn.value,
+                  child: Transform.translate(
+                    offset: Offset(0, 16 * (1 - _slideIn.value)),
+                    child: child,
+                  ),
+                );
+              },
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24.0,
+                        vertical: 20.0,
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'We sent password reset instructions to ${_emailController.text.trim()}',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.bodySecondary,
-                    ),
-                    const SizedBox(height: 32),
-                    PressableScale(
-                      onTap: () => context.pop(),
-                      child: Container(
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: AppColors.card,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Back to Sign In',
-                            style: AppTextStyles.buttonText.copyWith(color: AppColors.textPrimary),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'Reset Password',
-                      style: AppTextStyles.displayHero.copyWith(
-                        fontSize: 26,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Enter your email address and we will send you instructions to reset your password.',
-                      style: AppTextStyles.bodySecondary.copyWith(height: 1.4),
-                    ),
-                    const SizedBox(height: 28),
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      style: const TextStyle(color: AppColors.textPrimary),
-                      decoration: const InputDecoration(
-                        labelText: 'Email Address',
-                        prefixIcon: Icon(LucideIcons.mail, color: AppColors.textMuted, size: 20),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    PressableScale(
-                      onTap: isLoading ? null : _handleReset,
-                      child: Container(
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Center(
-                          child: isLoading
-                              ? const TrafficLoader(size: 8)
-                              : Text(
-                                  'Send Instructions',
-                                  style: AppTextStyles.buttonText.copyWith(color: Colors.white, fontSize: 15),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Glass back button
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: GestureDetector(
+                              onTap: () => context.pop(),
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: LiquidTheme.secondaryBackground
+                                      .withValues(alpha: 0.65),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: LiquidTheme.glassBorder,
+                                    width: 1.2,
+                                  ),
                                 ),
-                        ),
+                                child: const Icon(
+                                  LucideIcons.arrowLeft,
+                                  color: LiquidTheme.textPrimary,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+
+                          // Brand Logo
+                          const FocusFlowLogo(
+                            size: 64,
+                            showSubtitle: false,
+                          ),
+                          const SizedBox(height: 28),
+
+                          // Liquid Glass Card
+                          LiquidGlassCard(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 26.0,
+                              vertical: 30.0,
+                            ),
+                            child: _submitted
+                                ? _SuccessContent(
+                                    email: _emailController.text.trim(),
+                                    onBack: () => context.pop(),
+                                  )
+                                : _FormContent(
+                                    emailController: _emailController,
+                                    emailError: _emailError,
+                                    isLoading: isLoading,
+                                    onEmailChanged: (_) {
+                                      if (_emailError != null) {
+                                        setState(() => _emailError = null);
+                                      }
+                                    },
+                                    onSubmit: _handleReset,
+                                  ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+// ─── Form Content ──────────────────────────────────────────────
+class _FormContent extends StatelessWidget {
+  final TextEditingController emailController;
+  final String? emailError;
+  final bool isLoading;
+  final ValueChanged<String> onEmailChanged;
+  final VoidCallback onSubmit;
+
+  const _FormContent({
+    required this.emailController,
+    required this.emailError,
+    required this.isLoading,
+    required this.onEmailChanged,
+    required this.onSubmit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Title
+        Text(
+          'Reset Password',
+          textAlign: TextAlign.center,
+          style: LiquidTheme.loginTitle(),
+        ),
+        const SizedBox(height: 8),
+
+        // Subtitle
+        Text(
+          'Enter your email address and we will send you instructions to reset your password.',
+          textAlign: TextAlign.center,
+          style: LiquidTheme.small(
+            fontSize: 13.5,
+            color: LiquidTheme.textSecondary,
+          ).copyWith(height: 1.5),
+        ),
+        const SizedBox(height: 28),
+
+        // Email Pill Input
+        LiquidGlassInput(
+          controller: emailController,
+          label: 'Email Address',
+          prefixIcon: LucideIcons.mail,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.done,
+          onFieldSubmitted: (_) => onSubmit(),
+          errorText: emailError,
+          onChanged: onEmailChanged,
+        ),
+        const SizedBox(height: 28),
+
+        // Send Instructions Liquid Button
+        LiquidGlassButton(
+          label: 'Send Instructions',
+          isLoading: isLoading,
+          icon: LucideIcons.send,
+          onTap: onSubmit,
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Success Content ───────────────────────────────────────────
+class _SuccessContent extends StatelessWidget {
+  final String email;
+  final VoidCallback onBack;
+
+  const _SuccessContent({required this.email, required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Success glow icon
+        Container(
+          width: 68,
+          height: 68,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: LiquidTheme.success.withValues(alpha: 0.12),
+            border: Border.all(
+              color: LiquidTheme.success.withValues(alpha: 0.40),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: LiquidTheme.success.withValues(alpha: 0.22),
+                blurRadius: 18,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: const Icon(
+            LucideIcons.mailCheck,
+            size: 28,
+            color: LiquidTheme.success,
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        Text(
+          'Check your inbox',
+          textAlign: TextAlign.center,
+          style: LiquidTheme.heading(color: LiquidTheme.textPrimary)
+              .copyWith(fontSize: 22),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'We sent password reset instructions to\n$email',
+          textAlign: TextAlign.center,
+          style: LiquidTheme.small(
+            fontSize: 14,
+            color: LiquidTheme.textSecondary,
+          ).copyWith(height: 1.55),
+        ),
+        const SizedBox(height: 32),
+
+        // Back to Sign In glass button
+        LiquidGlassButton(
+          label: 'Back to Sign In',
+          icon: LucideIcons.arrowLeft,
+          onTap: onBack,
+        ),
+      ],
     );
   }
 }

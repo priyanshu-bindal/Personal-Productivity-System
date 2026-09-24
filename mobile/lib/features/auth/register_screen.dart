@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/error_formatter.dart';
-import '../../core/widgets/traffic_loader.dart';
-import '../../core/widgets/pressable_scale.dart';
 import '../../providers/auth_provider.dart';
+import 'widgets/liquid_theme.dart';
+import 'widgets/liquid_background.dart';
+import 'widgets/liquid_glass_card.dart';
+import 'widgets/liquid_glass_input.dart';
+import 'widgets/liquid_glass_button.dart';
+import 'widgets/focusflow_logo.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -16,7 +18,8 @@ class RegisterScreen extends ConsumerStatefulWidget {
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends ConsumerState<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -32,12 +35,35 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String? _confirmError;
   String? _generalError;
 
+  late final AnimationController _fadeController;
+  late final Animation<double> _fadeIn;
+  late final Animation<double> _slideIn;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fadeIn = CurvedAnimation(
+      parent: _fadeController,
+      curve: const Interval(0.0, 1.0, curve: Curves.easeOut),
+    );
+    _slideIn = CurvedAnimation(
+      parent: _fadeController,
+      curve: const Interval(0.0, 1.0, curve: Curves.easeOutCubic),
+    );
+    _fadeController.forward();
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
@@ -132,273 +158,246 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading;
+    final reducedMotion = MediaQuery.of(context).disableAnimations;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimary),
-          onPressed: () => context.pop(),
-        ),
-      ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Create Account',
-                    style: AppTextStyles.displayHero.copyWith(
-                      fontSize: 28,
-                      letterSpacing: -0.5,
+      backgroundColor: LiquidTheme.background,
+      body: Stack(
+        children: [
+          // Same animated liquid background
+          Positioned.fill(
+            child: LiquidBackground(reducedMotion: reducedMotion),
+          ),
+
+          // Main Responsive Scroll View
+          SafeArea(
+            child: AnimatedBuilder(
+              animation: _fadeController,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: _fadeIn.value,
+                  child: Transform.scale(
+                    scale: 0.97 + (0.03 * _slideIn.value),
+                    child: Transform.translate(
+                      offset: Offset(0, 15 * (1 - _slideIn.value)),
+                      child: child,
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Start building skills with consistency today',
-                    style: AppTextStyles.bodySecondary,
-                  ),
-                  const SizedBox(height: 32),
-
-                  // General error banner
-                  if (_generalError != null) ...[
-                    _ErrorBanner(message: _generalError!),
-                    const SizedBox(height: 12),
-                  ],
-
-                  // Full Name
-                  TextFormField(
-                    controller: _nameController,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                    onChanged: (_) {
-                      if (_nameError != null) setState(() => _nameError = null);
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Full Name',
-                      prefixIcon: const Icon(LucideIcons.user,
-                          color: AppColors.textMuted, size: 20),
-                      enabledBorder: _nameError != null
-                          ? OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(
-                                  color: AppColors.error, width: 1.2),
-                            )
-                          : null,
-                    ),
-                  ),
-                  if (_nameError != null) ...[
-                    const SizedBox(height: 6),
-                    _FieldError(message: _nameError!),
-                  ],
-                  const SizedBox(height: 16),
-
-                  // Email
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                    onChanged: (_) {
-                      if (_emailError != null) setState(() => _emailError = null);
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Email Address',
-                      prefixIcon: const Icon(LucideIcons.mail,
-                          color: AppColors.textMuted, size: 20),
-                      enabledBorder: _emailError != null
-                          ? OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(
-                                  color: AppColors.error, width: 1.2),
-                            )
-                          : null,
-                    ),
-                  ),
-                  if (_emailError != null) ...[
-                    const SizedBox(height: 6),
-                    _FieldError(message: _emailError!),
-                  ],
-                  const SizedBox(height: 16),
-
-                  // Password
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                    onChanged: (_) {
-                      if (_passwordError != null) {
-                        setState(() => _passwordError = null);
-                      }
-                      // Clear confirm error if passwords might now match
-                      if (_confirmError != null) {
-                        setState(() => _confirmError = null);
-                      }
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(LucideIcons.lock,
-                          color: AppColors.textMuted, size: 20),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? LucideIcons.eyeOff
-                              : LucideIcons.eye,
-                          color: AppColors.textMuted,
-                          size: 20,
-                        ),
-                        onPressed: () => setState(
-                            () => _obscurePassword = !_obscurePassword),
+                );
+              },
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24.0,
+                        vertical: 16.0,
                       ),
-                      enabledBorder: _passwordError != null
-                          ? OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(
-                                  color: AppColors.error, width: 1.2),
-                            )
-                          : null,
-                    ),
-                  ),
-                  if (_passwordError != null) ...[
-                    const SizedBox(height: 6),
-                    _FieldError(message: _passwordError!),
-                  ],
-                  const SizedBox(height: 16),
-
-                  // Confirm Password
-                  TextFormField(
-                    controller: _confirmController,
-                    obscureText: _obscureConfirm,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                    onChanged: (_) {
-                      if (_confirmError != null) {
-                        setState(() => _confirmError = null);
-                      }
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Confirm Password',
-                      prefixIcon: const Icon(LucideIcons.lock,
-                          color: AppColors.textMuted, size: 20),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirm
-                              ? LucideIcons.eyeOff
-                              : LucideIcons.eye,
-                          color: AppColors.textMuted,
-                          size: 20,
-                        ),
-                        onPressed: () =>
-                            setState(() => _obscureConfirm = !_obscureConfirm),
-                      ),
-                      enabledBorder: _confirmError != null
-                          ? OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(
-                                  color: AppColors.error, width: 1.2),
-                            )
-                          : null,
-                    ),
-                  ),
-                  if (_confirmError != null) ...[
-                    const SizedBox(height: 6),
-                    _FieldError(message: _confirmError!),
-                  ],
-                  const SizedBox(height: 28),
-
-                  // Create Account Button
-                  PressableScale(
-                    onTap: isLoading ? null : _handleRegister,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: isLoading
-                            ? AppColors.primaryDark
-                            : AppColors.primary,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: isLoading
-                            ? null
-                            : [
-                                BoxShadow(
-                                  color: AppColors.primaryGlow,
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Top Bar: Back Button
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: GestureDetector(
+                              onTap: () => context.pop(),
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: LiquidTheme.secondaryBackground
+                                      .withValues(alpha: 0.65),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: LiquidTheme.glassBorder,
+                                    width: 1.2,
+                                  ),
                                 ),
-                              ],
-                      ),
-                      child: Center(
-                        child: isLoading
-                            ? const TrafficLoader(size: 8)
-                            : Text(
-                                'Create Account',
-                                style: AppTextStyles.buttonText.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 15,
+                                child: const Icon(
+                                  LucideIcons.arrowLeft,
+                                  color: LiquidTheme.textPrimary,
+                                  size: 18,
                                 ),
                               ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Brand Logo
+                          const FocusFlowLogo(
+                            size: 64,
+                            showSubtitle: false,
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Liquid Glass Card
+                          LiquidGlassCard(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 26.0,
+                              vertical: 28.0,
+                            ),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    'Create Account',
+                                    textAlign: TextAlign.center,
+                                    style: LiquidTheme.heading(
+                                      color: LiquidTheme.textPrimary,
+                                    ).copyWith(fontSize: 26),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Start building skills with consistency today',
+                                    textAlign: TextAlign.center,
+                                    style: LiquidTheme.small(
+                                      fontSize: 13.5,
+                                      color: LiquidTheme.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 26),
+
+                                  // General error banner
+                                  if (_generalError != null) ...[
+                                    _ErrorBanner(message: _generalError!),
+                                    const SizedBox(height: 16),
+                                  ],
+
+                                  // Full Name
+                                  LiquidGlassInput(
+                                    controller: _nameController,
+                                    label: 'Full Name',
+                                    prefixIcon: LucideIcons.user,
+                                    textCapitalization: TextCapitalization.words,
+                                    textInputAction: TextInputAction.next,
+                                    errorText: _nameError,
+                                    onChanged: (_) {
+                                      if (_nameError != null) {
+                                        setState(() => _nameError = null);
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(height: 14),
+
+                                  // Email Address
+                                  LiquidGlassInput(
+                                    controller: _emailController,
+                                    label: 'Email address',
+                                    prefixIcon: LucideIcons.mail,
+                                    keyboardType: TextInputType.emailAddress,
+                                    textInputAction: TextInputAction.next,
+                                    errorText: _emailError,
+                                    onChanged: (_) {
+                                      if (_emailError != null) {
+                                        setState(() => _emailError = null);
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(height: 14),
+
+                                  // Password
+                                  LiquidGlassInput(
+                                    controller: _passwordController,
+                                    label: 'Password',
+                                    prefixIcon: LucideIcons.lock,
+                                    obscureText: _obscurePassword,
+                                    textInputAction: TextInputAction.next,
+                                    errorText: _passwordError,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? LucideIcons.eyeOff
+                                            : LucideIcons.eye,
+                                        color: LiquidTheme.textSecondary,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => setState(
+                                        () => _obscurePassword = !_obscurePassword,
+                                      ),
+                                    ),
+                                    onChanged: (_) {
+                                      if (_passwordError != null) {
+                                        setState(() => _passwordError = null);
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(height: 14),
+
+                                  // Confirm Password
+                                  LiquidGlassInput(
+                                    controller: _confirmController,
+                                    label: 'Confirm password',
+                                    prefixIcon: LucideIcons.lock,
+                                    obscureText: _obscureConfirm,
+                                    textInputAction: TextInputAction.done,
+                                    onFieldSubmitted: (_) => _handleRegister(),
+                                    errorText: _confirmError,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscureConfirm
+                                            ? LucideIcons.eyeOff
+                                            : LucideIcons.eye,
+                                        color: LiquidTheme.textSecondary,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => setState(
+                                        () => _obscureConfirm = !_obscureConfirm,
+                                      ),
+                                    ),
+                                    onChanged: (_) {
+                                      if (_confirmError != null) {
+                                        setState(() => _confirmError = null);
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(height: 28),
+
+                                  // Primary Create Account Button
+                                  LiquidGlassButton(
+                                    label: 'Create Account',
+                                    icon: Icons.arrow_forward,
+                                    isLoading: isLoading,
+                                    onTap: _handleRegister,
+                                  ),
+                                  const SizedBox(height: 24),
+
+                                  // Bottom: Already have an account? Sign In
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        'Already have an account? ',
+                                        style: LiquidTheme.subtitle(
+                                          fontSize: 13.5,
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () => context.pop(),
+                                        child: Text(
+                                          'Sign In',
+                                          style: LiquidTheme.linkText(
+                                            fontSize: 13.5,
+                                            bold: true,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Already have an account? ',
-                        style: AppTextStyles.bodySecondary,
-                      ),
-                      GestureDetector(
-                        onTap: () => context.pop(),
-                        child: Text(
-                          'Sign In',
-                          style: AppTextStyles.bodySecondary.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FieldError extends StatelessWidget {
-  final String message;
-  const _FieldError({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.errorBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.errorBorder),
-      ),
-      child: Row(
-        children: [
-          const Icon(LucideIcons.alertCircle, color: AppColors.error, size: 14),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: AppColors.error,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -408,6 +407,7 @@ class _FieldError extends StatelessWidget {
   }
 }
 
+// ─── Error Banner ─────────────────────────────────────────────
 class _ErrorBanner extends StatelessWidget {
   final String message;
   const _ErrorBanner({required this.message});
@@ -417,22 +417,24 @@ class _ErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.errorBg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.errorBorder),
+        color: LiquidTheme.errorBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: LiquidTheme.errorBorder),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(LucideIcons.alertTriangle,
-              color: AppColors.error, size: 16),
+          const Icon(
+            LucideIcons.alertTriangle,
+            color: LiquidTheme.error,
+            size: 16,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
-                color: AppColors.error,
-                fontSize: 13,
+              style: LiquidTheme.subtitle(fontSize: 13).copyWith(
+                color: LiquidTheme.error,
                 fontWeight: FontWeight.w500,
               ),
             ),

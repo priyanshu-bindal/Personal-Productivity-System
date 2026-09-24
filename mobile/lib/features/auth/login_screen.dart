@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/error_formatter.dart';
-import '../../core/widgets/traffic_loader.dart';
-import '../../core/widgets/pressable_scale.dart';
 import '../../providers/auth_provider.dart';
+import 'widgets/liquid_theme.dart';
+import 'widgets/liquid_background.dart';
+import 'widgets/liquid_glass_card.dart';
+import 'widgets/liquid_glass_input.dart';
+import 'widgets/liquid_glass_button.dart';
+import 'widgets/focusflow_logo.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -16,25 +18,47 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  // Inline field errors shown after an auth attempt
   String? _emailError;
   String? _passwordError;
   String? _generalError;
+
+  late final AnimationController _fadeController;
+  late final Animation<double> _fadeIn;
+  late final Animation<double> _slideIn;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _fadeIn = CurvedAnimation(
+      parent: _fadeController,
+      curve: const Interval(0.0, 1.0, curve: Curves.easeOut),
+    );
+    _slideIn = CurvedAnimation(
+      parent: _fadeController,
+      curve: const Interval(0.0, 1.0, curve: Curves.easeOutCubic),
+    );
+    _fadeController.forward();
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
-  /// Validate fields client-side and return true if valid.
   bool _validateFields() {
     setState(() {
       _emailError = null;
@@ -49,7 +73,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (email.isEmpty) {
       setState(() => _emailError = 'Please enter your email address.');
       valid = false;
-    } else if (!_isValidEmail(email)) {
+    } else if (!RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
+        .hasMatch(email)) {
       setState(() => _emailError = 'Please enter a valid email address.');
       valid = false;
     }
@@ -64,11 +89,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
 
     return valid;
-  }
-
-  bool _isValidEmail(String email) {
-    return RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
-        .hasMatch(email);
   }
 
   Future<void> _handleLogin() async {
@@ -86,14 +106,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
       final msg = ErrorFormatter.format(e);
 
-      // Route error to field-level display
       if (msg.toLowerCase().contains('incorrect email or password')) {
         setState(() => _passwordError = msg);
-      } else if (msg.toLowerCase().contains('connect') ||
-          msg.toLowerCase().contains('internet')) {
-        setState(() => _generalError = msg);
-      } else if (msg.toLowerCase().contains('too many')) {
-        setState(() => _generalError = msg);
       } else {
         setState(() => _generalError = msg);
       }
@@ -104,250 +118,189 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading;
+    final reducedMotion = MediaQuery.of(context).disableAnimations;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // App Brand Logo / Header
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.3),
-                          width: 2,
-                        ),
-                      ),
-                      child: const Icon(
-                        LucideIcons.target,
-                        size: 40,
-                        color: AppColors.primary,
-                      ),
+      backgroundColor: LiquidTheme.mainBackground, // #020817 Deep Midnight Navy
+      body: Stack(
+        children: [
+          // Continuous animated liquid background
+          Positioned.fill(
+            child: LiquidBackground(reducedMotion: reducedMotion),
+          ),
+
+          // Responsive scrollable content
+          SafeArea(
+            child: AnimatedBuilder(
+              animation: _fadeController,
+              builder: (context, child) {
+                return Opacity(
+                  opacity: _fadeIn.value,
+                  child: Transform.scale(
+                    scale: 0.96 + (0.04 * _slideIn.value),
+                    child: Transform.translate(
+                      offset: Offset(0, 14 * (1 - _slideIn.value)),
+                      child: child,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'FocusFlow',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.displayHero.copyWith(
-                      fontSize: 28,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Do fewer things, but consistently.',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.bodySecondary,
-                  ),
-                  const SizedBox(height: 36),
-
-                  // General error banner (network / rate limit)
-                  if (_generalError != null) ...[
-                    _ErrorBanner(message: _generalError!),
-                    const SizedBox(height: 12),
-                  ],
-
-                  // Email Field
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                    onChanged: (_) {
-                      if (_emailError != null) {
-                        setState(() => _emailError = null);
-                      }
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Email Address',
-                      prefixIcon: const Icon(LucideIcons.mail,
-                          color: AppColors.textMuted, size: 20),
-                      // Show error state styling
-                      enabledBorder: _emailError != null
-                          ? OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(
-                                  color: AppColors.error, width: 1.2),
-                            )
-                          : null,
-                      focusedBorder: _emailError != null
-                          ? OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(
-                                  color: AppColors.error, width: 1.5),
-                            )
-                          : null,
-                    ),
-                  ),
-                  if (_emailError != null) ...[
-                    const SizedBox(height: 6),
-                    _FieldError(message: _emailError!),
-                  ],
-                  const SizedBox(height: 16),
-
-                  // Password Field
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    style: const TextStyle(color: AppColors.textPrimary),
-                    onChanged: (_) {
-                      if (_passwordError != null) {
-                        setState(() => _passwordError = null);
-                      }
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(LucideIcons.lock,
-                          color: AppColors.textMuted, size: 20),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword
-                              ? LucideIcons.eyeOff
-                              : LucideIcons.eye,
-                          color: AppColors.textMuted,
-                          size: 20,
-                        ),
-                        onPressed: () =>
-                            setState(() => _obscurePassword = !_obscurePassword),
+                );
+              },
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24.0,
+                        vertical: 24.0,
                       ),
-                      enabledBorder: _passwordError != null
-                          ? OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(
-                                  color: AppColors.error, width: 1.2),
-                            )
-                          : null,
-                      focusedBorder: _passwordError != null
-                          ? OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              borderSide: const BorderSide(
-                                  color: AppColors.error, width: 1.5),
-                            )
-                          : null,
-                    ),
-                  ),
-                  if (_passwordError != null) ...[
-                    const SizedBox(height: 6),
-                    _FieldError(message: _passwordError!),
-                  ],
-                  const SizedBox(height: 8),
-
-                  // Forgot Password
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () => context.push('/forgot-password'),
-                      child: Text(
-                        'Forgot password?',
-                        style: AppTextStyles.bodySecondary,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Sign In Button — shows loader while signing in
-                  PressableScale(
-                    onTap: isLoading ? null : _handleLogin,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: isLoading
-                            ? AppColors.primaryDark
-                            : AppColors.primary,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: isLoading
-                            ? null
-                            : [
-                                BoxShadow(
-                                  color: AppColors.primaryGlow,
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                      ),
-                      child: Center(
-                        child: isLoading
-                            ? const TrafficLoader(size: 8)
-                            : Text(
-                                'Sign In',
-                                style: AppTextStyles.buttonText.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Register Link
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        "Don't have an account? ",
-                        style: AppTextStyles.bodySecondary,
-                      ),
-                      GestureDetector(
-                        onTap: () => context.push('/register'),
-                        child: Text(
-                          'Sign Up',
-                          style: AppTextStyles.bodySecondary.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Brand Logo with glowing liquid icon & Aurellis handwritten wordmark
+                          const FocusFlowLogo(
+                            size: 64,
+                            useAurellis: true,
+                            showSubtitle: false,
                           ),
-                        ),
+                          const SizedBox(height: 30),
+
+                          // Liquid Glass Card
+                          LiquidGlassCard(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 26.0,
+                              vertical: 30.0,
+                            ),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    'Welcome Back',
+                                    textAlign: TextAlign.center,
+                                    style: LiquidTheme.loginTitle(),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Stay focused. Keep growing.',
+                                    textAlign: TextAlign.center,
+                                    style: LiquidTheme.subtitle(fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 28),
+
+                                  if (_generalError != null) ...[
+                                    _ErrorBanner(message: _generalError!),
+                                    const SizedBox(height: 16),
+                                  ],
+
+                                  // Email Pill Field
+                                  LiquidGlassInput(
+                                    controller: _emailController,
+                                    label: 'Email address',
+                                    prefixIcon: LucideIcons.mail,
+                                    keyboardType: TextInputType.emailAddress,
+                                    textInputAction: TextInputAction.next,
+                                    errorText: _emailError,
+                                    onChanged: (_) {
+                                      if (_emailError != null) {
+                                        setState(() => _emailError = null);
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Password Pill Field
+                                  LiquidGlassInput(
+                                    controller: _passwordController,
+                                    label: 'Password',
+                                    prefixIcon: LucideIcons.lock,
+                                    obscureText: _obscurePassword,
+                                    textInputAction: TextInputAction.done,
+                                    onFieldSubmitted: (_) => _handleLogin(),
+                                    errorText: _passwordError,
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? LucideIcons.eyeOff
+                                            : LucideIcons.eye,
+                                        color: LiquidTheme.textSecondary,
+                                        size: 20,
+                                      ),
+                                      onPressed: () => setState(
+                                        () => _obscurePassword = !_obscurePassword,
+                                      ),
+                                    ),
+                                    onChanged: (_) {
+                                      if (_passwordError != null) {
+                                        setState(() => _passwordError = null);
+                                      }
+                                    },
+                                  ),
+                                  const SizedBox(height: 12),
+
+                                  // Forgot Password
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      onPressed: () =>
+                                          context.push('/forgot-password'),
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        minimumSize: Size.zero,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      child: Text(
+                                        'Forgot password?',
+                                        style: LiquidTheme.linkText(fontSize: 13),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 28),
+
+                                  // Sign In Primary Button
+                                  LiquidGlassButton(
+                                    label: 'Sign In',
+                                    icon: Icons.arrow_forward,
+                                    isLoading: isLoading,
+                                    onTap: _handleLogin,
+                                  ),
+                                  const SizedBox(height: 28),
+
+                                  // Sign Up Navigation
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        "Don't have an account? ",
+                                        style: LiquidTheme.subtitle(
+                                          fontSize: 13.5,
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () => context.push('/register'),
+                                        child: Text(
+                                          'Sign Up',
+                                          style: LiquidTheme.linkText(
+                                            fontSize: 13.5,
+                                            bold: true,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Small inline field-level error shown below a field
-class _FieldError extends StatelessWidget {
-  final String message;
-  const _FieldError({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.errorBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.errorBorder),
-      ),
-      child: Row(
-        children: [
-          const Icon(LucideIcons.alertCircle,
-              color: AppColors.error, size: 14),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: AppColors.error,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -357,7 +310,8 @@ class _FieldError extends StatelessWidget {
   }
 }
 
-/// Banner for general / non-field errors (network, rate limit)
+
+// ─── Error Banner ─────────────────────────────────────────────
 class _ErrorBanner extends StatelessWidget {
   final String message;
   const _ErrorBanner({required this.message});
@@ -365,25 +319,38 @@ class _ErrorBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: AppColors.errorBg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.errorBorder),
+        color: LiquidTheme.errorBg,              // rgba(255,107,157,0.08)
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: LiquidTheme.errorBorder,        // rgba(255,107,157,0.25)
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: LiquidTheme.errorGlow.withValues(alpha: 0.10),
+            blurRadius: 12,
+            spreadRadius: 0,
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(LucideIcons.alertTriangle,
-              color: AppColors.error, size: 16),
+          const Icon(
+            LucideIcons.alertTriangle,
+            color: LiquidTheme.errorText,  // #FF9FBC soft pink
+            size: 15,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
-              style: const TextStyle(
-                color: AppColors.error,
-                fontSize: 13,
+              style: LiquidTheme.small(fontSize: 13).copyWith(
+                color: LiquidTheme.errorText,  // #FF9FBC
                 fontWeight: FontWeight.w500,
+                height: 1.4,
               ),
             ),
           ),
