@@ -22,6 +22,7 @@ import '../features/messages/messages_screen.dart';
 import '../features/messages/new_message_screen.dart';
 import '../features/messages/chat_screen.dart';
 import 'scaffold_with_nav_bar.dart';
+import 'liquid_page_transition.dart';
 
 /// Bridges a Stream into a [Listenable] so GoRouter can react to auth changes.
 class _GoRouterRefreshStream extends ChangeNotifier {
@@ -71,113 +72,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/login',
-        pageBuilder: (context, state) => CustomTransitionPage(
+        pageBuilder: (context, state) => LiquidPageTransition.authMainScreen(
           key: state.pageKey,
           child: const LoginScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            // Forward/enter curve
-            final enterCurved = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
-            );
-            // Secondary curve (when register or another screen pushes over login)
-            final secondaryCurved = CurvedAnimation(
-              parent: secondaryAnimation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
-            );
-
-            return AnimatedBuilder(
-              animation: secondaryCurved,
-              builder: (context, staticChild) {
-                final double depthScale = 1.0 - (0.05 * secondaryCurved.value);
-                final double depthOpacity = 1.0 - (0.45 * secondaryCurved.value);
-                final double depthSlideX = -0.04 * secondaryCurved.value;
-
-                return Transform.translate(
-                  offset: Offset(depthSlideX * MediaQuery.of(context).size.width, 0),
-                  child: Transform.scale(
-                    scale: depthScale,
-                    child: Opacity(
-                      opacity: depthOpacity.clamp(0.0, 1.0),
-                      child: staticChild,
-                    ),
-                  ),
-                );
-              },
-              child: FadeTransition(
-                opacity: enterCurved,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0.0, 0.04),
-                    end: Offset.zero,
-                  ).animate(enterCurved),
-                  child: child,
-                ),
-              ),
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 500),
-          reverseTransitionDuration: const Duration(milliseconds: 400),
         ),
       ),
       GoRoute(
         path: '/register',
-        pageBuilder: (context, state) => CustomTransitionPage(
+        pageBuilder: (context, state) => LiquidPageTransition.authSubScreen(
           key: state.pageKey,
           child: const RegisterScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final curved = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInOutCubic,
-            );
-            return FadeTransition(
-              opacity: curved,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.10, 0.0),
-                  end: Offset.zero,
-                ).animate(curved),
-                child: Transform.scale(
-                  scale: 0.96 + (0.04 * curved.value),
-                  child: child,
-                ),
-              ),
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 420),
-          reverseTransitionDuration: const Duration(milliseconds: 360),
         ),
       ),
       GoRoute(
         path: '/forgot-password',
-        pageBuilder: (context, state) => CustomTransitionPage(
+        pageBuilder: (context, state) => LiquidPageTransition.authSubScreen(
           key: state.pageKey,
           child: const ForgotPasswordScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final curved = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInOutCubic,
-            );
-            return FadeTransition(
-              opacity: curved,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.08, 0.0),
-                  end: Offset.zero,
-                ).animate(curved),
-                child: Transform.scale(
-                  scale: 0.96 + (0.04 * curved.value),
-                  child: child,
-                ),
-              ),
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 400),
-          reverseTransitionDuration: const Duration(milliseconds: 350),
         ),
       ),
       GoRoute(
@@ -190,29 +101,10 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Bottom Navigation Shell with smooth entrance transition
       StatefulShellRoute.indexedStack(
-        pageBuilder: (context, state, navigationShell) => CustomTransitionPage(
+        pageBuilder: (context, state, navigationShell) =>
+            LiquidPageTransition.appShell(
           key: state.pageKey,
           child: ScaffoldWithNavBar(navigationShell: navigationShell),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final curved = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-            );
-            return FadeTransition(
-              opacity: curved,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.0, 0.03),
-                  end: Offset.zero,
-                ).animate(curved),
-                child: Transform.scale(
-                  scale: 0.95 + (0.05 * curved.value),
-                  child: child,
-                ),
-              ),
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 600),
         ),
         branches: [
           StatefulShellBranch(

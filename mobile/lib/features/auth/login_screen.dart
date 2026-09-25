@@ -28,6 +28,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   String? _emailError;
   String? _passwordError;
   String? _generalError;
+  bool _isSuccess = false;
+  bool _isNavigating = false;
 
   late final AnimationController _fadeController;
   late final Animation<double> _fadeIn;
@@ -92,7 +94,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 
   Future<void> _handleLogin() async {
+    FocusScope.of(context).unfocus();
     if (!_validateFields()) return;
+    if (_isSuccess) return;
 
     try {
       await ref.read(authControllerProvider.notifier).signIn(
@@ -100,10 +104,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             password: _passwordController.text,
           );
       if (mounted) {
+        setState(() => _isSuccess = true);
         context.go('/today');
       }
     } catch (e) {
       if (!mounted) return;
+      setState(() => _isSuccess = false);
       final msg = ErrorFormatter.format(e);
 
       if (msg.toLowerCase().contains('incorrect email or password')) {
@@ -245,8 +251,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                   Align(
                                     alignment: Alignment.centerRight,
                                     child: TextButton(
-                                      onPressed: () =>
-                                          context.push('/forgot-password'),
+                                      onPressed: () {
+                                        if (_isNavigating) return;
+                                        _isNavigating = true;
+                                        FocusScope.of(context).unfocus();
+                                        context
+                                            .push('/forgot-password')
+                                            .then((_) {
+                                          if (mounted) _isNavigating = false;
+                                        });
+                                      },
                                       style: TextButton.styleFrom(
                                         padding: EdgeInsets.zero,
                                         minimumSize: Size.zero,
@@ -266,6 +280,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                     label: 'Sign In',
                                     icon: Icons.arrow_forward,
                                     isLoading: isLoading,
+                                    isSuccess: _isSuccess,
                                     onTap: _handleLogin,
                                   ),
                                   const SizedBox(height: 28),
@@ -281,7 +296,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         ),
                                       ),
                                       GestureDetector(
-                                        onTap: () => context.push('/register'),
+                                        onTap: () {
+                                          if (_isNavigating) return;
+                                          _isNavigating = true;
+                                          FocusScope.of(context).unfocus();
+                                          context
+                                              .push('/register')
+                                              .then((_) {
+                                            if (mounted) _isNavigating = false;
+                                          });
+                                        },
                                         child: Text(
                                           'Sign Up',
                                           style: LiquidTheme.linkText(

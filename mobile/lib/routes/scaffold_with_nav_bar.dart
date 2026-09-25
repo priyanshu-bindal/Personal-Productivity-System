@@ -20,11 +20,19 @@ class ScaffoldWithNavBar extends ConsumerStatefulWidget {
 }
 
 class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _menuController;
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _scaleAnimation;
   late final Animation<Offset> _slideAnimation;
+
+  // Main app coordinated entrance animations (runs smoothly once on authentication entrance)
+  late final AnimationController _entranceController;
+  late final Animation<double> _contentFade;
+  late final Animation<Offset> _contentSlide;
+  late final Animation<double> _contentScale;
+  late final Animation<double> _navBarFade;
+  late final Animation<Offset> _navBarSlide;
 
   // Staggered animations for individual items
   late final List<Animation<double>> _itemFades;
@@ -41,6 +49,52 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
       duration: const Duration(milliseconds: 250),
       reverseDuration: const Duration(milliseconds: 190),
     );
+
+    // 480ms coordinated entrance into main app
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 480),
+    );
+
+    _contentFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: const Interval(0.0, 0.85, curve: Curves.easeOutCubic),
+      ),
+    );
+    _contentSlide = Tween<Offset>(
+      begin: const Offset(0, 14.0),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: const Interval(0.0, 0.85, curve: Curves.easeOutCubic),
+      ),
+    );
+    _contentScale = Tween<double>(begin: 0.985, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: const Interval(0.0, 0.85, curve: Curves.easeOutCubic),
+      ),
+    );
+
+    _navBarFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: const Interval(0.15, 1.0, curve: Curves.easeOutCubic),
+      ),
+    );
+    _navBarSlide = Tween<Offset>(
+      begin: const Offset(0, 8.0),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: const Interval(0.15, 1.0, curve: Curves.easeOutCubic),
+      ),
+    );
+
+    _entranceController.forward();
 
     final curved = CurvedAnimation(
       parent: _menuController,
@@ -113,6 +167,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
 
   @override
   void dispose() {
+    _entranceController.dispose();
     _menuController.dispose();
     super.dispose();
   }
@@ -218,8 +273,21 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
         extendBody: true,
         body: Stack(
           children: [
-            // Main navigation content
-            widget.navigationShell,
+            // Main navigation content with coordinated entrance
+            AnimatedBuilder(
+              animation: _entranceController,
+              builder: (context, child) => Transform.translate(
+                offset: _contentSlide.value,
+                child: Transform.scale(
+                  scale: _contentScale.value,
+                  child: Opacity(
+                    opacity: _contentFade.value.clamp(0.0, 1.0),
+                    child: child,
+                  ),
+                ),
+              ),
+              child: widget.navigationShell,
+            ),
 
             // Backdrop Barrier when More menu is open
             if (_isMenuOpen)
@@ -355,9 +423,18 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
               ),
           ],
         ),
-        bottomNavigationBar: SafeArea(
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+        bottomNavigationBar: AnimatedBuilder(
+          animation: _entranceController,
+          builder: (context, child) => Transform.translate(
+            offset: _navBarSlide.value,
+            child: Opacity(
+              opacity: _navBarFade.value.clamp(0.0, 1.0),
+              child: child,
+            ),
+          ),
+          child: SafeArea(
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             height: 68,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(28),
@@ -460,8 +537,9 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _MoreItemData {

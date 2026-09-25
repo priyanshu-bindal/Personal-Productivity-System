@@ -28,6 +28,7 @@ class LiquidGlassPrimaryButton extends StatefulWidget {
   final IconData? icon;
   final bool showArrow;
   final bool isLoading;
+  final bool isSuccess;
   final bool enabled;
   final double? width;
   final double height;
@@ -42,6 +43,7 @@ class LiquidGlassPrimaryButton extends StatefulWidget {
     this.icon,
     this.showArrow = true,
     this.isLoading = false,
+    this.isSuccess = false,
     this.enabled = true,
     this.width,
     this.height = 60.0,
@@ -73,7 +75,8 @@ class _LiquidGlassPrimaryButtonState extends State<LiquidGlassPrimaryButton>
 
   String get _buttonText => widget.label ?? widget.text ?? '';
   VoidCallback? get _callback => widget.enabled ? (widget.onTap ?? widget.onPressed) : null;
-  bool get _isInteractive => _callback != null && !widget.isLoading && widget.enabled;
+  bool get _isInteractive =>
+      _callback != null && !widget.isLoading && !widget.isSuccess && widget.enabled;
 
   @override
   void initState() {
@@ -130,6 +133,13 @@ class _LiquidGlassPrimaryButtonState extends State<LiquidGlassPrimaryButton>
     final double btnHeight = widget.height;
     final bool hasBubble = widget.showArrow || widget.icon != null;
 
+    final Color glowBaseColor = widget.isSuccess
+        ? LiquidTheme.success
+        : LiquidTheme.primary;
+    final Color glowAccentColor = widget.isSuccess
+        ? LiquidTheme.cyan
+        : LiquidTheme.cyan;
+
     return Semantics(
       button: true,
       enabled: _isInteractive,
@@ -158,15 +168,15 @@ class _LiquidGlassPrimaryButtonState extends State<LiquidGlassPrimaryButton>
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(radius),
                     boxShadow: [
-                      // Soft cyan/electric blue outer glow halo
+                      // Soft cyan/electric blue outer glow halo (turns emerald/cyan on success)
                       BoxShadow(
-                        color: LiquidTheme.primary.withValues(alpha: glowAlpha),
+                        color: glowBaseColor.withValues(alpha: glowAlpha),
                         blurRadius: _isPressed ? 18 : 30,
                         spreadRadius: _isPressed ? 0 : 2,
                         offset: const Offset(0, 4),
                       ),
                       BoxShadow(
-                        color: LiquidTheme.cyan.withValues(alpha: glowAlpha * 0.65),
+                        color: glowAccentColor.withValues(alpha: glowAlpha * 0.65),
                         blurRadius: _isPressed ? 10 : 16,
                         spreadRadius: -2,
                         offset: const Offset(0, 0),
@@ -284,6 +294,7 @@ class _LiquidGlassPrimaryButtonState extends State<LiquidGlassPrimaryButton>
                                       btnHeight: btnHeight,
                                       icon: widget.icon,
                                       isLoading: widget.isLoading,
+                                      isSuccess: widget.isSuccess,
                                       arrowNudge: _arrowNudgeAnim.value,
                                     ),
                                   );
@@ -586,12 +597,14 @@ class _EmbeddedGlassBubble extends StatelessWidget {
   final double btnHeight;
   final IconData? icon;
   final bool isLoading;
+  final bool isSuccess;
   final double arrowNudge;
 
   const _EmbeddedGlassBubble({
     required this.btnHeight,
     this.icon,
     required this.isLoading,
+    this.isSuccess = false,
     required this.arrowNudge,
   });
 
@@ -608,13 +621,15 @@ class _EmbeddedGlassBubble extends StatelessWidget {
         // Soft outer radial glow around the circular bubble
         boxShadow: [
           BoxShadow(
-            color: LiquidTheme.cyan.withValues(alpha: 0.38),
+            color: (isSuccess ? LiquidTheme.success : LiquidTheme.cyan)
+                .withValues(alpha: 0.38),
             blurRadius: 12,
             spreadRadius: 1,
             offset: const Offset(0, 0),
           ),
           BoxShadow(
-            color: LiquidTheme.primary.withValues(alpha: 0.28),
+            color: (isSuccess ? LiquidTheme.cyan : LiquidTheme.primary)
+                .withValues(alpha: 0.28),
             blurRadius: 18,
             spreadRadius: 2,
             offset: const Offset(0, 2),
@@ -630,7 +645,7 @@ class _EmbeddedGlassBubble extends StatelessWidget {
             painter: _GlassBubblePainter(),
           ),
 
-          // Loading state or Arrow icon
+          // Loading state, Success state, or Arrow icon
           if (isLoading)
             SizedBox(
               width: 18,
@@ -639,6 +654,12 @@ class _EmbeddedGlassBubble extends StatelessWidget {
                 strokeWidth: 2.2,
                 valueColor: AlwaysStoppedAnimation<Color>(LiquidTheme.cyan),
               ),
+            )
+          else if (isSuccess)
+            const Icon(
+              Icons.check_rounded,
+              size: 22,
+              color: LiquidTheme.success,
             )
           else if (icon != null)
             Transform.translate(

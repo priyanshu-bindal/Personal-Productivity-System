@@ -124,7 +124,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen>
                           Align(
                             alignment: Alignment.centerLeft,
                             child: GestureDetector(
-                              onTap: () => context.pop(),
+                              onTap: () {
+                                FocusScope.of(context).unfocus();
+                                context.pop();
+                              },
                               behavior: HitTestBehavior.opaque,
                               child: Container(
                                 width: 44,

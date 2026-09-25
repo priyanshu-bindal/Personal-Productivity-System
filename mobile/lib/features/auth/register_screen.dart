@@ -34,6 +34,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   String? _passwordError;
   String? _confirmError;
   String? _generalError;
+  bool _isSuccess = false;
+  bool _isNavigating = false;
 
   late final AnimationController _fadeController;
   late final Animation<double> _fadeIn;
@@ -121,7 +123,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   }
 
   Future<void> _handleRegister() async {
+    FocusScope.of(context).unfocus();
     if (!_validateFields()) return;
+    if (_isSuccess) return;
 
     try {
       final res = await ref.read(authControllerProvider.notifier).signUp(
@@ -136,10 +140,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
         // Email confirmation required
         context.go('/email-verification', extra: _emailController.text.trim());
       } else {
+        setState(() => _isSuccess = true);
         context.go('/today');
       }
     } catch (e) {
       if (!mounted) return;
+      setState(() => _isSuccess = false);
       final msg = ErrorFormatter.format(e);
 
       if (msg.toLowerCase().contains('already exists') ||
@@ -203,7 +209,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                           Align(
                             alignment: Alignment.centerLeft,
                             child: GestureDetector(
-                              onTap: () => context.pop(),
+                              onTap: () {
+                                if (_isNavigating) return;
+                                _isNavigating = true;
+                                FocusScope.of(context).unfocus();
+                                context.pop();
+                              },
                               behavior: HitTestBehavior.opaque,
                               child: Container(
                                 width: 44,
@@ -363,6 +374,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                                     label: 'Create Account',
                                     icon: Icons.arrow_forward,
                                     isLoading: isLoading,
+                                    isSuccess: _isSuccess,
                                     onTap: _handleRegister,
                                   ),
                                   const SizedBox(height: 24),
@@ -378,7 +390,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                                         ),
                                       ),
                                       GestureDetector(
-                                        onTap: () => context.pop(),
+                                        onTap: () {
+                                          if (_isNavigating) return;
+                                          _isNavigating = true;
+                                          FocusScope.of(context).unfocus();
+                                          context.pop();
+                                        },
                                         child: Text(
                                           'Sign In',
                                           style: LiquidTheme.linkText(

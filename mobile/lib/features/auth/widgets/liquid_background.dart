@@ -76,7 +76,11 @@ class _LiquidPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final t = animationValue * 2 * math.pi;
+    // Derive t from global millisecond phase so all auth screens (Login, Sign Up,
+    // Forgot Password) share the exact same continuous bubble and liquid ribbon positions.
+    // This completely eliminates jumps or restarts from frame 0 during page transitions.
+    final double globalPhase = (DateTime.now().millisecondsSinceEpoch % 60000) / 60000.0;
+    final t = (reducedMotion ? 0.0 : globalPhase) * 2 * math.pi;
 
     _drawRibbons(canvas, size, t);
     _drawParticles(canvas, size, t);
