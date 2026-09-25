@@ -48,7 +48,7 @@ class LiquidTheme {
 
   // ─── Typography: Inter (Unified System) ─────────────────────
   // Display: 40px / 700
-  static TextStyle display({Color color = textPrimary}) => GoogleFonts.inter(
+  static TextStyle display({Color color = textPrimary}) => GoogleFonts.spaceGrotesk(
         fontSize: 40,
         fontWeight: FontWeight.w700,
         color: color,
@@ -57,7 +57,7 @@ class LiquidTheme {
       );
 
   // Title: 32px / 700
-  static TextStyle title({Color color = textPrimary}) => GoogleFonts.inter(
+  static TextStyle title({Color color = textPrimary}) => GoogleFonts.spaceGrotesk(
         fontSize: 32,
         fontWeight: FontWeight.w700,
         color: color,
@@ -66,7 +66,7 @@ class LiquidTheme {
       );
 
   // Login Title: 30px / 700 / letter spacing -0.5
-  static TextStyle loginTitle({Color color = textPrimary}) => GoogleFonts.inter(
+  static TextStyle loginTitle({Color color = textPrimary}) => GoogleFonts.spaceGrotesk(
         fontSize: 30,
         fontWeight: FontWeight.w700,
         color: color,
@@ -75,7 +75,7 @@ class LiquidTheme {
       );
 
   // Heading: 24px / 600
-  static TextStyle heading({Color color = textPrimary}) => GoogleFonts.inter(
+  static TextStyle heading({Color color = textPrimary}) => GoogleFonts.spaceGrotesk(
         fontSize: 24,
         fontWeight: FontWeight.w600,
         color: color,
@@ -88,7 +88,7 @@ class LiquidTheme {
     double fontSize = 18,
     Color color = textSecondary,
   }) =>
-      GoogleFonts.inter(
+      GoogleFonts.spaceGrotesk(
         fontSize: fontSize,
         fontWeight: FontWeight.w500,
         color: color,
@@ -101,7 +101,7 @@ class LiquidTheme {
     double fontSize = 16,
     Color color = textPrimary,
   }) =>
-      GoogleFonts.inter(
+      GoogleFonts.spaceGrotesk(
         fontSize: fontSize,
         fontWeight: FontWeight.w400,
         color: color,
@@ -114,7 +114,7 @@ class LiquidTheme {
     FontWeight fontWeight = FontWeight.w400,
     Color color = textSecondary,
   }) =>
-      GoogleFonts.inter(
+      GoogleFonts.spaceGrotesk(
         fontSize: fontSize,
         fontWeight: fontWeight,
         color: color,
@@ -122,7 +122,7 @@ class LiquidTheme {
       );
 
   // Caption: 12px / 500
-  static TextStyle caption({Color color = textSecondary}) => GoogleFonts.inter(
+  static TextStyle caption({Color color = textSecondary}) => GoogleFonts.spaceGrotesk(
         fontSize: 12,
         fontWeight: FontWeight.w500,
         color: color,
@@ -130,20 +130,23 @@ class LiquidTheme {
       );
 
   // Semantic UI helpers:
-  static TextStyle logoTitle({double fontSize = 28}) => GoogleFonts.inter(
+  static TextStyle logoTitle({
+    double fontSize = 28,
+    FontWeight fontWeight = FontWeight.w700,
+  }) => GoogleFonts.spaceGrotesk(
         fontSize: fontSize,
-        fontWeight: FontWeight.w800,
-        letterSpacing: -0.6,
+        fontWeight: fontWeight,
+        letterSpacing: -0.5,
       );
 
-  static TextStyle logoSubtitle({double fontSize = 13}) => GoogleFonts.inter(
+  static TextStyle logoSubtitle({double fontSize = 13}) => GoogleFonts.spaceGrotesk(
         fontSize: fontSize,
         fontWeight: FontWeight.w500,
         color: textSecondary,
         letterSpacing: 0.8,
       );
 
-  static TextStyle heroHeading({double fontSize = 34}) => GoogleFonts.inter(
+  static TextStyle heroHeading({double fontSize = 34}) => GoogleFonts.spaceGrotesk(
         fontSize: fontSize,
         fontWeight: FontWeight.w800,
         color: textPrimary,
@@ -153,19 +156,19 @@ class LiquidTheme {
 
   static TextStyle pageTitle({double fontSize = 30}) => loginTitle();
 
-  static TextStyle inputText({double fontSize = 16}) => GoogleFonts.inter(
+  static TextStyle inputText({double fontSize = 16}) => GoogleFonts.spaceGrotesk(
         fontSize: fontSize,
         fontWeight: FontWeight.w400,
         color: textPrimary,
       );
 
-  static TextStyle inputLabel({double fontSize = 14}) => GoogleFonts.inter(
+  static TextStyle inputLabel({double fontSize = 14}) => GoogleFonts.spaceGrotesk(
         fontSize: fontSize,
         fontWeight: FontWeight.w400,
         color: textSecondary,
       );
 
-  static TextStyle buttonText({double fontSize = 16}) => GoogleFonts.inter(
+  static TextStyle buttonText({double fontSize = 16}) => GoogleFonts.spaceGrotesk(
         fontSize: fontSize,
         fontWeight: FontWeight.w600,
         color: textPrimary,
@@ -173,19 +176,19 @@ class LiquidTheme {
       );
 
   static TextStyle linkText({double fontSize = 14, bool bold = false}) =>
-      GoogleFonts.inter(
+      GoogleFonts.spaceGrotesk(
         fontSize: fontSize,
         fontWeight: bold ? FontWeight.w600 : FontWeight.w500,
         color: cyan,
       );
 
-  static TextStyle cardTitle({double fontSize = 15}) => GoogleFonts.inter(
+  static TextStyle cardTitle({double fontSize = 15}) => GoogleFonts.spaceGrotesk(
         fontSize: fontSize,
         fontWeight: FontWeight.w600,
         color: textPrimary,
       );
 
-  static TextStyle cardSubtitle({double fontSize = 11.5}) => GoogleFonts.inter(
+  static TextStyle cardSubtitle({double fontSize = 11.5}) => GoogleFonts.spaceGrotesk(
         fontSize: fontSize,
         fontWeight: FontWeight.w400,
         color: textSecondary,

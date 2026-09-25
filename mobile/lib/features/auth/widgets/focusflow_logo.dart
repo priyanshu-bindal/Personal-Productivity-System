@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'liquid_theme.dart';
 
 /// FocusFlow Brand Logo Component
@@ -16,6 +17,8 @@ class FocusFlowLogo extends StatelessWidget {
   final bool showGlyph;
   final bool useAurellis;
   final double? aurellisFontSize;
+  final double? wordmarkFontSize;
+  final FontWeight? wordmarkFontWeight;
 
   const FocusFlowLogo({
     super.key,
@@ -25,6 +28,8 @@ class FocusFlowLogo extends StatelessWidget {
     this.showGlyph = true,
     this.useAurellis = false,
     this.aurellisFontSize,
+    this.wordmarkFontSize,
+    this.wordmarkFontWeight,
   });
 
   @override
@@ -33,10 +38,13 @@ class FocusFlowLogo extends StatelessWidget {
     final double calculatedAurellisSize = aurellisFontSize ??
         (screenWidth * 0.12).clamp(42.0, 52.0);
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.topCenter,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
         // 1. Fluid 'F' Logo Emblem
         if (showGlyph) ...[
           SizedBox(
@@ -56,7 +64,10 @@ class FocusFlowLogo extends StatelessWidget {
           else
             RichText(
               text: TextSpan(
-                style: LiquidTheme.logoTitle(fontSize: size * 0.38),
+                style: LiquidTheme.logoTitle(
+                  fontSize: wordmarkFontSize ?? (size * 0.38),
+                  fontWeight: wordmarkFontWeight ?? FontWeight.w700,
+                ),
                 children: const [
                   TextSpan(
                     text: 'Focus',
@@ -88,8 +99,9 @@ class FocusFlowLogo extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
+    ),
+  );
+}
 }
 
 /// Handwritten "FocusFlow" brand name rendered with the local Aurellis font
@@ -105,13 +117,14 @@ class _AurellisBrandWordmark extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Ambient cyan/blue glow behind the handwritten signature
+          // Ambient cyan/blue glow behind the wordmark
           Text(
             'FocusFlow',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Aurellis',
+            style: GoogleFonts.spaceGrotesk(
+              fontWeight: FontWeight.w700,
               fontSize: fontSize,
+              letterSpacing: -0.5,
               color: Colors.transparent,
               shadows: [
                 Shadow(
@@ -148,11 +161,11 @@ class _AurellisBrandWordmark extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.visible,
-              style: TextStyle(
-                fontFamily: 'Aurellis',
+              style: GoogleFonts.spaceGrotesk(
+                fontWeight: FontWeight.w700,
                 fontSize: fontSize,
+                letterSpacing: -0.5,
                 color: Colors.white,
-                // Natural weight; preserve handwriting decorative strokes
               ),
             ),
           ),

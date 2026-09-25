@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../services/supabase_service.dart';
-import '../features/auth/login_screen.dart';
-import '../features/auth/register_screen.dart';
-import '../features/auth/forgot_password_screen.dart';
+import '../features/auth/onboarding_screen.dart';
+import '../features/auth/auth_flow_screen.dart';
 import '../features/auth/email_verification_screen.dart';
 import '../features/auth/widgets/liquid_theme.dart';
 import '../features/auth/widgets/liquid_background.dart';
@@ -47,7 +46,7 @@ final _authRefreshNotifier = _GoRouterRefreshStream(
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/login',
+    initialLocation: '/onboarding',
     // refreshListenable makes GoRouter re-run redirect on every auth state change
     refreshListenable: _authRefreshNotifier,
     redirect: (BuildContext context, GoRouterState state) {
@@ -67,10 +66,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      // Auth routes
+      // Onboarding — real route, shown first for unauthenticated users
       GoRoute(
         path: '/onboarding',
-        redirect: (context, state) => '/login',
+        pageBuilder: (context, state) => LiquidPageTransition.authMainScreen(
+          key: state.pageKey,
+          child: const OnboardingScreen(),
+        ),
       ),
       // Persistent Auth Shell with shared LiquidBackground
       ShellRoute(
@@ -89,29 +91,23 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
         routes: [
+          // Single route for all auth card modes (login / register / forgot)
           GoRoute(
             path: '/login',
             pageBuilder: (context, state) =>
                 LiquidPageTransition.authMainScreen(
               key: state.pageKey,
-              child: const LoginScreen(),
+              child: const AuthFlowScreen(),
             ),
           ),
+          // Backward-compat redirects so any deep-link or old code still works
           GoRoute(
             path: '/register',
-            pageBuilder: (context, state) =>
-                LiquidPageTransition.authSubScreen(
-              key: state.pageKey,
-              child: const RegisterScreen(),
-            ),
+            redirect: (context, state) => '/login',
           ),
           GoRoute(
             path: '/forgot-password',
-            pageBuilder: (context, state) =>
-                LiquidPageTransition.authSubScreen(
-              key: state.pageKey,
-              child: const ForgotPasswordScreen(),
-            ),
+            redirect: (context, state) => '/login',
           ),
         ],
       ),
