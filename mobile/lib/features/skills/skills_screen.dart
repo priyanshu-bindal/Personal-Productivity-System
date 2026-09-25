@@ -208,7 +208,7 @@ class SkillsScreen extends ConsumerWidget {
   }
 }
 
-class _SkillCard extends StatelessWidget {
+class _SkillCard extends StatefulWidget {
   final Skill skill;
   final int index;
   final VoidCallback onTap;
@@ -220,10 +220,27 @@ class _SkillCard extends StatelessWidget {
   });
 
   @override
+  State<_SkillCard> createState() => _SkillCardState();
+}
+
+class _SkillCardState extends State<_SkillCard> {
+  bool _isNavigating = false;
+
+  void _handleTap() {
+    if (_isNavigating) return;
+    setState(() => _isNavigating = true);
+    widget.onTap();
+    // Reset after the transition completes so back-navigation works.
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) setState(() => _isNavigating = false);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AnimatedCard(
-      index: index,
-      onTap: onTap,
+      index: widget.index,
+      onTap: _handleTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -244,11 +261,11 @@ class _SkillCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(skill.name, style: AppTextStyles.bodyStrong),
+                    Text(widget.skill.name, style: AppTextStyles.bodyStrong),
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Text(skill.category, style: AppTextStyles.bodySecondary),
+                        Text(widget.skill.category, style: AppTextStyles.bodySecondary),
                         const SizedBox(width: 8),
                         Container(
                           width: 4,
@@ -259,7 +276,7 @@ class _SkillCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(skill.level, style: AppTextStyles.labelSmall),
+                        Text(widget.skill.level, style: AppTextStyles.labelSmall),
                       ],
                     ),
                   ],
@@ -276,14 +293,14 @@ class _SkillCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Target: ${skill.weeklyTarget} sessions / week (${skill.sessionDuration}m)',
+                  'Target: ${widget.skill.weeklyTarget} sessions / week (${widget.skill.sessionDuration}m)',
                   style: AppTextStyles.bodySecondary,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: 8),
               Text(
-                '${skill.learningHours}h practiced',
+                '${widget.skill.learningHours}h practiced',
                 style: AppTextStyles.bodySecondary.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
@@ -305,7 +322,7 @@ class _SkillCard extends StatelessWidget {
                       Text('Consistency', style: AppTextStyles.labelSmall),
                       const SizedBox(width: 8),
                       Text(
-                        '${skill.consistencyPct}%',
+                        '${widget.skill.consistencyPct}%',
                         style: AppTextStyles.bodySecondary.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
@@ -314,7 +331,7 @@ class _SkillCard extends StatelessWidget {
                     ],
                   ),
                   Text(
-                    '🔥 ${skill.streak} day streak',
+                    '🔥 ${widget.skill.streak} day streak',
                     style: AppTextStyles.bodySecondary.copyWith(
                       fontWeight: FontWeight.bold,
                       color: AppColors.accentAmber,
@@ -326,7 +343,7 @@ class _SkillCard extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: LinearProgressIndicator(
-                  value: (skill.consistencyPct / 100).clamp(0.0, 1.0),
+                  value: (widget.skill.consistencyPct / 100).clamp(0.0, 1.0),
                   minHeight: 6,
                   backgroundColor: AppColors.blueDim,
                   valueColor: const AlwaysStoppedAnimation<Color>(AppColors.blue),

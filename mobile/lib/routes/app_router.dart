@@ -144,9 +144,33 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: ':id',
-                    builder: (context, state) {
+                    pageBuilder: (context, state) {
                       final id = state.pathParameters['id']!;
-                      return SkillDetailScreen(skillId: id);
+                      return CustomTransitionPage(
+                        key: state.pageKey,
+                        child: SkillDetailScreen(skillId: id),
+                        transitionsBuilder:
+                            (context, animation, secondaryAnimation, child) {
+                          final curved = CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOutCubic,
+                            reverseCurve: Curves.easeInCubic,
+                          );
+                          return FadeTransition(
+                            opacity:
+                                Tween<double>(begin: 0.0, end: 1.0).animate(curved),
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0.06, 0),
+                                end: Offset.zero,
+                              ).animate(curved),
+                              child: child,
+                            ),
+                          );
+                        },
+                        transitionDuration: const Duration(milliseconds: 250),
+                        reverseTransitionDuration: const Duration(milliseconds: 220),
+                      );
                     },
                   ),
                 ],

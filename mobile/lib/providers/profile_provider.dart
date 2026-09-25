@@ -128,4 +128,43 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
     }
     await fetchProfile();
   }
+
+  // --- Account Deletion Scheduling ------------------------------------------
+  // The client records the request in Supabase.
+  // A server-side pg_cron job (see migration 007) performs the actual deletion.
+
+  /// Schedules account deletion for 15 days from now (UTC).
+  /// Writes deletion_requested_at and deletion_scheduled_for to the profiles
+  /// table. The server-side cron job executes the actual permanent deletion.
+  Future<void> scheduleDeletion() async {
+    final userId = SupabaseService.currentUserId;
+    if (userId == null) throw Exception('Not authenticated');
+
+    final now = DateTime.now().toUtc();
+    final scheduledFor = now.add(const Duration(days: 15));
+
+    await SupabaseJwtRecovery.withJwtRecovery(
+      SupabaseService.client,
+      () => SupabaseService.client.from('profiles').update({
+        'deletion_requested_at': now.toIso8601String(),
+        'deletion_scheduled_for': scheduledFor.toIso8601String(),
+      }).eq('id', userId),
+    );
+    await fetchProfile();
+  }
+
+  /// Cancels a pending deletion request by clearing the deletion columns.
+  Future<void> cancelDeletion() async {
+    final userId = SupabaseService.currentUserId;
+    if (userId == null) throw Exception('Not authenticated');
+
+    await SupabaseJwtRecovery.withJwtRecovery(
+      SupabaseService.client,
+      () => SupabaseService.client.from('profiles').update({
+        'deletion_requested_at': null,
+        'deletion_scheduled_for': null,
+      }).eq('id', userId),
+    );
+    await fetchProfile();
+  }
 }

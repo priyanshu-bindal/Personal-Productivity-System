@@ -12,6 +12,10 @@ class UserProfile {
   final int longestStreak;
   final String? lastStreakDate; // 'YYYY-MM-DD'
 
+  // Account deletion scheduling (UTC)
+  final DateTime? deletionRequestedAt;
+  final DateTime? deletionScheduledFor;
+
   UserProfile({
     required this.id,
     required this.email,
@@ -23,6 +27,8 @@ class UserProfile {
     this.currentStreak = 0,
     this.longestStreak = 0,
     this.lastStreakDate,
+    this.deletionRequestedAt,
+    this.deletionScheduledFor,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json, {String email = ''}) {
@@ -37,6 +43,12 @@ class UserProfile {
       currentStreak: json['current_streak'] as int? ?? 0,
       longestStreak: json['longest_streak'] as int? ?? 0,
       lastStreakDate: json['last_streak_date'] as String?,
+      deletionRequestedAt: json['deletion_requested_at'] != null
+          ? DateTime.tryParse(json['deletion_requested_at'] as String)
+          : null,
+      deletionScheduledFor: json['deletion_scheduled_for'] != null
+          ? DateTime.tryParse(json['deletion_scheduled_for'] as String)
+          : null,
     );
   }
 
@@ -64,6 +76,9 @@ class UserProfile {
     int? longestStreak,
     String? lastStreakDate,
     bool clearLastStreakDate = false,
+    DateTime? deletionRequestedAt,
+    DateTime? deletionScheduledFor,
+    bool clearDeletion = false,
   }) {
     return UserProfile(
       id: id,
@@ -76,6 +91,14 @@ class UserProfile {
       currentStreak: currentStreak ?? this.currentStreak,
       longestStreak: longestStreak ?? this.longestStreak,
       lastStreakDate: clearLastStreakDate ? null : (lastStreakDate ?? this.lastStreakDate),
+      deletionRequestedAt: clearDeletion ? null : (deletionRequestedAt ?? this.deletionRequestedAt),
+      deletionScheduledFor: clearDeletion ? null : (deletionScheduledFor ?? this.deletionScheduledFor),
     );
   }
+
+  /// Whether this account has a pending deletion request that hasn't been
+  /// executed yet (i.e., deletionScheduledFor is in the future).
+  bool get hasPendingDeletion =>
+      deletionScheduledFor != null &&
+      deletionScheduledFor!.isAfter(DateTime.now().toUtc());
 }
