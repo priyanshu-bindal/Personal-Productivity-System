@@ -24,6 +24,7 @@ class LiquidPageTransition {
   static CustomTransitionPage<T> authMainScreen<T>({
     required LocalKey key,
     required Widget child,
+    bool? isHeadingToMainApp,
   }) {
     return CustomTransitionPage<T>(
       key: key,
@@ -43,69 +44,77 @@ class LiquidPageTransition {
           reverseCurve: Curves.easeInOutCubic,
         );
 
-        return AnimatedBuilder(
-          animation: secondaryCurved,
-          builder: (context, staticChild) {
-            if (secondaryCurved.value == 0.0) {
-              return staticChild!;
-            }
-
-            // Determine if outgoing towards Main App or towards an Auth Sub-screen
-            String targetPath = '';
-            try {
-              targetPath = GoRouterState.of(context).uri.path;
-            } catch (_) {}
-
-            final bool isHeadingToMainApp = targetPath.startsWith('/today') ||
+        // Determine if outgoing towards Main App or towards an Auth Sub-screen once per build
+        bool headingToMainApp = isHeadingToMainApp ?? false;
+        if (isHeadingToMainApp == null) {
+          try {
+            final targetPath = GoRouterState.of(context).uri.path;
+            headingToMainApp = targetPath.startsWith('/today') ||
                 targetPath.startsWith('/skills') ||
                 targetPath.startsWith('/calendar') ||
                 targetPath.startsWith('/progress') ||
                 targetPath.startsWith('/money');
+          } catch (_) {}
+        }
 
-            if (isHeadingToMainApp) {
-              // Outgoing toward Main App: translateY 0 → -8px, scale 1.0 → 0.985, opacity 1 → 0
-              final double translateY = -8.0 * secondaryCurved.value;
-              final double scale = 1.0 - (0.015 * secondaryCurved.value);
-              final double opacity = (1.0 - secondaryCurved.value).clamp(0.0, 1.0);
+        final secondaryFade = Tween<double>(
+          begin: 1.0,
+          end: 0.0,
+        ).animate(secondaryCurved);
 
-              return Transform.translate(
-                offset: Offset(0, translateY),
-                child: Transform.scale(
-                  scale: scale,
-                  child: Opacity(
-                    opacity: opacity,
+        return FadeTransition(
+          opacity: secondaryFade,
+          child: AnimatedBuilder(
+            animation: secondaryCurved,
+            builder: (context, staticChild) {
+              if (secondaryCurved.value == 0.0) {
+                return staticChild!;
+              }
+
+              if (headingToMainApp) {
+                // Outgoing toward Main App: translateY 0 → -8px, scale 1.0 → 0.985
+                final double translateY = -8.0 * secondaryCurved.value;
+                final double scale = 1.0 - (0.015 * secondaryCurved.value);
+
+                return Transform.translate(
+                  offset: Offset(0, translateY),
+                  child: Transform.scale(
+                    scale: scale,
                     child: staticChild,
                   ),
-                ),
-              );
-            } else {
-              // Outgoing toward Sign Up / Forgot Password: translateX 0 → -12px, scale 1.0 → 0.99, opacity 1 → 0
-              final double translateX = -12.0 * secondaryCurved.value;
-              final double scale = 1.0 - (0.010 * secondaryCurved.value);
-              final double opacity = (1.0 - secondaryCurved.value).clamp(0.0, 1.0);
+                );
+              } else {
+                // Outgoing toward Sign Up / Forgot Password: translateX 0 → -12px, scale 1.0 → 0.99
+                final double translateX = -12.0 * secondaryCurved.value;
+                final double scale = 1.0 - (0.010 * secondaryCurved.value);
 
-              return Transform.translate(
-                offset: Offset(translateX, 0),
-                child: Transform.scale(
-                  scale: scale,
-                  child: Opacity(
-                    opacity: opacity,
+                return Transform.translate(
+                  offset: Offset(translateX, 0),
+                  child: Transform.scale(
+                    scale: scale,
                     child: staticChild,
                   ),
+                );
+              }
+            },
+            child: FadeTransition(
+              opacity: enterCurved,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, 0.03),
+                  end: Offset.zero,
+                ).animate(enterCurved),
+                child: AnimatedBuilder(
+                  animation: enterCurved,
+                  builder: (context, innerChild) {
+                    final double scale = 0.985 + (0.015 * enterCurved.value);
+                    return Transform.scale(
+                      scale: scale,
+                      child: innerChild,
+                    );
+                  },
+                  child: pageChild,
                 ),
-              );
-            }
-          },
-          child: FadeTransition(
-            opacity: enterCurved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.0, 0.03),
-                end: Offset.zero,
-              ).animate(enterCurved),
-              child: Transform.scale(
-                scale: 0.985 + (0.015 * enterCurved.value),
-                child: pageChild,
               ),
             ),
           ),
@@ -150,47 +159,51 @@ class LiquidPageTransition {
           reverseCurve: Curves.easeInOutCubic,
         );
 
-        return AnimatedBuilder(
-          animation: secondaryCurved,
-          builder: (context, staticChild) {
-            if (secondaryCurved.value == 0.0) {
-              return staticChild!;
-            }
+        final secondaryFade = Tween<double>(
+          begin: 1.0,
+          end: 0.0,
+        ).animate(secondaryCurved);
 
-            // When navigating directly from Sign Up into Main App on account creation
-            final double translateY = -8.0 * secondaryCurved.value;
-            final double scale = 1.0 - (0.015 * secondaryCurved.value);
-            final double opacity = (1.0 - secondaryCurved.value).clamp(0.0, 1.0);
-
-            return Transform.translate(
-              offset: Offset(0, translateY),
-              child: Transform.scale(
-                scale: scale,
-                child: Opacity(
-                  opacity: opacity,
-                  child: staticChild,
-                ),
-              ),
-            );
-          },
+        return FadeTransition(
+          opacity: secondaryFade,
           child: AnimatedBuilder(
-            animation: enterCurved,
-            builder: (context, innerChild) {
-              final double translateX = 20.0 * (1.0 - enterCurved.value);
-              final double scale = 0.985 + (0.015 * enterCurved.value);
+            animation: secondaryCurved,
+            builder: (context, staticChild) {
+              if (secondaryCurved.value == 0.0) {
+                return staticChild!;
+              }
+
+              // When navigating directly from Sign Up into Main App on account creation
+              final double translateY = -8.0 * secondaryCurved.value;
+              final double scale = 1.0 - (0.015 * secondaryCurved.value);
 
               return Transform.translate(
-                offset: Offset(translateX, 0),
+                offset: Offset(0, translateY),
                 child: Transform.scale(
                   scale: scale,
-                  child: Opacity(
-                    opacity: enterCurved.value.clamp(0.0, 1.0),
-                    child: innerChild,
-                  ),
+                  child: staticChild,
                 ),
               );
             },
-            child: pageChild,
+            child: FadeTransition(
+              opacity: enterCurved,
+              child: AnimatedBuilder(
+                animation: enterCurved,
+                builder: (context, innerChild) {
+                  final double translateX = 20.0 * (1.0 - enterCurved.value);
+                  final double scale = 0.985 + (0.015 * enterCurved.value);
+
+                  return Transform.translate(
+                    offset: Offset(translateX, 0),
+                    child: Transform.scale(
+                      scale: scale,
+                      child: innerChild,
+                    ),
+                  );
+                },
+                child: pageChild,
+              ),
+            ),
           ),
         );
       },
@@ -218,24 +231,24 @@ class LiquidPageTransition {
           curve: Curves.easeOutCubic,
         );
 
-        return AnimatedBuilder(
-          animation: curved,
-          builder: (context, staticChild) {
-            final double translateY = 12.0 * (1.0 - curved.value);
-            final double scale = 0.985 + (0.015 * curved.value);
+        return FadeTransition(
+          opacity: curved,
+          child: AnimatedBuilder(
+            animation: curved,
+            builder: (context, staticChild) {
+              final double translateY = 12.0 * (1.0 - curved.value);
+              final double scale = 0.985 + (0.015 * curved.value);
 
-            return Transform.translate(
-              offset: Offset(0, translateY),
-              child: Transform.scale(
-                scale: scale,
-                child: Opacity(
-                  opacity: curved.value.clamp(0.0, 1.0),
+              return Transform.translate(
+                offset: Offset(0, translateY),
+                child: Transform.scale(
+                  scale: scale,
                   child: staticChild,
                 ),
-              ),
-            );
-          },
-          child: pageChild,
+              );
+            },
+            child: pageChild,
+          ),
         );
       },
     );

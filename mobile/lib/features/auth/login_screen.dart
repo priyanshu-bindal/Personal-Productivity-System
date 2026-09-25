@@ -5,7 +5,6 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/utils/error_formatter.dart';
 import '../../providers/auth_provider.dart';
 import 'widgets/liquid_theme.dart';
-import 'widgets/liquid_background.dart';
 import 'widgets/liquid_glass_card.dart';
 import 'widgets/liquid_glass_input.dart';
 import 'widgets/liquid_glass_button.dart';
@@ -18,8 +17,7 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen>
-    with SingleTickerProviderStateMixin {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -31,33 +29,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   bool _isSuccess = false;
   bool _isNavigating = false;
 
-  late final AnimationController _fadeController;
-  late final Animation<double> _fadeIn;
-  late final Animation<double> _slideIn;
-
-  @override
-  void initState() {
-    super.initState();
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    );
-    _fadeIn = CurvedAnimation(
-      parent: _fadeController,
-      curve: const Interval(0.0, 1.0, curve: Curves.easeOut),
-    );
-    _slideIn = CurvedAnimation(
-      parent: _fadeController,
-      curve: const Interval(0.0, 1.0, curve: Curves.easeOutCubic),
-    );
-    _fadeController.forward();
-  }
-
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _fadeController.dispose();
     super.dispose();
   }
 
@@ -124,47 +99,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading;
-    final reducedMotion = MediaQuery.of(context).disableAnimations;
 
     return Scaffold(
-      backgroundColor: LiquidTheme.mainBackground, // #020817 Deep Midnight Navy
-      body: Stack(
-        children: [
-          // Continuous animated liquid background
-          Positioned.fill(
-            child: LiquidBackground(reducedMotion: reducedMotion),
-          ),
-
-          // Responsive scrollable content
-          SafeArea(
-            child: AnimatedBuilder(
-              animation: _fadeController,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _fadeIn.value,
-                  child: Transform.scale(
-                    scale: 0.96 + (0.04 * _slideIn.value),
-                    child: Transform.translate(
-                      offset: Offset(0, 14 * (1 - _slideIn.value)),
-                      child: child,
-                    ),
-                  ),
-                );
-              },
-              child: CustomScrollView(
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24.0,
-                        vertical: 24.0,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 24.0,
+                ),
+                child: RepaintBoundary(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
                           // Brand Logo with glowing liquid icon & Aurellis handwritten wordmark
                           const FocusFlowLogo(
                             size: 64,
@@ -324,13 +277,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
-    );
+        );
   }
 }
 

@@ -7,6 +7,8 @@ import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
 import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/email_verification_screen.dart';
+import '../features/auth/widgets/liquid_theme.dart';
+import '../features/auth/widgets/liquid_background.dart';
 import '../features/today/today_screen.dart';
 import '../features/skills/skills_screen.dart';
 import '../features/skills/skill_detail_screen.dart';
@@ -70,26 +72,48 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/onboarding',
         redirect: (context, state) => '/login',
       ),
-      GoRoute(
-        path: '/login',
-        pageBuilder: (context, state) => LiquidPageTransition.authMainScreen(
-          key: state.pageKey,
-          child: const LoginScreen(),
-        ),
-      ),
-      GoRoute(
-        path: '/register',
-        pageBuilder: (context, state) => LiquidPageTransition.authSubScreen(
-          key: state.pageKey,
-          child: const RegisterScreen(),
-        ),
-      ),
-      GoRoute(
-        path: '/forgot-password',
-        pageBuilder: (context, state) => LiquidPageTransition.authSubScreen(
-          key: state.pageKey,
-          child: const ForgotPasswordScreen(),
-        ),
+      // Persistent Auth Shell with shared LiquidBackground
+      ShellRoute(
+        builder: (context, state, child) {
+          final reducedMotion = MediaQuery.of(context).disableAnimations;
+          return Scaffold(
+            backgroundColor: LiquidTheme.mainBackground,
+            body: Stack(
+              children: [
+                Positioned.fill(
+                  child: LiquidBackground(reducedMotion: reducedMotion),
+                ),
+                child,
+              ],
+            ),
+          );
+        },
+        routes: [
+          GoRoute(
+            path: '/login',
+            pageBuilder: (context, state) =>
+                LiquidPageTransition.authMainScreen(
+              key: state.pageKey,
+              child: const LoginScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/register',
+            pageBuilder: (context, state) =>
+                LiquidPageTransition.authSubScreen(
+              key: state.pageKey,
+              child: const RegisterScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/forgot-password',
+            pageBuilder: (context, state) =>
+                LiquidPageTransition.authSubScreen(
+              key: state.pageKey,
+              child: const ForgotPasswordScreen(),
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: '/email-verification',

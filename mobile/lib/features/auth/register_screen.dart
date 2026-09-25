@@ -5,7 +5,6 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/utils/error_formatter.dart';
 import '../../providers/auth_provider.dart';
 import 'widgets/liquid_theme.dart';
-import 'widgets/liquid_background.dart';
 import 'widgets/liquid_glass_card.dart';
 import 'widgets/liquid_glass_input.dart';
 import 'widgets/liquid_glass_button.dart';
@@ -18,8 +17,7 @@ class RegisterScreen extends ConsumerStatefulWidget {
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends ConsumerState<RegisterScreen>
-    with SingleTickerProviderStateMixin {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -37,35 +35,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   bool _isSuccess = false;
   bool _isNavigating = false;
 
-  late final AnimationController _fadeController;
-  late final Animation<double> _fadeIn;
-  late final Animation<double> _slideIn;
-
-  @override
-  void initState() {
-    super.initState();
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _fadeIn = CurvedAnimation(
-      parent: _fadeController,
-      curve: const Interval(0.0, 1.0, curve: Curves.easeOut),
-    );
-    _slideIn = CurvedAnimation(
-      parent: _fadeController,
-      curve: const Interval(0.0, 1.0, curve: Curves.easeOutCubic),
-    );
-    _fadeController.forward();
-  }
-
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
-    _fadeController.dispose();
     super.dispose();
   }
 
@@ -164,80 +139,62 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final isLoading = authState.isLoading;
-    final reducedMotion = MediaQuery.of(context).disableAnimations;
 
     return Scaffold(
-      backgroundColor: LiquidTheme.background,
-      body: Stack(
-        children: [
-          // Same animated liquid background
-          Positioned.fill(
-            child: LiquidBackground(reducedMotion: reducedMotion),
-          ),
-
-          // Main Responsive Scroll View
-          SafeArea(
-            child: AnimatedBuilder(
-              animation: _fadeController,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _fadeIn.value,
-                  child: Transform.scale(
-                    scale: 0.97 + (0.03 * _slideIn.value),
-                    child: Transform.translate(
-                      offset: Offset(0, 15 * (1 - _slideIn.value)),
-                      child: child,
-                    ),
-                  ),
-                );
-              },
-              child: CustomScrollView(
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24.0,
-                        vertical: 16.0,
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Top Bar: Back Button
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: GestureDetector(
-                              onTap: () {
-                                if (_isNavigating) return;
-                                _isNavigating = true;
-                                FocusScope.of(context).unfocus();
-                                context.pop();
-                              },
-                              behavior: HitTestBehavior.opaque,
-                              child: Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: LiquidTheme.secondaryBackground
-                                      .withValues(alpha: 0.65),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: LiquidTheme.glassBorder,
-                                    width: 1.2,
-                                  ),
-                                ),
-                                child: const Icon(
-                                  LucideIcons.arrowLeft,
-                                  color: LiquidTheme.textPrimary,
-                                  size: 18,
-                                ),
-                              ),
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24.0,
+                  vertical: 16.0,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Top Bar: Back Button
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
+                        onTap: () {
+                          if (_isNavigating) return;
+                          _isNavigating = true;
+                          FocusScope.of(context).unfocus();
+                          context.pop();
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: LiquidTheme.secondaryBackground
+                                .withValues(alpha: 0.65),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: LiquidTheme.glassBorder,
+                              width: 1.2,
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          child: const Icon(
+                            LucideIcons.arrowLeft,
+                            color: LiquidTheme.textPrimary,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
 
+                    // Logo & LiquidGlassCard in RepaintBoundary
+                    RepaintBoundary(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
                           // Brand Logo
                           const FocusFlowLogo(
                             size: 64,
@@ -413,12 +370,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                         ],
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
