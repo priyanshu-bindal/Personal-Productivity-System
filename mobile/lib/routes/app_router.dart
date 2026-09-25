@@ -66,14 +66,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      // Onboarding — real route, shown first for unauthenticated users
-      GoRoute(
-        path: '/onboarding',
-        pageBuilder: (context, state) => LiquidPageTransition.authMainScreen(
-          key: state.pageKey,
-          child: const OnboardingScreen(),
-        ),
-      ),
       // Persistent Auth Shell with shared LiquidBackground
       ShellRoute(
         builder: (context, state, child) {
@@ -91,11 +83,20 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
         routes: [
+          // Onboarding — shared continuous LiquidBackground, pure fade+scale transition
+          GoRoute(
+            path: '/onboarding',
+            pageBuilder: (context, state) =>
+                LiquidPageTransition.onboardingScreen(
+              key: state.pageKey,
+              child: const OnboardingScreen(),
+            ),
+          ),
           // Single route for all auth card modes (login / register / forgot)
           GoRoute(
             path: '/login',
             pageBuilder: (context, state) =>
-                LiquidPageTransition.authMainScreen(
+                LiquidPageTransition.authFlowScreen(
               key: state.pageKey,
               child: const AuthFlowScreen(),
             ),

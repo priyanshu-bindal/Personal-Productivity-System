@@ -27,10 +27,22 @@ class AuthFlowScreen extends ConsumerStatefulWidget {
 
 class _AuthFlowScreenState extends ConsumerState<AuthFlowScreen> {
   AuthCardMode _mode = AuthCardMode.login;
+  bool _isForwardTransition = true;
+  final TextEditingController _sharedEmailController = TextEditingController();
 
-  void _switchMode(AuthCardMode mode) {
-    if (_mode == mode) return;
-    setState(() => _mode = mode);
+  @override
+  void dispose() {
+    _sharedEmailController.dispose();
+    super.dispose();
+  }
+
+  void _switchMode(AuthCardMode newMode) {
+    if (_mode == newMode) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isForwardTransition = (_mode == AuthCardMode.login);
+      _mode = newMode;
+    });
   }
 
   @override
@@ -49,77 +61,99 @@ class _AuthFlowScreenState extends ConsumerState<AuthFlowScreen> {
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
+              // Static top offset calculated once per viewport constraints (strictly independent of _mode)
+              // so the FocusFlow logo and card top edge remain 100% stationary when switching modes.
+              final double topSpacing =
+                  (constraints.maxHeight * 0.04).clamp(10.0, 28.0);
+
               return SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
                     minHeight: constraints.maxHeight,
                   ),
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24.0,
-                        vertical: 16.0,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Brand logo — Hero so it flies in from OnboardingScreen
-                          RepaintBoundary(
-                            child: Hero(
-                              tag: 'focusflow-brand',
-                              flightShuttleBuilder: (
-                                flightContext,
-                                animation,
-                                flightDirection,
-                                fromHeroContext,
-                                toHeroContext,
-                              ) {
-                                final Hero toHero = toHeroContext.widget as Hero;
-                                return Center(
-                                  child: FittedBox(
-                                    fit: BoxFit.contain,
-                                    child: toHero.child,
-                                  ),
-                                );
-                              },
-                              child: const FocusFlowLogo(
-                                size: 52,
-                                wordmarkFontSize: 28,
-                                wordmarkFontWeight: FontWeight.bold,
-                                showSubtitle: false,
-                                useAurellis: false,
-                              ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24.0,
+                      vertical: 16.0,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(height: topSpacing),
+
+                        // Stationary Brand Logo anchor (Hero for Onboarding → Login transition)
+                        RepaintBoundary(
+                          child: Hero(
+                            tag: 'focusflow-brand',
+                            flightShuttleBuilder: (
+                              flightContext,
+                              animation,
+                              flightDirection,
+                              fromHeroContext,
+                              toHeroContext,
+                            ) {
+                              final Hero toHero = toHeroContext.widget as Hero;
+                              return Center(
+                                child: FittedBox(
+                                  fit: BoxFit.contain,
+                                  child: toHero.child,
+                                ),
+                              );
+                            },
+                            child: const FocusFlowLogo(
+                              size: 52,
+                              wordmarkFontSize: 28,
+                              wordmarkFontWeight: FontWeight.bold,
+                              showSubtitle: false,
+                              useAurellis: false,
                             ),
                           ),
-                          const SizedBox(height: 20),
+                        ),
+                        const SizedBox(height: 20),
 
-                          // Card region: AnimatedSize + AnimatedSwitcher for seamless
-                          // height changes and cross-fade + subtle slide when mode changes.
-                          RepaintBoundary(
+                        // Persistent LiquidGlassCard: mounted ONCE so blur, borders,
+                        // and luminous shadows remain completely stable without recreating or stacking.
+                        RepaintBoundary(
+                          child: LiquidGlassCard(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24.0,
+                              vertical: 20.0,
+                            ),
                             child: AnimatedSize(
-                              duration: const Duration(milliseconds: 280),
-                              curve: Curves.easeInOutCubic,
+                              duration: const Duration(milliseconds: 340),
+                              curve: Curves.easeOutCubic,
                               alignment: Alignment.topCenter,
                               child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 240),
-                                transitionBuilder: (child, animation) {
-                                  final fadeAnimation = CurvedAnimation(
-                                    parent: animation,
-                                    curve: Curves.easeOut,
+                                duration: const Duration(milliseconds: 260),
+                                switchInCurve: Curves.easeOutCubic,
+                                switchOutCurve: Curves.easeInCubic,
+                                layoutBuilder: (currentChild, previousChildren) {
+                                  return Stack(
+                                    alignment: Alignment.topCenter,
+                                    children: <Widget>[
+                                      ...previousChildren,
+                                      ?currentChild,
+                                    ],
                                   );
-                                  final slideAnimation = Tween<Offset>(
-                                    begin: const Offset(0, 0.04),
-                                    end: Offset.zero,
-                                  ).animate(CurvedAnimation(
-                                    parent: animation,
-                                    curve: Curves.easeOutCubic,
-                                  ));
+                                },
+                                transitionBuilder: (child, animation) {
+                                  final isCurrent =
+                                      child.key == ValueKey(_mode);
+                                  final double direction =
+                                      _isForwardTransition ? 1.0 : -1.0;
+                                  // Subtle 2.5% vertical glide in the direction of transition
+                                  final Offset beginOffset = isCurrent
+                                      ? Offset(0, 0.025 * direction)
+                                      : Offset(0, -0.025 * direction);
+
                                   return FadeTransition(
-                                    opacity: fadeAnimation,
+                                    opacity: animation,
                                     child: SlideTransition(
-                                      position: slideAnimation,
+                                      position: Tween<Offset>(
+                                        begin: beginOffset,
+                                        end: Offset.zero,
+                                      ).animate(animation),
                                       child: child,
                                     ),
                                   );
@@ -131,8 +165,9 @@ class _AuthFlowScreenState extends ConsumerState<AuthFlowScreen> {
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        SizedBox(height: topSpacing),
+                      ],
                     ),
                   ),
                 ),
@@ -147,11 +182,20 @@ class _AuthFlowScreenState extends ConsumerState<AuthFlowScreen> {
   Widget _cardForMode(AuthCardMode mode) {
     switch (mode) {
       case AuthCardMode.login:
-        return _LoginCardContent(onSwitchMode: _switchMode);
+        return _LoginCardContent(
+          onSwitchMode: _switchMode,
+          emailController: _sharedEmailController,
+        );
       case AuthCardMode.register:
-        return _RegisterCardContent(onSwitchMode: _switchMode);
+        return _RegisterCardContent(
+          onSwitchMode: _switchMode,
+          emailController: _sharedEmailController,
+        );
       case AuthCardMode.forgotPassword:
-        return _ForgotPasswordCardContent(onSwitchMode: _switchMode);
+        return _ForgotPasswordCardContent(
+          onSwitchMode: _switchMode,
+          emailController: _sharedEmailController,
+        );
     }
   }
 }
@@ -235,7 +279,11 @@ class _GlassBackButton extends StatelessWidget {
 // ─── Login Card Content ──────────────────────────────────────────────────────
 class _LoginCardContent extends ConsumerStatefulWidget {
   final void Function(AuthCardMode) onSwitchMode;
-  const _LoginCardContent({required this.onSwitchMode});
+  final TextEditingController emailController;
+  const _LoginCardContent({
+    required this.onSwitchMode,
+    required this.emailController,
+  });
 
   @override
   ConsumerState<_LoginCardContent> createState() => _LoginCardContentState();
@@ -243,7 +291,7 @@ class _LoginCardContent extends ConsumerStatefulWidget {
 
 class _LoginCardContentState extends ConsumerState<_LoginCardContent> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  TextEditingController get _emailController => widget.emailController;
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
@@ -254,10 +302,10 @@ class _LoginCardContentState extends ConsumerState<_LoginCardContent> {
 
   @override
   void dispose() {
-    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
+
 
   bool _validateFields() {
     setState(() {
@@ -322,13 +370,12 @@ class _LoginCardContentState extends ConsumerState<_LoginCardContent> {
   Widget build(BuildContext context) {
     final isLoading = ref.watch(authControllerProvider).isLoading;
 
-    return LiquidGlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+
             Text(
               'Welcome Back',
               textAlign: TextAlign.center,
@@ -433,15 +480,19 @@ class _LoginCardContentState extends ConsumerState<_LoginCardContent> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }
+
 
 // ─── Register Card Content ───────────────────────────────────────────────────
 class _RegisterCardContent extends ConsumerStatefulWidget {
   final void Function(AuthCardMode) onSwitchMode;
-  const _RegisterCardContent({required this.onSwitchMode});
+  final TextEditingController emailController;
+  const _RegisterCardContent({
+    required this.onSwitchMode,
+    required this.emailController,
+  });
 
   @override
   ConsumerState<_RegisterCardContent> createState() =>
@@ -451,7 +502,7 @@ class _RegisterCardContent extends ConsumerStatefulWidget {
 class _RegisterCardContentState extends ConsumerState<_RegisterCardContent> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
+  TextEditingController get _emailController => widget.emailController;
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
   bool _obscurePassword = true;
@@ -467,7 +518,6 @@ class _RegisterCardContentState extends ConsumerState<_RegisterCardContent> {
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
     _passwordController.dispose();
     _confirmController.dispose();
     super.dispose();
@@ -572,9 +622,7 @@ class _RegisterCardContentState extends ConsumerState<_RegisterCardContent> {
         ),
         const SizedBox(height: 10),
 
-        LiquidGlassCard(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-          child: Form(
+        Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -709,16 +757,19 @@ class _RegisterCardContentState extends ConsumerState<_RegisterCardContent> {
               ],
             ),
           ),
-        ),
-      ],
-    );
+        ],
+      );
   }
 }
 
 // ─── Forgot Password Card Content ────────────────────────────────────────────
 class _ForgotPasswordCardContent extends ConsumerStatefulWidget {
   final void Function(AuthCardMode) onSwitchMode;
-  const _ForgotPasswordCardContent({required this.onSwitchMode});
+  final TextEditingController emailController;
+  const _ForgotPasswordCardContent({
+    required this.onSwitchMode,
+    required this.emailController,
+  });
 
   @override
   ConsumerState<_ForgotPasswordCardContent> createState() =>
@@ -727,15 +778,9 @@ class _ForgotPasswordCardContent extends ConsumerStatefulWidget {
 
 class _ForgotPasswordCardContentState
     extends ConsumerState<_ForgotPasswordCardContent> {
-  final _emailController = TextEditingController();
+  TextEditingController get _emailController => widget.emailController;
   bool _submitted = false;
   String? _emailError;
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    super.dispose();
-  }
 
   Future<void> _handleReset() async {
     final email = _emailController.text.trim();
@@ -774,25 +819,22 @@ class _ForgotPasswordCardContentState
         ),
         const SizedBox(height: 10),
 
-        LiquidGlassCard(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-          child: _submitted
-              ? _ForgotSuccessContent(
-                  email: _emailController.text.trim(),
-                  onBack: () => widget.onSwitchMode(AuthCardMode.login),
-                )
-              : _ForgotFormContent(
-                  emailController: _emailController,
-                  emailError: _emailError,
-                  isLoading: isLoading,
-                  onEmailChanged: (_) {
-                    if (_emailError != null) {
-                      setState(() => _emailError = null);
-                    }
-                  },
-                  onSubmit: _handleReset,
-                ),
-        ),
+        _submitted
+            ? _ForgotSuccessContent(
+                email: _emailController.text.trim(),
+                onBack: () => widget.onSwitchMode(AuthCardMode.login),
+              )
+            : _ForgotFormContent(
+                emailController: _emailController,
+                emailError: _emailError,
+                isLoading: isLoading,
+                onEmailChanged: (_) {
+                  if (_emailError != null) {
+                    setState(() => _emailError = null);
+                  }
+                },
+                onSubmit: _handleReset,
+              ),
       ],
     );
   }

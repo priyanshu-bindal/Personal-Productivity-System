@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'widgets/liquid_theme.dart';
-import 'widgets/liquid_background.dart';
 import 'widgets/liquid_glass_button.dart';
 import 'widgets/focusflow_logo.dart';
 
@@ -52,21 +51,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    final reducedMotion = MediaQuery.of(context).disableAnimations;
     final screenHeight = MediaQuery.of(context).size.height;
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
-      backgroundColor: LiquidTheme.background,
-      body: Stack(
-        children: [
-          // Animated continuous liquid background
-          Positioned.fill(
-            child: LiquidBackground(reducedMotion: reducedMotion),
-          ),
-
-          // Main content
-          SafeArea(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
             child: AnimatedBuilder(
               animation: _fadeController,
               builder: (context, child) {
@@ -168,8 +158,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
             ),
           ),
-        ],
-      ),
     );
   }
 }
