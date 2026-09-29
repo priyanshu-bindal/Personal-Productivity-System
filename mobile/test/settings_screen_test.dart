@@ -36,7 +36,6 @@ void main() {
 
     // Verify Section Titles
     expect(find.text('ACCOUNT'), findsOneWidget);
-    expect(find.text('PRACTICE PREFERENCES'), findsOneWidget);
     expect(find.text('NOTIFICATIONS'), findsOneWidget);
     expect(find.text('DATA & PRIVACY'), findsOneWidget);
     expect(find.text('DANGER ZONE'), findsOneWidget);
@@ -48,7 +47,6 @@ void main() {
     expect(find.text('#ABC12'), findsOneWidget); // Focus ID
 
     // Verify Preferences
-    expect(find.text('45 mins'), findsOneWidget);
     expect(find.text('Daily Practice Reminders'), findsOneWidget);
 
     // Verify Danger Zone
@@ -90,45 +88,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Save Changes'), findsNothing);
-  });
-
-  testWidgets('Tapping Session Duration opens selector modal and allows selection', (tester) async {
-    final testProfile = UserProfile(
-      id: 'test-user-123',
-      email: 'test@example.com',
-      fullName: 'Jane Doe',
-      avatarUrl: '',
-      defaultSessionDuration: 60,
-    );
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          profileProvider.overrideWith((ref) => _MockProfileNotifier(testProfile)),
-          currentChatUserShortIdProvider.overrideWith((ref) => Future.value('ABC12')),
-        ],
-        child: const MaterialApp(
-          home: SettingsScreen(),
-        ),
-      ),
-    );
-
-    await tester.pumpAndSettle();
-
-    // Tap Duration Row
-    await tester.tap(find.text('Default Session Duration'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('30 mins'), findsOneWidget);
-    expect(find.text('45 mins'), findsOneWidget);
-    expect(find.text('90 mins'), findsOneWidget);
-    expect(find.text('120 mins'), findsOneWidget);
-
-    // Tap 90 mins
-    await tester.tap(find.text('90 mins'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Choose the baseline duration for practice sessions'), findsNothing);
   });
 
   testWidgets('Sign Out opens confirmation dialog with cancel and sign out buttons', (tester) async {

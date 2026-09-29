@@ -5,7 +5,6 @@ import 'package:focus_flow/features/auth/auth_flow_screen.dart';
 import 'package:focus_flow/features/auth/widgets/liquid_auth_background.dart';
 import 'package:focus_flow/features/auth/widgets/liquid_auth_card.dart';
 import 'package:focus_flow/features/auth/widgets/liquid_auth_field.dart';
-import 'package:focus_flow/features/auth/widgets/liquid_auth_button.dart';
 import 'package:focus_flow/features/auth/widgets/liquid_auth_secondary_button.dart';
 
 void main() {

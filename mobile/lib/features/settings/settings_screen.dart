@@ -1586,25 +1586,25 @@ class _ChangePasswordModalState extends State<_ChangePasswordModal> {
               duration: const Duration(milliseconds: 120),
               onTap: _isUpdating ? null : () => Navigator.of(context).pop(),
               child: Container(
-                height: 52,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
                   color: _SettingsColors.surface,
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: _SettingsColors.border),
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   'Cancel',
                   style: GoogleFonts.inter(
-                    fontSize: 14,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                     color: _SettingsColors.textSecondary,
                   ),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             // Update Password button
             PressableScale(
               scaleFactor: _isUpdating ? 1.0 : 0.98,
@@ -1612,13 +1612,13 @@ class _ChangePasswordModalState extends State<_ChangePasswordModal> {
               onTap: _isUpdating ? null : _handleUpdatePassword,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 140),
-                height: 52,
-                padding: const EdgeInsets.symmetric(horizontal: 22),
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 18),
                 decoration: BoxDecoration(
                   color: _isUpdating
                       ? const Color(0xFF2F6BFF).withValues(alpha: 0.65)
                       : const Color(0xFF2F6BFF),
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: BorderRadius.circular(14),
                   boxShadow: _isUpdating
                       ? null
                       : const [
@@ -1647,7 +1647,7 @@ class _ChangePasswordModalState extends State<_ChangePasswordModal> {
                     : Text(
                         'Update Password',
                         style: GoogleFonts.spaceGrotesk(
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                           letterSpacing: -0.2,

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../services/supabase_service.dart';
 import '../features/auth/onboarding_screen.dart';
-import '../features/auth/auth_flow_screen.dart';
+import '../features/auth_v2/auth_flow_v2_screen.dart';
 import '../features/auth/email_verification_screen.dart';
 import '../features/auth/widgets/liquid_theme.dart';
 import '../features/auth/widgets/liquid_background.dart';
@@ -46,7 +46,7 @@ final _authRefreshNotifier = _GoRouterRefreshStream(
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/onboarding',
+    initialLocation: '/login',
     // refreshListenable makes GoRouter re-run redirect on every auth state change
     refreshListenable: _authRefreshNotifier,
     redirect: (BuildContext context, GoRouterState state) {
@@ -98,7 +98,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (context, state) =>
                 LiquidPageTransition.authFlowScreen(
               key: state.pageKey,
-              child: const AuthFlowScreen(),
+              child: const AuthFlowV2Screen(),
             ),
           ),
           // Backward-compat redirects so any deep-link or old code still works

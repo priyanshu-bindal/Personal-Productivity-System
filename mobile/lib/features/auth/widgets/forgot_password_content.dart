@@ -93,7 +93,7 @@ class _ForgotPasswordContentState extends ConsumerState<ForgotPasswordContent> {
         LiquidAuthTextField(
           controller: widget.emailController,
           label: 'Email address',
-          hintText: 'name@example.com',
+          hintText: 'Enter your email',
           prefixIcon: LucideIcons.mail,
           keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.done,

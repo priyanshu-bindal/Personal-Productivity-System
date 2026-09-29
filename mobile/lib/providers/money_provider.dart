@@ -439,7 +439,7 @@ final moneySummaryProvider = Provider<MoneySummary>((ref) {
   catTotals.forEach((cat, amt) {
     if (amt > highestAmt) {
       highestAmt = amt;
-      highestCat = cat;
+      highestCat = cat.isNotEmpty ? cat[0].toUpperCase() + cat.substring(1) : 'None';
     }
   });
 

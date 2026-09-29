@@ -34,6 +34,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
 
   bool _isSubmitting = false;
   bool _isAmountFocused = false;
+  bool _hasRequestedFocus = false;
 
   final List<double> _quickAmounts = [100, 250, 500, 1000, 2000];
 
@@ -51,17 +52,30 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
     _selectedPaymentMethod = AppConstants.paymentMethods.first;
     _selectedDate = DateTime.now();
 
-    _amountFocusNode.addListener(() {
-      if (mounted) {
-        setState(() {
-          _isAmountFocused = _amountFocusNode.hasFocus;
-        });
+    _amountFocusNode.addListener(_handleAmountFocusChange);
+
+    // Focus amount field exactly once after modal is mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_hasRequestedFocus) {
+        _hasRequestedFocus = true;
+        _amountFocusNode.requestFocus();
       }
     });
   }
 
+  void _handleAmountFocusChange() {
+    if (mounted && !_isSubmitting) {
+      if (_isAmountFocused != _amountFocusNode.hasFocus) {
+        setState(() {
+          _isAmountFocused = _amountFocusNode.hasFocus;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
+    _amountFocusNode.removeListener(_handleAmountFocusChange);
     _amountController.dispose();
     _descController.dispose();
     _noteController.dispose();
@@ -145,7 +159,10 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
           : null,
     };
 
-    // Instant pop without any artificial delays!
+    // Dismiss keyboard cleanly before popping to avoid flash
+    _amountFocusNode.unfocus();
+    FocusScope.of(context).unfocus();
+    SystemChannels.textInput.invokeMethod('TextInput.hide');
     Navigator.of(context).pop(result);
   }
 
@@ -244,7 +261,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                         child: TextFormField(
                           controller: _amountController,
                           focusNode: _amountFocusNode,
-                          autofocus: true,
+                          autofocus: false,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           style: const TextStyle(
                             color: AppColors.textPrimary,
@@ -338,8 +355,8 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
             // Description Input
             TextFormField(
               controller: _descController,
+              textCapitalization: TextCapitalization.sentences,
               style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-              inputFormatters: [_TitleCaseFormatter()],
               decoration: InputDecoration(
                 labelText: 'Description',
                 hintText: 'e.g. Groceries, Team Lunch, Books',
@@ -445,6 +462,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
             // Note Field (Optional)
             TextFormField(
               controller: _noteController,
+              textCapitalization: TextCapitalization.sentences,
               style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
               decoration: InputDecoration(
                 labelText: 'Note (Optional)',
@@ -526,49 +544,6 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// Capitalises the first letter of every word while the user types.
-///
-/// Rules:
-/// - The very first character is always uppercased.
-/// - The character immediately after a space is uppercased.
-/// - All other characters are left exactly as typed (no forced lowercase).
-/// - Cursor position and selection are preserved through the transformation.
-class _TitleCaseFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    final text = newValue.text;
-    if (text.isEmpty) return newValue;
-
-    final buffer = StringBuffer();
-    for (int i = 0; i < text.length; i++) {
-      final ch = text[i];
-      // Capitalise if this is the very first character, or if the preceding
-      // character is a space (i.e. we are at the start of a new word).
-      final shouldCapitalise = i == 0 || text[i - 1] == ' ';
-      buffer.write(shouldCapitalise ? ch.toUpperCase() : ch);
-    }
-
-    final formatted = buffer.toString();
-
-    // If nothing changed, return the new value untouched to avoid a
-    // pointless rebuild that would reset the IME composing region.
-    if (formatted == text) return newValue;
-
-    // Clamp the selection/composing extents to the (same-length) new string.
-    return newValue.copyWith(
-      text: formatted,
-      selection: newValue.selection.copyWith(
-        baseOffset: newValue.selection.baseOffset.clamp(0, formatted.length),
-        extentOffset:
-            newValue.selection.extentOffset.clamp(0, formatted.length),
       ),
     );
   }

@@ -39,7 +39,11 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      animationDuration: const Duration(milliseconds: 250),
+    );
     _entranceController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
@@ -75,6 +79,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen>
       subtitle: 'Log spending into your financial record',
       child: const AddExpenseSheet(),
     );
+
+    // Ensure no focus restoration happens automatically after modal closes
+    FocusManager.instance.primaryFocus?.unfocus();
 
     if (result != null && mounted) {
       final amt = result['amount'] as double;
@@ -247,7 +254,7 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen>
             position: _slideAnimation,
             child: TabBarView(
               controller: _tabController,
-              physics: const BouncingScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
               children: [
                 _KeepAliveTab(
                   child: _OverviewTab(
@@ -426,11 +433,19 @@ class _OverviewTab extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           Container(
-            constraints: const BoxConstraints(minHeight: 180),
+            constraints: const BoxConstraints(minHeight: 200),
+            padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               color: OceanTheme.card,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.border),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x18000000),
+                  blurRadius: 12,
+                  offset: Offset(0, 4),
+                ),
+              ],
             ),
             child: summary.dailyChartData.isEmpty
                 ? const MoneyEmptyState(
@@ -438,45 +453,141 @@ class _OverviewTab extends ConsumerWidget {
                     title: 'No spending trend yet',
                     description: 'Log your expenses to see daily spending patterns over time.',
                     accentColor: AppColors.primary,
-                    minHeight: 180,
+                    minHeight: 200,
                   )
-                : Container(
-                    height: 180,
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
-                    child: LineChart(
-                      LineChartData(
-                        gridData: const FlGridData(show: false),
-                        titlesData: const FlTitlesData(show: false),
-                        borderData: FlBorderData(show: false),
-                        lineBarsData: [
-                          LineChartBarData(
-                            spots: summary.dailyChartData.asMap().entries.map((e) {
-                              return FlSpot(
-                                e.key.toDouble(),
-                                (e.value['amount'] as double),
-                              );
-                            }).toList(),
-                            isCurved: true,
-                            curveSmoothness: 0.35,
-                            color: AppColors.primary,
-                            barWidth: 2.8,
-                            isStrokeCapRound: true,
-                            dotData: const FlDotData(show: false),
-                            belowBarData: BarAreaData(
+                : TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0.0, end: 1.0),
+                    duration: const Duration(milliseconds: 600),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, animValue, child) {
+                      final spots = summary.dailyChartData.asMap().entries.map((e) {
+                        final rawAmount = (e.value['amount'] as num).toDouble();
+                        return FlSpot(
+                          e.key.toDouble(),
+                          rawAmount * animValue,
+                        );
+                      }).toList();
+
+                      final maxY = summary.dailyChartData.fold<double>(
+                        0.0,
+                        (prev, e) {
+                          final amt = (e['amount'] as num).toDouble();
+                          return amt > prev ? amt : prev;
+                        },
+                      );
+                      final chartMaxY = maxY > 0 ? maxY * 1.2 : 100.0;
+
+                      return Container(
+                        height: 200,
+                        padding: const EdgeInsets.fromLTRB(8, 20, 16, 8),
+                        child: LineChart(
+                          LineChartData(
+                            minY: 0,
+                            maxY: chartMaxY,
+                            gridData: FlGridData(
                               show: true,
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  AppColors.primary.withValues(alpha: 0.22),
-                                  AppColors.primary.withValues(alpha: 0.0),
-                                ],
+                              drawVerticalLine: false,
+                              horizontalInterval: chartMaxY / 4,
+                              getDrawingHorizontalLine: (value) {
+                                return FlLine(
+                                  color: AppColors.border.withValues(alpha: 0.4),
+                                  strokeWidth: 0.5,
+                                  dashArray: [4, 4],
+                                );
+                              },
+                            ),
+                            titlesData: FlTitlesData(
+                              leftTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              rightTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              topTitles: const AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  reservedSize: 22,
+                                  getTitlesWidget: (value, meta) {
+                                    final idx = value.toInt();
+                                    if (idx < 0 || idx >= summary.dailyChartData.length) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    final dayLabel = summary.dailyChartData[idx]['day'] as String;
+                                    return Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: Text(
+                                        dayLabel,
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textDim,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
                               ),
                             ),
+                            borderData: FlBorderData(show: false),
+                            lineBarsData: [
+                              LineChartBarData(
+                                spots: spots,
+                                isCurved: true,
+                                curveSmoothness: 0.35,
+                                color: const Color(0xFF2F6BFF),
+                                barWidth: 2.5,
+                                isStrokeCapRound: true,
+                                dotData: FlDotData(
+                                  show: true,
+                                  getDotPainter: (spot, percent, barData, index) {
+                                    return FlDotCirclePainter(
+                                      radius: 2.5,
+                                      color: const Color(0xFF2F6BFF),
+                                      strokeWidth: 1.2,
+                                      strokeColor: const Color(0xFF0D1629),
+                                    );
+                                  },
+                                ),
+                                belowBarData: BarAreaData(
+                                  show: true,
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: [
+                                      const Color(0xFF2F6BFF).withValues(alpha: 0.18 * animValue),
+                                      const Color(0xFF2F6BFF).withValues(alpha: 0.02),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                            lineTouchData: LineTouchData(
+                              touchTooltipData: LineTouchTooltipData(
+                                getTooltipColor: (_) => const Color(0xFF1A2540),
+                                tooltipRoundedRadius: 8,
+                                tooltipPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                getTooltipItems: (touchedSpots) {
+                                  return touchedSpots.map((spot) {
+                                    return LineTooltipItem(
+                                      '₹${spot.y.toStringAsFixed(0)}',
+                                      const TextStyle(
+                                        color: Color(0xFFF1F5F9),
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                      ),
+                                    );
+                                  }).toList();
+                                },
+                              ),
+                              handleBuiltInTouches: true,
+                            ),
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      );
+                    },
                   ),
           ),
           const SizedBox(height: 24),
@@ -582,8 +693,8 @@ class _OverviewTab extends ConsumerWidget {
             Column(
               children: summary.categoryBreakdown.take(4).map((item) {
                 final cat = item['category'] as String;
-                final amt = item['amount'] as double;
-                final pct = item['percentage'] as int;
+                final amt = (item['amount'] as num).toDouble();
+                final pct = (item['percentage'] as num).toInt();
                 final catName = cat[0].toUpperCase() + cat.substring(1);
                 final catColor = TransactionListItem.getCategoryColor(cat);
                 final catIcon = TransactionListItem.getCategoryIcon(cat);

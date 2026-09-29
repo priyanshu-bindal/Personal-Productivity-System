@@ -16,16 +16,8 @@ class CustomBottomSheet {
       barrierColor: Colors.black.withValues(alpha: 0.75),
       // 220ms open; close feels faster because we use fade-only on reverse.
       transitionDuration: const Duration(milliseconds: 220),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return const SizedBox.shrink();
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, childWidget) {
-        // On close (reverse): skip slide + scale so the dialog fades out
-        // without fighting the heavy AddSkillSheet teardown → no jank.
-        final isClosing = animation.status == AnimationStatus.reverse ||
-            animation.status == AnimationStatus.dismissed;
-
-        final dialogContent = Dialog(
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return Dialog(
           backgroundColor: Colors.transparent,
           insetPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -33,7 +25,7 @@ class CustomBottomSheet {
           child: Container(
             constraints: BoxConstraints(
               maxWidth: 480,
-              maxHeight: MediaQuery.of(context).size.height * 0.85,
+              maxHeight: MediaQuery.of(dialogContext).size.height * 0.85,
             ),
             decoration: BoxDecoration(
               color: AppColors.card,
@@ -89,7 +81,10 @@ class CustomBottomSheet {
                           ),
                           const SizedBox(width: 12),
                           GestureDetector(
-                            onTap: () => Navigator.of(context).pop(),
+                            onTap: () {
+                              FocusManager.instance.primaryFocus?.unfocus();
+                              Navigator.of(dialogContext).pop();
+                            },
                             child: Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
@@ -118,6 +113,10 @@ class CustomBottomSheet {
             ),
           ),
         );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, childWidget) {
+        final isClosing = animation.status == AnimationStatus.reverse ||
+            animation.status == AnimationStatus.dismissed;
 
         if (isClosing) {
           // Fast fade-out only — no transform work while child disposes.
@@ -126,7 +125,7 @@ class CustomBottomSheet {
               parent: animation,
               curve: Curves.easeIn,
             ),
-            child: dialogContent,
+            child: childWidget,
           );
         }
 
@@ -145,7 +144,7 @@ class CustomBottomSheet {
             scale: Tween<double>(begin: 0.96, end: 1.0).animate(openCurve),
             child: FadeTransition(
               opacity: openCurve,
-              child: dialogContent,
+              child: childWidget,
             ),
           ),
         );
