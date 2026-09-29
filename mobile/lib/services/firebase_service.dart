@@ -38,6 +38,17 @@ class FirebaseService {
   static FirebaseAuth get auth => FirebaseAuth.instance;
   static FirebaseFirestore get firestore => FirebaseFirestore.instance;
 
+  /// Signs out the active Firebase Auth bridge user, terminating any associated Firestore streams.
+  static Future<void> signOut() async {
+    try {
+      if (_isInitialized && auth.currentUser != null) {
+        await auth.signOut();
+      }
+    } catch (e) {
+      debugPrint('Notice during Firebase bridge sign out: $e');
+    }
+  }
+
   /// Ensures user is authenticated with Firebase Auth corresponding to Supabase UID.
   /// Strictly reproduces planner/src/lib/firebase/authBridge.ts:
   /// - bridgeEmail = '${supabaseUid.toLowerCase()}@focusflow.internal'
@@ -51,8 +62,16 @@ class FirebaseService {
 
     // Check if user is already signed in with matching bridge email
     final currentUser = auth.currentUser;
-    if (currentUser != null && currentUser.email?.toLowerCase() == bridgeEmail) {
-      return currentUser.uid;
+    if (currentUser != null) {
+      if (currentUser.email?.toLowerCase() == bridgeEmail) {
+        return currentUser.uid;
+      }
+      // Signed in with a different user's bridge account — sign out immediately
+      try {
+        await auth.signOut();
+      } catch (e) {
+        debugPrint('Notice signing out previous Firebase user: $e');
+      }
     }
 
     try {

@@ -3,18 +3,18 @@ import '../models/skill.dart';
 import '../models/learning_session.dart';
 import '../services/supabase_service.dart';
 import '../core/utils/session_generator.dart';
+import 'auth_provider.dart';
 import 'sessions_provider.dart';
 
-/// A stable provider that holds the [SkillsNotifier] singleton.
-/// By NOT watching [sessionsProvider] here, Riverpod never destroys and
-/// re-creates the notifier when sessions change — eliminating the
-/// ~1 second Supabase re-fetch that was triggered on every navigation.
+/// Scoped provider holding the [SkillsNotifier] for the current user.
+/// Re-created whenever [currentUserIdProvider] changes to ensure complete data isolation.
 final skillsProvider =
     StateNotifierProvider<SkillsNotifier, AsyncValue<List<Skill>>>((ref) {
-  final notifier = SkillsNotifier();
+  final userId = ref.watch(currentUserIdProvider);
+  final notifier = SkillsNotifier(userId);
 
   // Wire session updates reactively: whenever sessionsProvider emits a new
-  // list, push it into the existing notifier so skills are recomputed
+  // list, push it into the notifier so skills are recomputed
   // from cached data — no network round-trip on navigation.
   ref.listen<AsyncValue<List<LearningSession>>>(
     sessionsProvider,
@@ -30,16 +30,25 @@ final skillsProvider =
 });
 
 class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
+  final String? _userId;
   List<LearningSession> _sessions = [];
 
-  SkillsNotifier() : super(const AsyncValue.loading()) {
-    fetchSkills();
+  SkillsNotifier([this._userId])
+      : super(_userId == null
+            ? const AsyncValue.data([])
+            : const AsyncValue.loading()) {
+    if (_userId != null) {
+      fetchSkills();
+    }
   }
 
   /// Called reactively by the provider when [sessionsProvider] emits.
   /// Recomputes skill stats from the cached session list without hitting
   /// the network again.
   void updateSessions(List<LearningSession> sessions) {
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
+
     _sessions = sessions;
     // If we already have skill data, recompute stats from new sessions
     // without a network round-trip.
@@ -136,9 +145,11 @@ class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
   }
 
   Future<void> fetchSkills() async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) {
-      state = const AsyncValue.data([]);
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      if (mounted) state = const AsyncValue.data([]);
       return;
     }
 
@@ -146,18 +157,18 @@ class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
       final res = await SupabaseService.client
           .from('skills')
           .select('*')
-          .eq('user_id', userId)
+          .eq('user_id', effectiveUserId)
           .order('created_at', ascending: false);
 
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       final list = (res as List)
           .map((e) => Skill.fromJson(e as Map<String, dynamic>,
               allSessions: _sessions))
           .toList();
 
-      if (!mounted) return;
       state = AsyncValue.data(list);
     } catch (e, st) {
-      if (!mounted) return;
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       state = AsyncValue.error(e, st);
     }
   }
@@ -171,11 +182,15 @@ class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
     String? description,
     String? target,
   }) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
     final insertData = {
-      'user_id': userId,
+      'user_id': effectiveUserId,
       'name': name,
       'category': category,
       'description': description,
@@ -198,7 +213,7 @@ class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
       await SupabaseService.client.from('skills').insert(insertData);
     }
 
-    await SessionGenerator.autoGenerateSessions();
+    await SessionGenerator.autoGenerateSessions(effectiveUserId);
     await fetchSkills();
   }
 
@@ -210,8 +225,12 @@ class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
     List<String>? preferredDays,
     String? description,
   }) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
     final updateData = <String, dynamic>{};
     if (name != null) updateData['name'] = name;
@@ -228,28 +247,35 @@ class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
       await SupabaseService.client
           .from('skills')
           .update(updateData)
-          .eq('id', skillId);
+          .eq('id', skillId)
+          .eq('user_id', effectiveUserId);
     } catch (e) {
       updateData.remove('session_duration');
       updateData.remove('preferred_days');
       await SupabaseService.client
           .from('skills')
           .update(updateData)
-          .eq('id', skillId);
+          .eq('id', skillId)
+          .eq('user_id', effectiveUserId);
     }
 
-    await SessionGenerator.autoGenerateSessions();
+    await SessionGenerator.autoGenerateSessions(effectiveUserId);
     await fetchSkills();
   }
 
   Future<void> deleteSkill(String skillId) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
     await SupabaseService.client
         .from('skills')
         .delete()
-        .eq('id', skillId);
+        .eq('id', skillId)
+        .eq('user_id', effectiveUserId);
     await fetchSkills();
   }
 }

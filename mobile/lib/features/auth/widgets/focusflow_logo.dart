@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'liquid_theme.dart';
 
-/// FocusFlow Brand Logo Component
+/// FocusFlow Brand Logo Component (Dark Liquid Glass / No Cyan)
 ///
 /// Features:
-/// - Custom painted liquid 'F' glyph with cyan/blue/violet glow
+/// - Custom painted liquid 'F' glyph with blue/violet glow (NO CYAN)
 /// - Supports [useAurellis] for the handwritten "FocusFlow" brand name
-/// - Gradient color treatment: soft white for "Focus" → luminous cyan/blue for "Flow"
-/// - Subtle cyan/blue volumetric glow behind the brand name
+/// - Gradient color treatment: soft white for "Focus" → electric blue for "Flow"
+/// - Subtle blue volumetric glow behind the brand name
 /// - Responsive sizing without clipping
 class FocusFlowLogo extends StatelessWidget {
   final double size;
@@ -36,7 +36,7 @@ class FocusFlowLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final double calculatedAurellisSize = aurellisFontSize ??
-        (screenWidth * 0.12).clamp(42.0, 52.0);
+        (screenWidth * 0.12).clamp(40.0, 50.0);
 
     return FittedBox(
       fit: BoxFit.scaleDown,
@@ -45,66 +45,66 @@ class FocusFlowLogo extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-        // 1. Fluid 'F' Logo Emblem
-        if (showGlyph) ...[
-          SizedBox(
-            width: size,
-            height: size,
-            child: CustomPaint(
-              painter: _LogoPainter(),
-            ),
-          ),
-        ],
-
-        // 2. Wordmark (Aurellis handwritten or Inter classic)
-        if (showWordmark) ...[
-          SizedBox(height: showGlyph ? 16 : 0),
-          if (useAurellis)
-            _AurellisBrandWordmark(fontSize: calculatedAurellisSize)
-          else
-            RichText(
-              text: TextSpan(
-                style: LiquidTheme.logoTitle(
-                  fontSize: wordmarkFontSize ?? (size * 0.38),
-                  fontWeight: wordmarkFontWeight ?? FontWeight.w700,
-                ),
-                children: const [
-                  TextSpan(
-                    text: 'Focus',
-                    style: TextStyle(color: LiquidTheme.textPrimary),
-                  ),
-                  TextSpan(
-                    text: 'Flow',
-                    style: TextStyle(
-                      color: LiquidTheme.accent,
-                      shadows: [
-                        Shadow(
-                          color: Color(0x6620D9FF),
-                          blurRadius: 14,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+          // 1. Fluid 'F' Logo Emblem
+          if (showGlyph) ...[
+            SizedBox(
+              width: size,
+              height: size,
+              child: CustomPaint(
+                painter: _LogoPainter(),
               ),
             ),
-        ],
+          ],
 
-        // 3. Optional Subtitle
-        if (showSubtitle && showWordmark && !useAurellis) ...[
-          const SizedBox(height: 6),
-          Text(
-            'Plan  •  Track  •  Grow',
-            style: LiquidTheme.logoSubtitle(),
-          ),
+          // 2. Wordmark (Space Grotesk classic or Aurellis handwritten)
+          if (showWordmark) ...[
+            SizedBox(height: showGlyph ? 14 : 0),
+            if (useAurellis)
+              _AurellisBrandWordmark(fontSize: calculatedAurellisSize)
+            else
+              RichText(
+                text: TextSpan(
+                  style: LiquidTheme.logoTitle(
+                    fontSize: wordmarkFontSize ?? (size * 0.42),
+                    fontWeight: wordmarkFontWeight ?? FontWeight.w700,
+                  ),
+                  children: const [
+                    TextSpan(
+                      text: 'Focus',
+                      style: TextStyle(color: LiquidTheme.textPrimary),
+                    ),
+                    TextSpan(
+                      text: 'Flow',
+                      style: TextStyle(
+                        color: LiquidTheme.secondaryBlue,
+                        shadows: [
+                          Shadow(
+                            color: Color(0x662F6BFF), // subtle blue glow, NO cyan
+                            blurRadius: 14,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+
+          // 3. Optional Subtitle
+          if (showSubtitle && showWordmark && !useAurellis) ...[
+            const SizedBox(height: 5),
+            Text(
+              'Stay focused. Keep growing.',
+              style: LiquidTheme.logoSubtitle(),
+            ),
+          ],
         ],
-      ],
-    ),
-  );
-}
+      ),
+    );
+  }
 }
 
-/// Handwritten "FocusFlow" brand name rendered with the local Aurellis font
+/// Brand Wordmark with subtle blue/violet ambient glow (NO CYAN)
 class _AurellisBrandWordmark extends StatelessWidget {
   final double fontSize;
 
@@ -117,7 +117,7 @@ class _AurellisBrandWordmark extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Ambient cyan/blue glow behind the wordmark
+          // Ambient blue glow behind wordmark
           Text(
             'FocusFlow',
             textAlign: TextAlign.center,
@@ -128,31 +128,30 @@ class _AurellisBrandWordmark extends StatelessWidget {
               color: Colors.transparent,
               shadows: [
                 Shadow(
-                  color: LiquidTheme.cyan.withValues(alpha: 0.42),
-                  blurRadius: 24,
+                  color: LiquidTheme.primary.withValues(alpha: 0.35),
+                  blurRadius: 20,
                   offset: const Offset(0, 2),
                 ),
                 Shadow(
-                  color: LiquidTheme.primary.withValues(alpha: 0.30),
-                  blurRadius: 36,
-                  offset: const Offset(0, 4),
+                  color: LiquidTheme.violet.withValues(alpha: 0.20),
+                  blurRadius: 28,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
           ),
 
-          // Luminous White → Cyan/Blue Gradient on the Aurellis font
+          // Luminous White → Electric Blue Gradient
           ShaderMask(
             blendMode: BlendMode.srcIn,
             shaderCallback: (bounds) => const LinearGradient(
               colors: [
                 Color(0xFFFFFFFF), // Soft pure white for "Focus"
-                Color(0xFFE2F4FF), // Ice white transition
-                Color(0xFF48D7FF), // Cyan emergence
-                Color(0xFF20D9FF), // Luminous Cyan for "Flow"
-                Color(0xFF168BFF), // Electric Blue tail
+                Color(0xFFEDF2FF), // Ice blue transition
+                Color(0xFF6B93FF), // Soft blue emergence
+                Color(0xFF2F6BFF), // Primary blue for "Flow"
               ],
-              stops: [0.0, 0.38, 0.58, 0.85, 1.0],
+              stops: [0.0, 0.42, 0.70, 1.0],
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ).createShader(bounds),
@@ -181,11 +180,11 @@ class _LogoPainter extends CustomPainter {
     final double width = size.width;
     final double height = size.height;
 
-    // Volumetric glow
+    // Volumetric blue glow
     final Paint glowPaint = Paint()
-      ..color = LiquidTheme.primary.withValues(alpha: 0.35)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18);
-    canvas.drawCircle(Offset(width * 0.5, height * 0.5), width * 0.42, glowPaint);
+      ..color = LiquidTheme.primary.withValues(alpha: 0.28)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16);
+    canvas.drawCircle(Offset(width * 0.5, height * 0.5), width * 0.40, glowPaint);
 
     final Rect rect = Rect.fromLTWH(0, 0, width, height);
 
@@ -212,9 +211,9 @@ class _LogoPainter extends CustomPainter {
     final Paint upperPaint = Paint()
       ..shader = const LinearGradient(
         colors: [
-          LiquidTheme.accent, // #20D9FF
-          LiquidTheme.primary, // #168BFF
-          LiquidTheme.secondaryBackground, // #06142B
+          LiquidTheme.secondaryBlue, // #4F7CFF
+          LiquidTheme.primary, // #2F6BFF
+          LiquidTheme.secondaryBackground, // #0A1223
         ],
         stops: [0.0, 0.55, 1.0],
         begin: Alignment.topRight,
@@ -247,11 +246,11 @@ class _LogoPainter extends CustomPainter {
     final Paint lowerPaint = Paint()
       ..shader = const LinearGradient(
         colors: [
-          LiquidTheme.primary, // #168BFF
-          LiquidTheme.accent, // #20D9FF
-          LiquidTheme.secondaryAccent, // #6C5CE7 Liquid Violet
+          LiquidTheme.primary, // #2F6BFF
+          LiquidTheme.secondaryBlue, // #4F7CFF
+          LiquidTheme.violet, // #7C6CFF
         ],
-        stops: [0.0, 0.6, 1.0],
+        stops: [0.0, 0.55, 1.0],
         begin: Alignment.bottomLeft,
         end: Alignment.topRight,
       ).createShader(rect)
@@ -270,14 +269,14 @@ class _LogoPainter extends CustomPainter {
 
     final Paint rimHighlight = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.4
+      ..strokeWidth = 2.0
       ..strokeCap = StrokeCap.round
       ..shader = const LinearGradient(
         colors: [
           Color(0x00FFFFFF),
-          LiquidTheme.highlight, // #8BE8FF
-          LiquidTheme.accent, // #20D9FF
-          Color(0x0020D9FF),
+          LiquidTheme.iceBlue, // #9DB8FF
+          LiquidTheme.secondaryBlue, // #4F7CFF
+          Color(0x004F7CFF),
         ],
         stops: [0.0, 0.35, 0.75, 1.0],
         begin: Alignment.bottomLeft,
@@ -289,8 +288,8 @@ class _LogoPainter extends CustomPainter {
     // Inner bright glint
     final Paint glintPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.85)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-    canvas.drawCircle(Offset(width * 0.66, height * 0.22), 2.2, glintPaint);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.8);
+    canvas.drawCircle(Offset(width * 0.66, height * 0.22), 2.0, glintPaint);
   }
 
   @override

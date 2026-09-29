@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../models/learning_session.dart';
 import '../providers/profile_provider.dart';
 import '../services/supabase_service.dart';
+import 'auth_provider.dart';
 
 // ─── State ──────────────────────────────────────────────────────────────────
 
@@ -42,19 +43,30 @@ class StreakState {
 
 final streakProvider =
     StateNotifierProvider<StreakNotifier, StreakState>((ref) {
-  return StreakNotifier(ref);
+  final userId = ref.watch(currentUserIdProvider);
+  return StreakNotifier(ref, userId);
 });
 
 class StreakNotifier extends StateNotifier<StreakState> {
   final Ref _ref;
+  final String? _userId;
 
-  StreakNotifier(this._ref) : super(const StreakState()) {
-    _loadFromProfile();
+  StreakNotifier(this._ref, [this._userId]) : super(const StreakState()) {
+    if (_userId != null) {
+      _loadFromProfile();
+    }
   }
 
   // ── Bootstrap from cached profile ────────────────────────────────────────
 
   void _loadFromProfile() {
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
+
     final profile = _ref.read(profileProvider).value;
     if (profile != null) {
       state = StreakState(
@@ -68,6 +80,13 @@ class StreakNotifier extends StateNotifier<StreakState> {
   /// Called from [SessionsNotifier.completeSession] after DB write succeeds.
   /// Checks whether all of today's sessions are done and updates the streak.
   Future<void> checkAndUpdateStreak(List<LearningSession> allSessions) async {
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
+
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final yesterday = DateFormat('yyyy-MM-dd')
         .format(DateTime.now().subtract(const Duration(days: 1)));
@@ -108,31 +127,37 @@ class StreakNotifier extends StateNotifier<StreakState> {
     );
 
     // Persist to Supabase
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
-
     try {
       await SupabaseService.client.from('profiles').update({
         'current_streak': newStreak,
         'longest_streak': newLongest,
         'last_streak_date': today,
-      }).eq('id', userId);
+      }).eq('id', effectiveUserId);
 
       // Refresh profile so the rest of the app sees the new values
-      await _ref.read(profileProvider.notifier).fetchProfile();
+      if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+        await _ref.read(profileProvider.notifier).fetchProfile();
+      }
     } catch (_) {
       // Streak still shows locally even if network fails
     }
 
     // Clear the "just incremented" flag after a short delay
     await Future.delayed(const Duration(seconds: 3));
-    if (mounted) {
+    if (mounted && SupabaseService.currentUserId == effectiveUserId) {
       state = state.copyWith(justIncremented: false);
     }
   }
 
   /// Sync streak state from the latest profile data (call after fetchProfile).
   void syncFromProfile() {
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
+
     final profile = _ref.read(profileProvider).value;
     if (profile == null) return;
     // Don't override justIncremented if it's still active

@@ -11,8 +11,8 @@ class SessionGenerator {
     'Saturday'
   ];
 
-  static Future<void> autoGenerateSessions() async {
-    final userId = SupabaseService.currentUserId;
+  static Future<void> autoGenerateSessions([String? targetUserId]) async {
+    final userId = targetUserId ?? SupabaseService.currentUserId;
     if (userId == null) return;
 
     try {
@@ -23,6 +23,7 @@ class SessionGenerator {
           .eq('user_id', userId);
 
       if (skillsResponse.isEmpty) return;
+      if (SupabaseService.currentUserId != userId) return;
 
       final skills = List<Map<String, dynamic>>.from(skillsResponse);
       final today = DateTime.now();

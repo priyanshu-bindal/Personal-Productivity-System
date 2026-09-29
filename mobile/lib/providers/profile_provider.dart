@@ -3,43 +3,49 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_profile.dart';
 import '../services/supabase_service.dart';
 import '../services/supabase_jwt_recovery.dart';
+import 'auth_provider.dart';
 
 final profileProvider =
     StateNotifierProvider<ProfileNotifier, AsyncValue<UserProfile?>>((ref) {
-  return ProfileNotifier();
+  final userId = ref.watch(currentUserIdProvider);
+  return ProfileNotifier(userId);
 });
 
 class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
-  ProfileNotifier() : super(const AsyncValue.loading()) {
-    fetchProfile();
+  final String? _userId;
+
+  ProfileNotifier([this._userId])
+      : super(_userId == null
+            ? const AsyncValue.data(null)
+            : const AsyncValue.loading()) {
+    if (_userId != null) {
+      fetchProfile();
+    }
   }
 
   // --- Fetch ----------------------------------------------------------------
 
   Future<void> fetchProfile() async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) {
-      state = const AsyncValue.data(null);
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      if (mounted) state = const AsyncValue.data(null);
       return;
-    }
-
-    // Keep existing data visible while we refresh (avoids flash-of-loading).
-    if (state is! AsyncLoading) {
-      // Already have data — silently refresh in background; keep showing it.
-    } else {
-      state = const AsyncValue.loading();
     }
 
     try {
       final result = await SupabaseJwtRecovery.withJwtRecovery(
         SupabaseService.client,
-        () => _doFetch(userId),
+        () => _doFetch(effectiveUserId),
       );
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       state = AsyncValue.data(result);
     } on PostgrestException catch (e, st) {
-      // Surface a typed error so TodayScreen can display a friendly message.
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       state = AsyncValue.error(e, st);
     } catch (e, st) {
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       state = AsyncValue.error(e, st);
     }
   }
@@ -73,8 +79,12 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
   // --- Update ---------------------------------------------------------------
 
   Future<void> updateProfile({String? fullName, String? avatarUrl}) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
     final updateData = <String, dynamic>{};
     if (fullName != null) updateData['full_name'] = fullName;
@@ -86,7 +96,7 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
         await SupabaseService.client
             .from('profiles')
             .update(updateData)
-            .eq('id', userId);
+            .eq('id', effectiveUserId);
         if (fullName != null) {
           await SupabaseService.client.auth
               .updateUser(UserAttributes(data: {'full_name': fullName}));
@@ -101,8 +111,12 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
     bool? practiceReminders,
     String? dailyReminderTime,
   }) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
     final updateData = <String, dynamic>{};
     if (defaultSessionDuration != null) {
@@ -121,7 +135,7 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
         () => SupabaseService.client
             .from('profiles')
             .update(updateData)
-            .eq('id', userId),
+            .eq('id', effectiveUserId),
       );
     } catch (_) {
       // Preferences update failure is non-fatal; silently continue.
@@ -130,15 +144,14 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
   }
 
   // --- Account Deletion Scheduling ------------------------------------------
-  // The client records the request in Supabase.
-  // A server-side pg_cron job (see migration 007) performs the actual deletion.
 
-  /// Schedules account deletion for 15 days from now (UTC).
-  /// Writes deletion_requested_at and deletion_scheduled_for to the profiles
-  /// table. The server-side cron job executes the actual permanent deletion.
   Future<void> scheduleDeletion() async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) throw Exception('Not authenticated');
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      throw Exception('Not authenticated');
+    }
 
     final now = DateTime.now().toUtc();
     final scheduledFor = now.add(const Duration(days: 15));
@@ -148,22 +161,25 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
       () => SupabaseService.client.from('profiles').update({
         'deletion_requested_at': now.toIso8601String(),
         'deletion_scheduled_for': scheduledFor.toIso8601String(),
-      }).eq('id', userId),
+      }).eq('id', effectiveUserId),
     );
     await fetchProfile();
   }
 
-  /// Cancels a pending deletion request by clearing the deletion columns.
   Future<void> cancelDeletion() async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) throw Exception('Not authenticated');
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      throw Exception('Not authenticated');
+    }
 
     await SupabaseJwtRecovery.withJwtRecovery(
       SupabaseService.client,
       () => SupabaseService.client.from('profiles').update({
         'deletion_requested_at': null,
         'deletion_scheduled_for': null,
-      }).eq('id', userId),
+      }).eq('id', effectiveUserId),
     );
     await fetchProfile();
   }

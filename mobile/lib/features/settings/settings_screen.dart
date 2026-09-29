@@ -106,28 +106,21 @@ class SettingsScreen extends ConsumerWidget {
 
               const SizedBox(height: 20),
 
-              // 2. PRACTICE PREFERENCES SECTION
-              const _SectionLabel(label: 'PRACTICE PREFERENCES'),
-              const SizedBox(height: 10),
-              _PracticePreferencesCard(profile: profile),
-
-              const SizedBox(height: 20),
-
-              // 3. NOTIFICATIONS SECTION
+              // 2. NOTIFICATIONS SECTION
               const _SectionLabel(label: 'NOTIFICATIONS'),
               const SizedBox(height: 10),
               _NotificationsCard(profile: profile),
 
               const SizedBox(height: 20),
 
-              // 4. DATA & PRIVACY SECTION
+              // 3. DATA & PRIVACY SECTION
               const _SectionLabel(label: 'DATA & PRIVACY'),
               const SizedBox(height: 10),
               const _DataAndPrivacyCard(),
 
               const SizedBox(height: 20),
 
-              // 5. DANGER ZONE SECTION
+              // 4. DANGER ZONE SECTION
               const _SectionLabel(
                 label: 'DANGER ZONE',
                 color: _SettingsColors.destructive,
@@ -137,7 +130,7 @@ class SettingsScreen extends ConsumerWidget {
 
               const SizedBox(height: 20),
 
-              // 6. ABOUT SECTION
+              // 5. ABOUT SECTION
               const _SectionLabel(label: 'ABOUT'),
               const SizedBox(height: 10),
               const _AboutCard(),
@@ -642,213 +635,6 @@ class _FocusIdRowState extends ConsumerState<_FocusIdRow> {
           ),
         ],
       ),
-    );
-  }
-}
-
-// ─── PRACTICE PREFERENCES CARD ────────────────────────────────────────────────
-
-class _PracticePreferencesCard extends ConsumerWidget {
-  final UserProfile? profile;
-
-  const _PracticePreferencesCard({required this.profile});
-
-  void _openDurationSheet(BuildContext context, WidgetRef ref) {
-    _SmoothAnimatedDialog.show(
-      context: context,
-      child: _DurationSelectorModal(
-        currentDuration: profile?.defaultSessionDuration ?? 60,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final duration = profile?.defaultSessionDuration ?? 60;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: _SettingsColors.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _SettingsColors.border, width: 1),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(17),
-        child: PressableScale(
-          scaleFactor: 0.99,
-          duration: const Duration(milliseconds: 120),
-          onTap: () => _openDurationSheet(context, ref),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _openDurationSheet(context, ref),
-              hoverColor: _SettingsColors.surface,
-              splashColor: _SettingsColors.primaryBlue.withValues(alpha: 0.1),
-              highlightColor: _SettingsColors.pressed,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: _SettingsColors.surface,
-                      borderRadius: BorderRadius.circular(9),
-                      border: Border.all(color: _SettingsColors.border),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      LucideIcons.clock,
-                      color: _SettingsColors.primaryBlue,
-                      size: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Default Session Duration',
-                          style: GoogleFonts.inter(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w600,
-                            color: _SettingsColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Target time for new focus sessions',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: _SettingsColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  // Small selected pill
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: _SettingsColors.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: _SettingsColors.primaryBlue.withValues(alpha: 0.35),
-                      ),
-                    ),
-                    child: Text(
-                      '$duration mins',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: _SettingsColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-  }
-}
-
-// ─── DURATION SELECTOR MODAL ──────────────────────────────────────────────────
-
-class _DurationSelectorModal extends ConsumerWidget {
-  final int currentDuration;
-
-  const _DurationSelectorModal({required this.currentDuration});
-
-  static const List<int> durations = [30, 45, 60, 90, 120];
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Default Session Duration',
-          style: GoogleFonts.spaceGrotesk(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: _SettingsColors.textPrimary,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Choose the baseline duration for practice sessions',
-          style: GoogleFonts.inter(
-              fontSize: 12.5, color: _SettingsColors.textSecondary),
-        ),
-        const SizedBox(height: 16),
-        ...durations.map((duration) {
-          final isSelected = duration == currentDuration;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await ref
-                      .read(profileProvider.notifier)
-                      .updatePreferences(defaultSessionDuration: duration);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 13,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? _SettingsColors.surface
-                        : _SettingsColors.card,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected
-                          ? _SettingsColors.primaryBlue
-                          : _SettingsColors.border,
-                      width: isSelected ? 1.5 : 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '$duration mins',
-                        style: GoogleFonts.inter(
-                          fontSize: 14.5,
-                          fontWeight:
-                              isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected
-                              ? _SettingsColors.textPrimary
-                              : _SettingsColors.textSecondary,
-                        ),
-                      ),
-                      if (isSelected)
-                        const Icon(
-                          LucideIcons.check,
-                          color: _SettingsColors.primaryBlue,
-                          size: 17,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-      ],
     );
   }
 }
@@ -1381,7 +1167,7 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
         ),
         const SizedBox(height: 20),
 
-        // Full Name Field
+        // Full Name Field — unified surface, focus-tracked blue border
         Text(
           'FULL NAME',
           style: GoogleFonts.spaceGrotesk(
@@ -1392,26 +1178,9 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
           ),
         ),
         const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: _SettingsColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _SettingsColors.border),
-          ),
-          child: TextField(
-            controller: _nameController,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: _SettingsColors.textPrimary,
-            ),
-            decoration: const InputDecoration(
-              contentPadding:
-                  EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              border: InputBorder.none,
-              hintText: 'Enter your name',
-              hintStyle: TextStyle(color: _SettingsColors.textMuted),
-            ),
-          ),
+        _UnifiedTextField(
+          controller: _nameController,
+          hintText: 'Enter your name',
         ),
 
         const SizedBox(height: 16),
@@ -1464,10 +1233,12 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             PressableScale(
-              scaleFactor: 0.96,
+              scaleFactor: 0.97,
+              duration: const Duration(milliseconds: 120),
               onTap: _isSaving ? null : () => Navigator.of(context).pop(),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 18),
                 decoration: BoxDecoration(
                   color: _SettingsColors.surface,
                   borderRadius: BorderRadius.circular(12),
@@ -1486,16 +1257,27 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
             ),
             const SizedBox(width: 10),
             PressableScale(
-              scaleFactor: 0.96,
+              scaleFactor: _isSaving ? 1.0 : 0.97,
+              duration: const Duration(milliseconds: 120),
               onTap: _isSaving ? null : _handleSave,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 150),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 decoration: BoxDecoration(
                   color: _isSaving
                       ? _SettingsColors.primaryBlue.withValues(alpha: 0.6)
                       : _SettingsColors.primaryBlue,
                   borderRadius: BorderRadius.circular(12),
+                  boxShadow: _isSaving
+                      ? null
+                      : const [
+                          BoxShadow(
+                            color: Color(0x302F6BFF),
+                            blurRadius: 10,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
                 ),
                 alignment: Alignment.center,
                 child: _isSaving
@@ -1509,9 +1291,9 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
                       )
                     : Text(
                         'Save Changes',
-                        style: GoogleFonts.inter(
+                        style: GoogleFonts.spaceGrotesk(
                           fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
                       ),
@@ -1804,11 +1586,11 @@ class _ChangePasswordModalState extends State<_ChangePasswordModal> {
               duration: const Duration(milliseconds: 120),
               onTap: _isUpdating ? null : () => Navigator.of(context).pop(),
               child: Container(
-                height: 42,
+                height: 52,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 decoration: BoxDecoration(
                   color: _SettingsColors.surface,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(15),
                   border: Border.all(color: _SettingsColors.border),
                 ),
                 alignment: Alignment.center,
@@ -1830,19 +1612,33 @@ class _ChangePasswordModalState extends State<_ChangePasswordModal> {
               onTap: _isUpdating ? null : _handleUpdatePassword,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 140),
-                height: 42,
+                height: 52,
                 padding: const EdgeInsets.symmetric(horizontal: 22),
                 decoration: BoxDecoration(
                   color: _isUpdating
                       ? const Color(0xFF2F6BFF).withValues(alpha: 0.65)
                       : const Color(0xFF2F6BFF),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: _isUpdating
+                      ? null
+                      : const [
+                          BoxShadow(
+                            color: Color(0x281A3D80),
+                            blurRadius: 12,
+                            offset: Offset(0, 4),
+                          ),
+                          BoxShadow(
+                            color: Color(0x302F6BFF),
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
                 ),
                 alignment: Alignment.center,
                 child: _isUpdating
                     ? const SizedBox(
-                        width: 16,
-                        height: 16,
+                        width: 18,
+                        height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: Colors.white,
@@ -1850,10 +1646,11 @@ class _ChangePasswordModalState extends State<_ChangePasswordModal> {
                       )
                     : Text(
                         'Update Password',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
+                          letterSpacing: -0.2,
                         ),
                       ),
               ),
@@ -2275,35 +2072,9 @@ class _DeleteAccountModalState extends State<_DeleteAccountModal> {
           ),
         ),
         const SizedBox(height: 6),
-        Container(
-          decoration: BoxDecoration(
-            color: _SettingsColors.surface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: _isConfirmed
-                  ? _SettingsColors.destructive
-                  : _SettingsColors.border,
-            ),
-          ),
-          child: TextField(
-            controller: _confirmController,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: _SettingsColors.textPrimary,
-              letterSpacing: 1.0,
-            ),
-            decoration: InputDecoration(
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              border: InputBorder.none,
-              hintText: 'DELETE',
-              hintStyle: TextStyle(
-                color: _SettingsColors.textMuted.withValues(alpha: 0.6),
-                letterSpacing: 1.0,
-              ),
-            ),
-          ),
+        _UnifiedDeleteField(
+          controller: _confirmController,
+          isConfirmed: _isConfirmed,
         ),
 
         const SizedBox(height: 20),
@@ -2313,20 +2084,21 @@ class _DeleteAccountModalState extends State<_DeleteAccountModal> {
           children: [
             Expanded(
               child: PressableScale(
-                scaleFactor: 0.96,
+                scaleFactor: 0.97,
+                duration: const Duration(milliseconds: 120),
                 onTap: _isScheduling ? null : () => Navigator.of(context).pop(),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  height: 48,
                   decoration: BoxDecoration(
                     color: _SettingsColors.surface,
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: _SettingsColors.border),
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     'Cancel',
                     style: GoogleFonts.inter(
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: _SettingsColors.textSecondary,
                     ),
@@ -2338,37 +2110,54 @@ class _DeleteAccountModalState extends State<_DeleteAccountModal> {
             Expanded(
               flex: 2,
               child: PressableScale(
-                scaleFactor: _isConfirmed ? 0.96 : 1.0,
+                scaleFactor: _isConfirmed ? 0.97 : 1.0,
+                duration: const Duration(milliseconds: 120),
                 onTap: (_isConfirmed && !_isScheduling)
                     ? _handleScheduleDeletion
                     : null,
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  duration: const Duration(milliseconds: 200),
+                  height: 48,
                   decoration: BoxDecoration(
                     color: _isConfirmed
-                        ? _SettingsColors.destructive
-                        : _SettingsColors.destructive.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(10),
+                        ? const Color(0xFF8B1A25)
+                        : _SettingsColors.destructive.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _isConfirmed
+                          ? _SettingsColors.destructive.withValues(alpha: 0.5)
+                          : _SettingsColors.destructive.withValues(alpha: 0.2),
+                    ),
+                    boxShadow: _isConfirmed
+                        ? const [
+                            BoxShadow(
+                              color: Color(0x30FF5C68),
+                              blurRadius: 10,
+                              offset: Offset(0, 3),
+                            ),
+                          ]
+                        : null,
                   ),
                   alignment: Alignment.center,
                   child: _isScheduling
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white,
+                            color: _isConfirmed
+                                ? Colors.white
+                                : _SettingsColors.destructive.withValues(alpha: 0.4),
                           ),
                         )
                       : Text(
                           'Schedule Account Deletion',
-                          style: GoogleFonts.inter(
-                            fontSize: 12.5,
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 13,
                             fontWeight: FontWeight.w700,
                             color: _isConfirmed
                                 ? Colors.white
-                                : Colors.white.withValues(alpha: 0.4),
+                                : _SettingsColors.destructive.withValues(alpha: 0.35),
                           ),
                         ),
                 ),
@@ -2412,6 +2201,210 @@ class _DataBullet extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── REUSABLE UNIFIED FIELD WIDGETS ──────────────────────────────────────────
+
+/// A single-surface text field with animated blue focus border and no system
+/// focus rectangle. Use for any plain-text modal input.
+class _UnifiedTextField extends StatefulWidget {
+  final TextEditingController controller;
+  final String hintText;
+
+  const _UnifiedTextField({
+    required this.controller,
+    required this.hintText,
+  });
+
+  @override
+  State<_UnifiedTextField> createState() => _UnifiedTextFieldState();
+}
+
+class _UnifiedTextFieldState extends State<_UnifiedTextField> {
+  final FocusNode _focusNode = FocusNode();
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      if (mounted) setState(() => _isFocused = _focusNode.hasFocus);
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      height: 48,
+      decoration: BoxDecoration(
+        color: _SettingsColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _isFocused
+              ? _SettingsColors.primaryBlue
+              : _SettingsColors.border,
+          width: _isFocused ? 1.4 : 1.0,
+        ),
+        boxShadow: _isFocused
+            ? const [
+                BoxShadow(
+                  color: Color(0x1E2F6BFF),
+                  blurRadius: 6,
+                  spreadRadius: 0,
+                ),
+              ]
+            : null,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: TextField(
+          controller: widget.controller,
+          focusNode: _focusNode,
+          cursorColor: _SettingsColors.primaryBlue,
+          cursorWidth: 1.5,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: _SettingsColors.textPrimary,
+            fontWeight: FontWeight.w500,
+          ),
+          decoration: InputDecoration(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            border: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            isDense: true,
+            hintText: widget.hintText,
+            hintStyle: const TextStyle(
+              color: _SettingsColors.textMuted,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Unified DELETE confirmation field with focus-tracking border.
+/// Shows blue border when focused, red border when confirmed.
+class _UnifiedDeleteField extends StatefulWidget {
+  final TextEditingController controller;
+  final bool isConfirmed;
+
+  const _UnifiedDeleteField({
+    required this.controller,
+    required this.isConfirmed,
+  });
+
+  @override
+  State<_UnifiedDeleteField> createState() => _UnifiedDeleteFieldState();
+}
+
+class _UnifiedDeleteFieldState extends State<_UnifiedDeleteField> {
+  final FocusNode _focusNode = FocusNode();
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(() {
+      if (mounted) setState(() => _isFocused = _focusNode.hasFocus);
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Priority: focused = blue border, confirmed = red border, else default
+    final borderColor = _isFocused
+      ? _SettingsColors.primaryBlue
+      : widget.isConfirmed
+        ? _SettingsColors.destructive
+        : _SettingsColors.border;
+
+    final borderWidth =
+        (widget.isConfirmed || _isFocused) ? 1.4 : 1.0;
+
+    final shadows = widget.isConfirmed
+        ? const [
+            BoxShadow(
+              color: Color(0x18FF5C68),
+              blurRadius: 6,
+              spreadRadius: 0,
+            ),
+          ]
+        : _isFocused
+            ? const [
+                BoxShadow(
+                  color: Color(0x1E2F6BFF),
+                  blurRadius: 6,
+                  spreadRadius: 0,
+                ),
+              ]
+            : null;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      height: 48,
+      decoration: BoxDecoration(
+        color: _SettingsColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor, width: borderWidth),
+        boxShadow: shadows,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: TextField(
+          controller: widget.controller,
+          focusNode: _focusNode,
+            cursorColor: _isFocused
+              ? _SettingsColors.primaryBlue
+              : widget.isConfirmed
+                ? _SettingsColors.destructive
+                : _SettingsColors.primaryBlue,
+          cursorWidth: 1.5,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: _SettingsColors.textPrimary,
+            letterSpacing: 1.0,
+          ),
+          decoration: InputDecoration(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            border: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            isDense: true,
+            hintText: 'DELETE',
+            hintStyle: TextStyle(
+              color: _SettingsColors.textMuted.withValues(alpha: 0.5),
+              fontSize: 14,
+              letterSpacing: 1.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -2476,7 +2469,7 @@ class _SettingsActionTileState extends State<_SettingsActionTile> {
                       ),
                     ),
                   ),
-                  ?widget.trailing,
+                  if (widget.trailing != null) widget.trailing!,
                 ],
               ),
             ),
@@ -2597,7 +2590,9 @@ class _SmoothAnimatedDialog {
       barrierDismissible: true,
       barrierLabel: 'Dismiss',
       barrierColor: Colors.black.withValues(alpha: 0.75),
-      transitionDuration: const Duration(milliseconds: 270),
+      // 290ms covers open at 280ms feel; close uses a tighter curve making
+      // it feel ~240ms without needing a separate AnimationController.
+      transitionDuration: const Duration(milliseconds: 290),
       pageBuilder: (context, animation, secondaryAnimation) {
         return const SizedBox.shrink();
       },
@@ -2614,18 +2609,23 @@ class _SmoothAnimatedDialog {
             constraints: const BoxConstraints(maxWidth: 440),
             decoration: BoxDecoration(
               color: _SettingsColors.card,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(22),
               border: Border.all(color: _SettingsColors.border, width: 1),
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x66000000),
-                  blurRadius: 28,
-                  offset: Offset(0, 10),
+                  color: Color(0x70000000),
+                  blurRadius: 32,
+                  offset: Offset(0, 12),
+                ),
+                BoxShadow(
+                  color: Color(0x14000000),
+                  blurRadius: 8,
+                  offset: Offset(0, 2),
                 ),
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(22),
               child: SingleChildScrollView(
                 child: Padding(
                   padding: const EdgeInsets.all(20),
@@ -2637,9 +2637,10 @@ class _SmoothAnimatedDialog {
         );
 
         if (isClosing) {
+          // Close: faster easeInCubic — feels ~240ms even at 290ms total
           final closeCurve = CurvedAnimation(
             parent: animation,
-            curve: Curves.easeInCubic,
+            curve: const Cubic(0.32, 0.0, 0.67, 0.0), // easeInCubic
           );
           return FadeTransition(
             opacity: closeCurve,
@@ -2647,7 +2648,7 @@ class _SmoothAnimatedDialog {
               scale: Tween<double>(begin: 0.96, end: 1.0).animate(closeCurve),
               child: SlideTransition(
                 position: Tween<Offset>(
-                  begin: const Offset(0, 0.03),
+                  begin: const Offset(0, 0.025),
                   end: Offset.zero,
                 ).animate(closeCurve),
                 child: dialogContent,
@@ -2656,9 +2657,10 @@ class _SmoothAnimatedDialog {
           );
         }
 
+        // Open: smooth easeOutCubic — 280ms feel
         final openCurve = CurvedAnimation(
           parent: animation,
-          curve: Curves.easeOutCubic,
+          curve: const Cubic(0.33, 1.0, 0.68, 1.0), // easeOutCubic
         );
 
         return FadeTransition(
@@ -2667,7 +2669,7 @@ class _SmoothAnimatedDialog {
             scale: Tween<double>(begin: 0.96, end: 1.0).animate(openCurve),
             child: SlideTransition(
               position: Tween<Offset>(
-                begin: const Offset(0, 0.035),
+                begin: const Offset(0, 0.032),
                 end: Offset.zero,
               ).animate(openCurve),
               child: dialogContent,

@@ -1,23 +1,32 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/expense.dart';
 import '../services/supabase_service.dart';
+import 'auth_provider.dart';
 
 final trashedExpensesProvider =
     StateNotifierProvider<TrashedExpensesNotifier, AsyncValue<List<Expense>>>((ref) {
-  return TrashedExpensesNotifier();
+  final userId = ref.watch(currentUserIdProvider);
+  return TrashedExpensesNotifier(userId);
 });
 
 class TrashedExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
-  TrashedExpensesNotifier() : super(const AsyncValue.loading()) {
-    fetchTrashed();
+  final String? _userId;
+
+  TrashedExpensesNotifier([this._userId])
+      : super(_userId == null ? const AsyncValue.data([]) : const AsyncValue.loading()) {
+    if (_userId != null) {
+      fetchTrashed();
+    }
   }
 
   /// Fetches all trashed expenses (deleted_at IS NOT NULL) sorted newest deleted first.
   /// Also triggers safe, idempotent background cleanup for records expired past 30 days.
   Future<void> fetchTrashed() async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) {
-      state = const AsyncValue.data([]);
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      if (mounted) state = const AsyncValue.data([]);
       return;
     }
 
@@ -25,10 +34,11 @@ class TrashedExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
       final res = await SupabaseService.client
           .from('expenses')
           .select('*')
-          .eq('user_id', userId)
+          .eq('user_id', effectiveUserId)
           .not('deleted_at', 'is', null)
           .order('deleted_at', ascending: false);
 
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       final list = (res as List)
           .map((e) => Expense.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -38,6 +48,7 @@ class TrashedExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
       // Safe opportunistic cleanup of expired records (older than exactly 30 days)
       cleanupExpiredExpenses();
     } catch (e, st) {
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       if (state.value == null) {
         state = AsyncValue.error(e, st);
       }
@@ -47,8 +58,12 @@ class TrashedExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
   /// Restores a trashed expense by setting deleted_at = NULL in Supabase.
   /// Optimistically removes the item from the Trash list immediately.
   Future<void> restore(Expense expense) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
     final currentList = state.value ?? [];
     final index = currentList.indexWhere((e) => e.id == expense.id);
@@ -62,13 +77,16 @@ class TrashedExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
       await SupabaseService.client
           .from('expenses')
           .update({'deleted_at': null})
-          .eq('id', expense.id);
+          .eq('id', expense.id)
+          .eq('user_id', effectiveUserId);
     } catch (e) {
       // Rollback
-      final latestList = List<Expense>.from(state.value ?? []);
-      final insertIndex = index.clamp(0, latestList.length);
-      latestList.insert(insertIndex, removedItem);
-      state = AsyncValue.data(latestList);
+      if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+        final latestList = List<Expense>.from(state.value ?? []);
+        final insertIndex = index.clamp(0, latestList.length);
+        latestList.insert(insertIndex, removedItem);
+        state = AsyncValue.data(latestList);
+      }
       rethrow;
     }
   }
@@ -76,8 +94,12 @@ class TrashedExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
   /// Permanently deletes a single expense from Supabase.
   /// Optimistically removes it from the Trash list.
   Future<void> permanentlyDelete(String expenseId) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
     final currentList = state.value ?? [];
     final index = currentList.indexWhere((e) => e.id == expenseId);
@@ -91,13 +113,16 @@ class TrashedExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
       await SupabaseService.client
           .from('expenses')
           .delete()
-          .eq('id', expenseId);
+          .eq('id', expenseId)
+          .eq('user_id', effectiveUserId);
     } catch (e) {
       // Rollback
-      final latestList = List<Expense>.from(state.value ?? []);
-      final insertIndex = index.clamp(0, latestList.length);
-      latestList.insert(insertIndex, removedItem);
-      state = AsyncValue.data(latestList);
+      if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+        final latestList = List<Expense>.from(state.value ?? []);
+        final insertIndex = index.clamp(0, latestList.length);
+        latestList.insert(insertIndex, removedItem);
+        state = AsyncValue.data(latestList);
+      }
       rethrow;
     }
   }
@@ -108,8 +133,12 @@ class TrashedExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
   ///   cutoffUtc = nowUtc - 30 days
   ///   delete where deleted_at < cutoffUtc
   Future<void> cleanupExpiredExpenses() async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
     final nowUtc = DateTime.now().toUtc();
     final cutoffUtc = nowUtc.subtract(const Duration(days: 30));
@@ -118,9 +147,11 @@ class TrashedExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
       await SupabaseService.client
           .from('expenses')
           .delete()
-          .eq('user_id', userId)
+          .eq('user_id', effectiveUserId)
           .not('deleted_at', 'is', null)
           .lt('deleted_at', cutoffUtc.toIso8601String());
+
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
 
       // Filter out any locally cached items that have expired
       final currentList = state.value ?? [];

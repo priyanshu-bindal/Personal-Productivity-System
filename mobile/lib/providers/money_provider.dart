@@ -3,25 +3,33 @@ import 'package:intl/intl.dart';
 import '../models/expense.dart';
 import '../models/budget.dart';
 import '../services/supabase_service.dart';
+import 'auth_provider.dart';
 
 final expenseSearchProvider = StateProvider<String>((ref) => '');
 final expenseCategoryFilterProvider = StateProvider<String?>((ref) => null);
 
 final expensesProvider = StateNotifierProvider<ExpensesNotifier, AsyncValue<List<Expense>>>((ref) {
-  return ExpensesNotifier();
+  final userId = ref.watch(currentUserIdProvider);
+  return ExpensesNotifier(userId);
 });
 
 class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
   static int _uuidCounter = 0;
+  final String? _userId;
 
-  ExpensesNotifier() : super(const AsyncValue.loading()) {
-    fetchExpenses();
+  ExpensesNotifier([this._userId])
+      : super(_userId == null ? const AsyncValue.data([]) : const AsyncValue.loading()) {
+    if (_userId != null) {
+      fetchExpenses();
+    }
   }
 
   Future<void> fetchExpenses() async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) {
-      state = const AsyncValue.data([]);
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      if (mounted) state = const AsyncValue.data([]);
       return;
     }
 
@@ -29,10 +37,11 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
       final res = await SupabaseService.client
           .from('expenses')
           .select('*')
-          .eq('user_id', userId)
+          .eq('user_id', effectiveUserId)
           .isFilter('deleted_at', null)
           .order('expense_date', ascending: false);
 
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       final list = (res as List).map((e) => Expense.fromJson(e as Map<String, dynamic>)).toList();
       
       // Preserve any in-flight optimistic expenses that haven't reconciled yet and are not deleted
@@ -44,6 +53,7 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
         state = AsyncValue.data(list);
       }
     } catch (e, st) {
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       if (state.value == null) {
         state = AsyncValue.error(e, st);
       }
@@ -58,8 +68,12 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
     required DateTime date,
     String? note,
   }) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return null;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return null;
+    }
 
     final dateStr = DateFormat('yyyy-MM-dd').format(date);
     final tempId = 'opt_${DateTime.now().microsecondsSinceEpoch}_${_uuidCounter++}';
@@ -67,7 +81,7 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
     // 1. Immediate optimistic insertion
     final optimisticExpense = Expense(
       id: tempId,
-      userId: userId,
+      userId: effectiveUserId,
       amount: amount,
       description: description,
       category: category.toLowerCase(),
@@ -86,7 +100,7 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
       final res = await SupabaseService.client
           .from('expenses')
           .insert({
-            'user_id': userId,
+            'user_id': effectiveUserId,
             'amount': amount,
             'description': description,
             'category': category.toLowerCase(),
@@ -96,6 +110,10 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
           })
           .select()
           .single();
+
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) {
+        return null;
+      }
 
       final confirmedExpense = Expense.fromJson(res);
 
@@ -116,9 +134,11 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
       return confirmedExpense;
     } catch (e) {
       // 4. Rollback: remove the specific optimistic item without disturbing other transactions
-      final latestList = state.value ?? [];
-      final updatedList = latestList.where((e) => e.id != tempId).toList();
-      state = AsyncValue.data(updatedList);
+      if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+        final latestList = state.value ?? [];
+        final updatedList = latestList.where((e) => e.id != tempId).toList();
+        state = AsyncValue.data(updatedList);
+      }
       rethrow;
     }
   }
@@ -132,8 +152,12 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
     required DateTime date,
     String? note,
   }) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
     final currentList = state.value ?? [];
     final index = currentList.indexWhere((e) => e.id == expenseId);
@@ -167,8 +191,11 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
             'note': note,
           })
           .eq('id', expenseId)
+          .eq('user_id', effectiveUserId)
           .select()
           .single();
+
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
 
       final confirmed = Expense.fromJson(res);
       final latestList = List<Expense>.from(state.value ?? []);
@@ -178,19 +205,25 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
         state = AsyncValue.data(latestList);
       }
     } catch (e) {
-      final latestList = List<Expense>.from(state.value ?? []);
-      final latestIndex = latestList.indexWhere((e) => e.id == expenseId);
-      if (latestIndex != -1) {
-        latestList[latestIndex] = originalItem;
-        state = AsyncValue.data(latestList);
+      if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+        final latestList = List<Expense>.from(state.value ?? []);
+        final latestIndex = latestList.indexWhere((e) => e.id == expenseId);
+        if (latestIndex != -1) {
+          latestList[latestIndex] = originalItem;
+          state = AsyncValue.data(latestList);
+        }
       }
       rethrow;
     }
   }
 
   Future<void> deleteExpense(String expenseId) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
     final currentList = state.value ?? [];
     final index = currentList.indexWhere((e) => e.id == expenseId);
@@ -206,20 +239,27 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
       await SupabaseService.client
           .from('expenses')
           .update({'deleted_at': nowUtc.toIso8601String()})
-          .eq('id', expenseId);
+          .eq('id', expenseId)
+          .eq('user_id', effectiveUserId);
     } catch (e) {
       // Rollback
-      final latestList = List<Expense>.from(state.value ?? []);
-      final insertIndex = index.clamp(0, latestList.length);
-      latestList.insert(insertIndex, removedItem);
-      state = AsyncValue.data(latestList);
+      if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+        final latestList = List<Expense>.from(state.value ?? []);
+        final insertIndex = index.clamp(0, latestList.length);
+        latestList.insert(insertIndex, removedItem);
+        state = AsyncValue.data(latestList);
+      }
       rethrow;
     }
   }
 
   Future<void> restoreExpense(Expense expense) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
     final restoredItem = expense.copyWith(clearDeletedAt: true, isOptimistic: false);
 
@@ -234,29 +274,40 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
       await SupabaseService.client
           .from('expenses')
           .update({'deleted_at': null})
-          .eq('id', expense.id);
+          .eq('id', expense.id)
+          .eq('user_id', effectiveUserId);
     } catch (e) {
       // Rollback optimistic restoration
-      final latestList = state.value ?? [];
-      state = AsyncValue.data(latestList.where((e) => e.id != expense.id).toList());
+      if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+        final latestList = state.value ?? [];
+        state = AsyncValue.data(latestList.where((e) => e.id != expense.id).toList());
+      }
       rethrow;
     }
   }
 }
 
 final budgetsProvider = StateNotifierProvider<BudgetsNotifier, AsyncValue<List<Budget>>>((ref) {
-  return BudgetsNotifier();
+  final userId = ref.watch(currentUserIdProvider);
+  return BudgetsNotifier(userId);
 });
 
 class BudgetsNotifier extends StateNotifier<AsyncValue<List<Budget>>> {
-  BudgetsNotifier() : super(const AsyncValue.loading()) {
-    fetchBudgets();
+  final String? _userId;
+
+  BudgetsNotifier([this._userId])
+      : super(_userId == null ? const AsyncValue.data([]) : const AsyncValue.loading()) {
+    if (_userId != null) {
+      fetchBudgets();
+    }
   }
 
   Future<void> fetchBudgets() async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) {
-      state = const AsyncValue.data([]);
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      if (mounted) state = const AsyncValue.data([]);
       return;
     }
 
@@ -267,19 +318,25 @@ class BudgetsNotifier extends StateNotifier<AsyncValue<List<Budget>>> {
       final res = await SupabaseService.client
           .from('budgets')
           .select('*')
-          .eq('user_id', userId)
+          .eq('user_id', effectiveUserId)
           .eq('month', monthKey);
 
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       final list = (res as List).map((e) => Budget.fromJson(e as Map<String, dynamic>)).toList();
       state = AsyncValue.data(list);
     } catch (e, st) {
+      if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       state = AsyncValue.error(e, st);
     }
   }
 
   Future<void> setBudget({required String category, required double monthlyLimit}) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
     final now = DateTime.now();
     final monthKey = DateFormat('yyyy-MM-01').format(now);
@@ -288,19 +345,22 @@ class BudgetsNotifier extends StateNotifier<AsyncValue<List<Budget>>> {
     final existing = await SupabaseService.client
         .from('budgets')
         .select('id')
-        .eq('user_id', userId)
+        .eq('user_id', effectiveUserId)
         .eq('category', cat)
         .eq('month', monthKey)
         .maybeSingle();
+
+    if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
 
     if (existing != null) {
       await SupabaseService.client
           .from('budgets')
           .update({'monthly_limit': monthlyLimit})
-          .eq('id', existing['id']);
+          .eq('id', existing['id'])
+          .eq('user_id', effectiveUserId);
     } else {
       await SupabaseService.client.from('budgets').insert({
-        'user_id': userId,
+        'user_id': effectiveUserId,
         'category': cat,
         'monthly_limit': monthlyLimit,
         'month': monthKey,
@@ -310,10 +370,18 @@ class BudgetsNotifier extends StateNotifier<AsyncValue<List<Budget>>> {
   }
 
   Future<void> deleteBudget(String budgetId) async {
-    final userId = SupabaseService.currentUserId;
-    if (userId == null) return;
+    final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+    if (effectiveUserId == null ||
+        !mounted ||
+        SupabaseService.currentUserId != effectiveUserId) {
+      return;
+    }
 
-    await SupabaseService.client.from('budgets').delete().eq('id', budgetId);
+    await SupabaseService.client
+        .from('budgets')
+        .delete()
+        .eq('id', budgetId)
+        .eq('user_id', effectiveUserId);
     await fetchBudgets();
   }
 }
@@ -358,52 +426,55 @@ final moneySummaryProvider = Provider<MoneySummary>((ref) {
     }
     if (e.expenseDate.startsWith(monthPrefix)) {
       monthSum += e.amount;
-
-      final cat = e.category.toLowerCase();
-      catTotals[cat] = (catTotals[cat] ?? 0) + e.amount;
-
+      catTotals[e.category] = (catTotals[e.category] ?? 0) + e.amount;
       dailyTotals[e.expenseDate] = (dailyTotals[e.expenseDate] ?? 0) + e.amount;
     }
   }
 
-  final daysElapsed = now.day;
-  final avg = daysElapsed > 0 ? monthSum / daysElapsed : 0.0;
+  final dayOfMonth = now.day > 0 ? now.day : 1;
+  final avgDaily = monthSum / dayOfMonth;
 
-  String topCat = 'None';
-  double topCatAmt = 0;
+  String highestCat = 'None';
+  double highestAmt = 0;
   catTotals.forEach((cat, amt) {
-    if (amt > topCatAmt) {
-      topCatAmt = amt;
-      topCat = cat;
+    if (amt > highestAmt) {
+      highestAmt = amt;
+      highestCat = cat;
     }
   });
 
-  // Category breakdown list
-  final breakdown = catTotals.entries.map((entry) {
-    return {
-      'category': entry.key,
-      'amount': entry.value,
-      'percentage': monthSum > 0 ? ((entry.value / monthSum) * 100).round() : 0,
-    };
-  }).toList()
-    ..sort((a, b) => (b['amount'] as double).compareTo(a['amount'] as double));
+  // Daily Chart for last 7 days
+  final List<Map<String, dynamic>> dailyChart = [];
+  for (int i = 6; i >= 0; i--) {
+    final d = now.subtract(Duration(days: i));
+    final dStr = DateFormat('yyyy-MM-dd').format(d);
+    final dayLabel = DateFormat('E').format(d);
+    dailyChart.add({
+      'day': dayLabel,
+      'date': dStr,
+      'amount': dailyTotals[dStr] ?? 0.0,
+    });
+  }
 
-  // Daily chart data sorted by date
-  final dailyChart = dailyTotals.entries.map((entry) {
-    return {
-      'date': entry.key,
-      'amount': entry.value,
-    };
-  }).toList()
-    ..sort((a, b) => (a['date'] as String).compareTo(b['date'] as String));
+  // Category Breakdown sorted descending
+  final List<Map<String, dynamic>> catBreakdown = [];
+  catTotals.forEach((cat, amt) {
+    final pct = monthSum > 0 ? (amt / monthSum * 100) : 0.0;
+    catBreakdown.add({
+      'category': cat,
+      'amount': amt,
+      'percentage': pct,
+    });
+  });
+  catBreakdown.sort((a, b) => (b['amount'] as double).compareTo(a['amount'] as double));
 
   return MoneySummary(
     todayTotal: todaySum,
     monthTotal: monthSum,
-    avgDaily: avg,
-    highestCategory: topCat.isNotEmpty ? topCat[0].toUpperCase() + topCat.substring(1) : 'None',
-    highestCategoryAmount: topCatAmt,
+    avgDaily: avgDaily,
+    highestCategory: highestCat,
+    highestCategoryAmount: highestAmt,
     dailyChartData: dailyChart,
-    categoryBreakdown: breakdown,
+    categoryBreakdown: catBreakdown,
   );
 });

@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'routes/app_router.dart';
 import 'services/supabase_service.dart';
 import 'services/firebase_service.dart';
+import 'services/user_session_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +43,8 @@ class FocusFlowApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Keep user session manager active throughout the app lifecycle
+    ref.watch(userSessionManagerProvider);
     final router = ref.watch(routerProvider);
 
     return MaterialApp.router(
