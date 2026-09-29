@@ -6,15 +6,18 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/ocean_theme.dart';
+import '../../models/expense.dart';
 import 'widgets/financial_dropdown_field.dart';
 import 'widgets/transaction_list_item.dart';
 
 class AddExpenseSheet extends StatefulWidget {
   final String? initialCategory;
+  final Expense? existingExpense;
 
   const AddExpenseSheet({
     super.key,
     this.initialCategory,
+    this.existingExpense,
   });
 
   @override
@@ -41,16 +44,29 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
   @override
   void initState() {
     super.initState();
-    final initCat = widget.initialCategory?.trim().toLowerCase();
-    if (initCat != null &&
-        AppConstants.expenseCategories
-            .any((c) => c.toLowerCase() == initCat)) {
-      _selectedCategory = initCat;
+    final exp = widget.existingExpense;
+    if (exp != null) {
+      final amtStr = exp.amount.truncateToDouble() == exp.amount
+          ? exp.amount.toInt().toString()
+          : exp.amount.toString();
+      _amountController.text = amtStr;
+      _descController.text = exp.description;
+      _noteController.text = exp.note ?? '';
+      _selectedCategory = exp.category.toLowerCase();
+      _selectedPaymentMethod = exp.paymentMethod.toLowerCase().replaceAll(' ', '_');
+      _selectedDate = DateTime.tryParse(exp.expenseDate) ?? DateTime.now();
     } else {
-      _selectedCategory = AppConstants.expenseCategories.first;
+      final initCat = widget.initialCategory?.trim().toLowerCase();
+      if (initCat != null &&
+          AppConstants.expenseCategories
+              .any((c) => c.toLowerCase() == initCat)) {
+        _selectedCategory = initCat;
+      } else {
+        _selectedCategory = AppConstants.expenseCategories.first;
+      }
+      _selectedPaymentMethod = AppConstants.paymentMethods.first;
+      _selectedDate = DateTime.now();
     }
-    _selectedPaymentMethod = AppConstants.paymentMethods.first;
-    _selectedDate = DateTime.now();
 
     _amountFocusNode.addListener(_handleAmountFocusChange);
 
@@ -525,12 +541,20 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                       )
                     : Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(LucideIcons.plusCircle, color: Colors.white, size: 18),
-                          SizedBox(width: 8),
+                        children: [
+                          Icon(
+                            widget.existingExpense != null
+                                ? LucideIcons.check
+                                : LucideIcons.plusCircle,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 8),
                           Text(
-                            'Add Expense',
-                            style: TextStyle(
+                            widget.existingExpense != null
+                                ? 'Save Changes'
+                                : 'Add Expense',
+                            style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,

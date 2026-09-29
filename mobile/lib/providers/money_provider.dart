@@ -5,8 +5,11 @@ import '../models/budget.dart';
 import '../services/supabase_service.dart';
 import 'auth_provider.dart';
 
+import '../features/money/models/expense_filter_state.dart';
+
 final expenseSearchProvider = StateProvider<String>((ref) => '');
 final expenseCategoryFilterProvider = StateProvider<String?>((ref) => null);
+final expenseFilterStateProvider = StateProvider<ExpenseFilterState>((ref) => const ExpenseFilterState());
 
 final expensesProvider = StateNotifierProvider<ExpensesNotifier, AsyncValue<List<Expense>>>((ref) {
   final userId = ref.watch(currentUserIdProvider);

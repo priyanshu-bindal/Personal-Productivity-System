@@ -111,6 +111,7 @@ class UserSessionManager {
     _ref.invalidate(trashedExpensesProvider);
     _ref.invalidate(expenseSearchProvider);
     _ref.invalidate(expenseCategoryFilterProvider);
+    _ref.invalidate(expenseFilterStateProvider);
 
     // Notes
     _ref.invalidate(notesProvider);

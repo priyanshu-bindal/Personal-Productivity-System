@@ -262,113 +262,117 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
             ),
             child: SafeArea(
               child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                height: 68,
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                height: 64,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
+                  borderRadius: BorderRadius.circular(26),
                   boxShadow: const [
                     BoxShadow(
-                      color: Color(0x3D000000),
-                      blurRadius: 16,
+                      color: Color(0x40000000),
+                      blurRadius: 18,
                       offset: Offset(0, 6),
                     ),
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xF00E1526),
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(
-                          color: AppColors.border,
-                          width: 1,
-                        ),
+                  borderRadius: BorderRadius.circular(26),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xF2090F1C),
+                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(
+                        color: const Color(0xFF172A46),
+                        width: 1,
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
-                      child: LayoutBuilder(
-                        builder: (context, constraints) {
-                          final itemWidth = constraints.maxWidth / 5;
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final itemWidth = constraints.maxWidth / 5;
 
-                          return Stack(
-                            children: [
-                              // Localized Active Pill Indicator - slides smoothly
-                              ValueListenableBuilder<bool>(
-                                valueListenable: _isMenuOpenNotifier,
-                                builder: (context, isMenuOpen, _) {
-                                  final effectiveIndex = isMenuOpen ? 4 : currentIndex;
-                                  final alignmentX = -1.0 + (effectiveIndex * 0.5);
+                        return Stack(
+                          children: [
+                            // Localized Active Pill Indicator - slides smoothly with easeOutCubic
+                            ValueListenableBuilder<bool>(
+                              valueListenable: _isMenuOpenNotifier,
+                              builder: (context, isMenuOpen, _) {
+                                final effectiveIndex = isMenuOpen ? 4 : currentIndex;
+                                final alignmentX = -1.0 + (effectiveIndex * 0.5);
 
-                                  return AnimatedAlign(
-                                    duration: const Duration(milliseconds: 230),
-                                    curve: Curves.easeOutCubic,
-                                    alignment: Alignment(alignmentX, 0.0),
-                                    child: SizedBox(
-                                      width: itemWidth,
-                                      height: double.infinity,
-                                      child: Container(
-                                        margin: const EdgeInsets.all(3),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primaryBg,
-                                          borderRadius: BorderRadius.circular(22),
-                                          border: Border.all(
-                                            color: AppColors.primary.withValues(alpha: 0.35),
-                                            width: 1,
-                                          ),
+                                return AnimatedAlign(
+                                  duration: const Duration(milliseconds: 240),
+                                  curve: Curves.easeOutCubic,
+                                  alignment: Alignment(alignmentX, 0.0),
+                                  child: SizedBox(
+                                    width: itemWidth,
+                                    height: double.infinity,
+                                    child: Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF14223E),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: const Color(0xFF2F6BFF),
+                                          width: 1,
                                         ),
+                                        boxShadow: const [
+                                          BoxShadow(
+                                            color: Color(0x332F6BFF),
+                                            blurRadius: 8,
+                                            spreadRadius: 0,
+                                          ),
+                                        ],
                                       ),
                                     ),
-                                  );
-                                },
-                              ),
+                                  ),
+                                );
+                              },
+                            ),
 
-                              // Tab Items with localized rebuilds
-                              ValueListenableBuilder<bool>(
-                                valueListenable: _isMenuOpenNotifier,
-                                builder: (context, isMenuOpen, _) {
-                                  return Row(
-                                    children: [
-                                      _NavBarItem(
-                                        icon: LucideIcons.layoutDashboard,
-                                        label: 'Today',
-                                        isSelected: currentIndex == 0 && !isMenuOpen,
-                                        onTap: () => _onTap(0),
-                                      ),
-                                      _NavBarItem(
-                                        icon: LucideIcons.bookOpen,
-                                        label: 'Skills',
-                                        isSelected: currentIndex == 1 && !isMenuOpen,
-                                        onTap: () => _onTap(1),
-                                      ),
-                                      _NavBarItem(
-                                        icon: LucideIcons.calendar,
-                                        label: 'Calendar',
-                                        isSelected: currentIndex == 2 && !isMenuOpen,
-                                        onTap: () => _onTap(2),
-                                      ),
-                                      _NavBarItem(
-                                        icon: LucideIcons.trendingUp,
-                                        label: 'Progress',
-                                        isSelected: currentIndex == 3 && !isMenuOpen,
-                                        onTap: () => _onTap(3),
-                                      ),
-                                      _NavBarMoreItem(
-                                        icon: LucideIcons.moreHorizontal,
-                                        label: 'More',
-                                        isOpenNotifier: _isMenuOpenNotifier,
-                                        hasBadge: totalUnread > 0,
-                                        onTap: () => _onTap(4),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      ),
+                            // Tab Items with localized rebuilds
+                            ValueListenableBuilder<bool>(
+                              valueListenable: _isMenuOpenNotifier,
+                              builder: (context, isMenuOpen, _) {
+                                return Row(
+                                  children: [
+                                    _NavBarItem(
+                                      icon: LucideIcons.layoutGrid,
+                                      label: 'Today',
+                                      isSelected: currentIndex == 0 && !isMenuOpen,
+                                      onTap: () => _onTap(0),
+                                    ),
+                                    _NavBarItem(
+                                      icon: LucideIcons.bookOpen,
+                                      label: 'Skills',
+                                      isSelected: currentIndex == 1 && !isMenuOpen,
+                                      onTap: () => _onTap(1),
+                                    ),
+                                    _NavBarItem(
+                                      icon: LucideIcons.calendar,
+                                      label: 'Calendar',
+                                      isSelected: currentIndex == 2 && !isMenuOpen,
+                                      onTap: () => _onTap(2),
+                                    ),
+                                    _NavBarItem(
+                                      icon: LucideIcons.trendingUp,
+                                      label: 'Progress',
+                                      isSelected: currentIndex == 3 && !isMenuOpen,
+                                      onTap: () => _onTap(3),
+                                    ),
+                                    _NavBarMoreItem(
+                                      icon: LucideIcons.moreHorizontal,
+                                      label: 'More',
+                                      isOpenNotifier: _isMenuOpenNotifier,
+                                      hasBadge: totalUnread > 0,
+                                      onTap: () => _onTap(4),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -631,8 +635,9 @@ class _NavBarMoreItemState extends State<_NavBarMoreItem>
 
   @override
   Widget build(BuildContext context) {
-    const activeColor = AppColors.primary;
-    const inactiveColor = AppColors.textSecondary;
+    const activeColor = Color(0xFF2F6BFF);
+    const activeTextColor = Color(0xFFF1F5F9);
+    const inactiveColor = Color(0xFF7E93A8);
 
     return Expanded(
       child: GestureDetector(
@@ -651,16 +656,16 @@ class _NavBarMoreItemState extends State<_NavBarMoreItem>
                     ScaleTransition(
                       scale: _pressScaleAnimation,
                       child: AnimatedScale(
-                        duration: const Duration(milliseconds: 230),
+                        duration: const Duration(milliseconds: 240),
                         curve: Curves.easeOutCubic,
-                        scale: highlighted ? 1.08 : 1.0,
+                        scale: highlighted ? 1.05 : 1.0,
                         child: AnimatedRotation(
-                          duration: const Duration(milliseconds: 230),
+                          duration: const Duration(milliseconds: 240),
                           turns: isOpen ? 0.25 : 0.0,
                           curve: Curves.easeOutCubic,
                           child: Icon(
                             widget.icon,
-                            size: 19,
+                            size: 18.5,
                             color: highlighted ? activeColor : inactiveColor,
                           ),
                         ),
@@ -674,11 +679,11 @@ class _NavBarMoreItemState extends State<_NavBarMoreItem>
                           width: 7,
                           height: 7,
                           decoration: const BoxDecoration(
-                            color: Color(0xFF3B82F6),
+                            color: Color(0xFF2F6BFF),
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Color(0x663B82F6),
+                                color: Color(0x662F6BFF),
                                 blurRadius: 4,
                               ),
                             ],
@@ -687,17 +692,17 @@ class _NavBarMoreItemState extends State<_NavBarMoreItem>
                       ),
                   ],
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 230),
+                  duration: const Duration(milliseconds: 240),
                   curve: Curves.easeOutCubic,
                   style: TextStyle(
                     fontSize: 10.5,
-                    fontWeight: highlighted ? FontWeight.w600 : FontWeight.w400,
-                    color: highlighted ? activeColor : inactiveColor,
+                    fontWeight: highlighted ? FontWeight.w600 : FontWeight.w500,
+                    color: highlighted ? activeTextColor : inactiveColor,
                     letterSpacing: 0.1,
                   ),
-                  child: Text(widget.label),
+                  child: Text(widget.label, maxLines: 1),
                 ),
               ],
             );
@@ -723,8 +728,9 @@ class _NavBarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const activeColor = AppColors.primary;
-    const inactiveColor = AppColors.textSecondary;
+    const activeColor = Color(0xFF2F6BFF);
+    const activeTextColor = Color(0xFFF1F5F9);
+    const inactiveColor = Color(0xFF7E93A8);
 
     return Expanded(
       child: GestureDetector(
@@ -734,26 +740,26 @@ class _NavBarItem extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             AnimatedScale(
-              duration: const Duration(milliseconds: 230),
+              duration: const Duration(milliseconds: 240),
               curve: Curves.easeOutCubic,
-              scale: isSelected ? 1.08 : 1.0,
+              scale: isSelected ? 1.05 : 1.0,
               child: Icon(
                 icon,
-                size: 19,
+                size: 18.5,
                 color: isSelected ? activeColor : inactiveColor,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 3),
             AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 230),
+              duration: const Duration(milliseconds: 240),
               curve: Curves.easeOutCubic,
               style: TextStyle(
                 fontSize: 10.5,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? activeColor : inactiveColor,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? activeTextColor : inactiveColor,
                 letterSpacing: 0.1,
               ),
-              child: Text(label),
+              child: Text(label, maxLines: 1),
             ),
           ],
         ),

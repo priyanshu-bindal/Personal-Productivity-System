@@ -10,6 +10,7 @@ import '../../../models/expense.dart';
 class TransactionListItem extends StatelessWidget {
   final Expense expense;
   final VoidCallback? onDelete;
+  final VoidCallback? onTap;
   final bool animateEntrance;
   final bool showNote;
 
@@ -17,6 +18,7 @@ class TransactionListItem extends StatelessWidget {
     super.key,
     required this.expense,
     this.onDelete,
+    this.onTap,
     this.animateEntrance = false,
     this.showNote = true,
   });
@@ -132,7 +134,7 @@ class TransactionListItem extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
-            onTap: () {},
+            onTap: onTap,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
@@ -214,7 +216,8 @@ class TransactionListItem extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 3),
-                        Row(
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             Text(
                               catName,
@@ -248,7 +251,7 @@ class TransactionListItem extends StatelessWidget {
                                 ),
                               ),
                               Text(
-                                expense.paymentMethod.toUpperCase(),
+                                expense.paymentMethod.replaceAll('_', ' ').toUpperCase(),
                                 style: const TextStyle(
                                   color: AppColors.textFaint,
                                   fontSize: 11,

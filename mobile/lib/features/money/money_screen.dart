@@ -13,11 +13,15 @@ import '../../core/widgets/money_empty_state.dart';
 import '../../models/expense.dart';
 import '../../providers/money_provider.dart';
 import '../../providers/trash_provider.dart';
+import '../../core/widgets/pressable_scale.dart';
 import '../../core/widgets/trash_confirmation_overlay.dart';
 import 'add_expense_sheet.dart';
 import 'category_transactions_screen.dart';
+import 'models/expense_filter_state.dart';
 import 'set_budget_sheet.dart';
+import 'widgets/expense_filter_bar.dart';
 import 'widgets/financial_balance_card.dart';
+import 'widgets/money_pdf_export_dialog.dart';
 import 'widgets/transaction_list_item.dart';
 
 class MoneyScreen extends ConsumerStatefulWidget {
@@ -778,52 +782,102 @@ class _ExpensesTab extends ConsumerWidget {
     final expensesAsync = ref.watch(expensesProvider);
     final expenses = expensesAsync.value ?? [];
     final searchQuery = ref.watch(expenseSearchProvider);
+    final filterState = ref.watch(expenseFilterStateProvider);
 
-    List<Expense> filtered = expenses;
-    if (searchQuery.trim().isNotEmpty) {
-      final q = searchQuery.toLowerCase().trim();
-      filtered = filtered.where((e) {
-        return e.description.toLowerCase().contains(q) ||
-            e.category.toLowerCase().contains(q) ||
-            (e.note ?? '').toLowerCase().contains(q);
-      }).toList();
-    }
+    // Apply quick filters and search query
+    final filtered = filterState.apply(expenses, searchQuery: searchQuery);
 
     return Column(
       children: [
+        // 1. Search Bar and Export PDF Action Row
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-          child: TextField(
-            style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-            decoration: InputDecoration(
-              hintText: 'Search expenses by description or category...',
-              hintStyle: const TextStyle(color: AppColors.textFaint, fontSize: 13),
-              prefixIcon: const Icon(LucideIcons.search, color: AppColors.textDim, size: 18),
-              suffixIcon: searchQuery.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(LucideIcons.x, color: AppColors.textDim, size: 16),
-                      onPressed: () => ref.read(expenseSearchProvider.notifier).state = '',
-                    )
-                  : null,
-              filled: true,
-              fillColor: OceanTheme.card,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.border),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                  decoration: InputDecoration(
+                    hintText: 'Search description, category, or note...',
+                    hintStyle: const TextStyle(color: AppColors.textFaint, fontSize: 13),
+                    prefixIcon: const Icon(LucideIcons.search, color: AppColors.textDim, size: 18),
+                    suffixIcon: searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(LucideIcons.x, color: AppColors.textDim, size: 16),
+                            onPressed: () => ref.read(expenseSearchProvider.notifier).state = '',
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: OceanTheme.card,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Color(0xFF2F6BFF)),
+                    ),
+                  ),
+                  onChanged: (v) => ref.read(expenseSearchProvider.notifier).state = v,
+                ),
               ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.border),
+              const SizedBox(width: 10),
+              // Money-Specific Export PDF Action Button
+              PressableScale(
+                scaleFactor: 0.95,
+                onTap: () {
+                  MoneyPdfExportDialog.show(
+                    context,
+                    expenses: filtered,
+                    filterState: filterState,
+                  );
+                },
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: OceanTheme.card,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF1B2B48)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x18000000),
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(LucideIcons.fileDown, color: Color(0xFF2F6BFF), size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        'Export PDF',
+                        style: TextStyle(
+                          color: Color(0xFF2F6BFF),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.6)),
-              ),
-            ),
-            onChanged: (v) => ref.read(expenseSearchProvider.notifier).state = v,
+            ],
           ),
         ),
+
+        // 2. Quick Filters Bar
+        const ExpenseFilterBar(),
+        const SizedBox(height: 8),
+
+        // 3. Transactions List or Contextual Empty State
         Expanded(
           child: expensesAsync.isLoading && filtered.isEmpty
               ? ListView.builder(
@@ -835,37 +889,13 @@ class _ExpensesTab extends ConsumerWidget {
                   ? Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            MoneyEmptyState(
-                              icon: LucideIcons.receipt,
-                              title: searchQuery.isNotEmpty
-                                  ? 'No matching expenses'
-                                  : 'No expenses logged yet',
-                              description: searchQuery.isNotEmpty
-                                  ? 'Try searching with a different keyword.'
-                                  : 'Tap + Add Expense to track your spending.',
-                              accentColor: AppColors.primary,
-                              minHeight: 180,
-                              showGrid: false,
-                            ),
-                            if (searchQuery.isEmpty) ...[
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: onAddTap,
-                                icon: const Icon(LucideIcons.plus, size: 16),
-                                label: const Text('Add Expense'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.primary,
-                                  foregroundColor: OceanTheme.bg,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
+                        child: _buildContextualEmptyState(
+                          context: context,
+                          ref: ref,
+                          expenses: expenses,
+                          searchQuery: searchQuery,
+                          filterState: filterState,
+                          onAddTap: onAddTap,
                         ),
                       ),
                     )
@@ -906,6 +936,120 @@ class _ExpensesTab extends ConsumerWidget {
                         );
                       },
                     ),
+        ),
+      ],
+    );
+  }
+
+  /// Builds polished contextual empty states depending on user state.
+  static Widget _buildContextualEmptyState({
+    required BuildContext context,
+    required WidgetRef ref,
+    required List<Expense> expenses,
+    required String searchQuery,
+    required ExpenseFilterState filterState,
+    required VoidCallback onAddTap,
+  }) {
+    // Situation 1: No expenses logged at all
+    if (expenses.isEmpty) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const MoneyEmptyState(
+            icon: LucideIcons.receipt,
+            title: 'No expenses yet',
+            description:
+                'Start tracking your spending to understand where your money goes.',
+            accentColor: Color(0xFF2F6BFF),
+            minHeight: 180,
+            showGrid: false,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: onAddTap,
+            icon: const Icon(LucideIcons.plus, size: 16),
+            label: const Text('Add Expense'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2F6BFF),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Situation 3: No expenses for selected date period (when only date filter is active)
+    final hasAttributeFilters = (filterState.category != null && filterState.category != 'all') ||
+        (filterState.paymentMethod != null && filterState.paymentMethod != 'all') ||
+        filterState.amountRange != AmountFilterRange.all ||
+        searchQuery.trim().isNotEmpty;
+
+    if (!hasAttributeFilters && filterState.dateFilter != QuickDateFilter.all) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const MoneyEmptyState(
+            icon: LucideIcons.calendarX,
+            title: 'Nothing recorded here',
+            description: 'No expenses were recorded for this period.',
+            accentColor: Color(0xFF2F6BFF),
+            minHeight: 180,
+            showGrid: false,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: onAddTap,
+            icon: const Icon(LucideIcons.plus, size: 16),
+            label: const Text('Add Expense'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2F6BFF),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Situation 2: No results after filtering / searching
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const MoneyEmptyState(
+          icon: LucideIcons.searchX,
+          title: 'No matching expenses',
+          description: 'Try changing your filters or date range.',
+          accentColor: Color(0xFF2F6BFF),
+          minHeight: 180,
+          showGrid: false,
+        ),
+        const SizedBox(height: 16),
+        ElevatedButton.icon(
+          onPressed: () {
+            ref.read(expenseSearchProvider.notifier).state = '';
+            ref.read(expenseFilterStateProvider.notifier).state =
+                filterState.reset();
+          },
+          icon: const Icon(LucideIcons.rotateCcw, size: 16),
+          label: const Text('Clear Filters'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2F6BFF),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
         ),
       ],
     );
