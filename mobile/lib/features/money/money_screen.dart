@@ -207,47 +207,10 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen>
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              color: OceanTheme.card,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: TabBar(
-              controller: _tabController,
-              isScrollable: true,
-              tabAlignment: TabAlignment.center,
-              labelPadding: const EdgeInsets.symmetric(horizontal: 14),
-              indicator: BoxDecoration(
-                color: OceanTheme.cardHi,
-                borderRadius: BorderRadius.circular(9),
-                border: Border.all(
-                  color: AppColors.secondary.withValues(alpha: 0.6),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.secondary.withValues(alpha: 0.16),
-                    blurRadius: 8,
-                  ),
-                ],
-              ),
-              indicatorSize: TabBarIndicatorSize.tab,
-              dividerColor: Colors.transparent,
-              labelColor: AppColors.textPrimary,
-              unselectedLabelColor: AppColors.textDim,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-              unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal, fontSize: 13),
-              tabs: const [
-                Tab(child: Text('Overview', maxLines: 1, softWrap: false)),
-                Tab(child: Text('Expenses', maxLines: 1, softWrap: false)),
-                Tab(child: Text('Categories', maxLines: 1, softWrap: false)),
-                Tab(child: Text('Budgets', maxLines: 1, softWrap: false)),
-              ],
-            ),
+          preferredSize: const Size.fromHeight(56),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: _MoneyTabBar(controller: _tabController),
           ),
         ),
       ),
@@ -437,16 +400,14 @@ class _OverviewTab extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           Container(
-            constraints: const BoxConstraints(minHeight: 200),
-            padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
-              color: OceanTheme.card,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
+              color: const Color(0xFF080F1E),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF172A46), width: 1),
               boxShadow: const [
                 BoxShadow(
-                  color: Color(0x18000000),
-                  blurRadius: 12,
+                  color: Color(0x30000000),
+                  blurRadius: 18,
                   offset: Offset(0, 4),
                 ),
               ],
@@ -461,44 +422,50 @@ class _OverviewTab extends ConsumerWidget {
                   )
                 : TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0.0, end: 1.0),
-                    duration: const Duration(milliseconds: 600),
+                    duration: const Duration(milliseconds: 700),
                     curve: Curves.easeOutCubic,
                     builder: (context, animValue, child) {
-                      final spots = summary.dailyChartData.asMap().entries.map((e) {
-                        final rawAmount = (e.value['amount'] as num).toDouble();
-                        return FlSpot(
-                          e.key.toDouble(),
-                          rawAmount * animValue,
-                        );
-                      }).toList();
+                      final data = summary.dailyChartData;
+                      final totalCount = data.length;
 
-                      final maxY = summary.dailyChartData.fold<double>(
+                      // Progressive left-to-right sweep:
+                      // Each spot rises sequentially as animValue travels from left to right
+                      final spots = <FlSpot>[];
+                      for (int i = 0; i < totalCount; i++) {
+                        final rawAmount = (data[i]['amount'] as num).toDouble();
+                        final start = totalCount > 1 ? (i / (totalCount - 0.5)) * 0.70 : 0.0;
+                        final spotProgress = ((animValue - start) / 0.30).clamp(0.0, 1.0);
+                        final curvedProgress = Curves.easeOutCubic.transform(spotProgress);
+                        spots.add(FlSpot(i.toDouble(), rawAmount * curvedProgress));
+                      }
+
+                      final maxY = data.fold<double>(
                         0.0,
                         (prev, e) {
                           final amt = (e['amount'] as num).toDouble();
                           return amt > prev ? amt : prev;
                         },
                       );
-                      final chartMaxY = maxY > 0 ? maxY * 1.2 : 100.0;
+                      final chartMaxY = maxY > 0 ? maxY * 1.25 : 100.0;
+                      final gridInterval = chartMaxY / 4;
 
                       return Container(
                         height: 200,
-                        padding: const EdgeInsets.fromLTRB(8, 20, 16, 8),
+                        padding: const EdgeInsets.fromLTRB(4, 18, 14, 8),
                         child: LineChart(
                           LineChartData(
                             minY: 0,
                             maxY: chartMaxY,
+                            clipData: const FlClipData.all(),
                             gridData: FlGridData(
                               show: true,
                               drawVerticalLine: false,
-                              horizontalInterval: chartMaxY / 4,
-                              getDrawingHorizontalLine: (value) {
-                                return FlLine(
-                                  color: AppColors.border.withValues(alpha: 0.4),
-                                  strokeWidth: 0.5,
-                                  dashArray: [4, 4],
-                                );
-                              },
+                              horizontalInterval: gridInterval,
+                              getDrawingHorizontalLine: (value) => FlLine(
+                                color: const Color(0xFF172A46).withValues(alpha: 0.7),
+                                strokeWidth: 0.6,
+                                dashArray: [4, 6],
+                              ),
                             ),
                             titlesData: FlTitlesData(
                               leftTitles: const AxisTitles(
@@ -514,20 +481,25 @@ class _OverviewTab extends ConsumerWidget {
                                 sideTitles: SideTitles(
                                   showTitles: true,
                                   reservedSize: 22,
+                                  interval: data.length > 10
+                                      ? (data.length / 6).ceilToDouble()
+                                      : 1,
                                   getTitlesWidget: (value, meta) {
                                     final idx = value.toInt();
-                                    if (idx < 0 || idx >= summary.dailyChartData.length) {
+                                    if (idx < 0 ||
+                                        idx >= data.length ||
+                                        value != value.roundToDouble()) {
                                       return const SizedBox.shrink();
                                     }
-                                    final dayLabel = summary.dailyChartData[idx]['day'] as String;
+                                    final dayLabel = data[idx]['day'] as String;
                                     return Padding(
-                                      padding: const EdgeInsets.only(top: 6),
+                                      padding: const EdgeInsets.only(top: 5),
                                       child: Text(
                                         dayLabel,
                                         style: const TextStyle(
-                                          fontSize: 10,
+                                          fontSize: 9.5,
                                           fontWeight: FontWeight.w500,
-                                          color: AppColors.textDim,
+                                          color: Color(0xFF5C7093),
                                         ),
                                       ),
                                     );
@@ -540,18 +512,22 @@ class _OverviewTab extends ConsumerWidget {
                               LineChartBarData(
                                 spots: spots,
                                 isCurved: true,
-                                curveSmoothness: 0.35,
+                                curveSmoothness: 0.38,
                                 color: const Color(0xFF2F6BFF),
-                                barWidth: 2.5,
+                                barWidth: 2.4,
                                 isStrokeCapRound: true,
                                 dotData: FlDotData(
                                   show: true,
                                   getDotPainter: (spot, percent, barData, index) {
+                                    final start = totalCount > 1
+                                        ? (index / (totalCount - 0.5)) * 0.70
+                                        : 0.0;
+                                    final dotProgress = ((animValue - start) / 0.30).clamp(0.0, 1.0);
                                     return FlDotCirclePainter(
-                                      radius: 2.5,
-                                      color: const Color(0xFF2F6BFF),
+                                      radius: 2.2 * dotProgress,
+                                      color: const Color(0xFF2F6BFF).withValues(alpha: 0.75 * dotProgress),
                                       strokeWidth: 1.2,
-                                      strokeColor: const Color(0xFF0D1629),
+                                      strokeColor: const Color(0xFF080F1E),
                                     );
                                   },
                                 ),
@@ -561,32 +537,84 @@ class _OverviewTab extends ConsumerWidget {
                                     begin: Alignment.topCenter,
                                     end: Alignment.bottomCenter,
                                     colors: [
-                                      const Color(0xFF2F6BFF).withValues(alpha: 0.18 * animValue),
-                                      const Color(0xFF2F6BFF).withValues(alpha: 0.02),
+                                      const Color(0xFF2F6BFF).withValues(
+                                          alpha: 0.16 * animValue),
+                                      const Color(0xFF2F6BFF)
+                                          .withValues(alpha: 0.0),
                                     ],
+                                    stops: const [0.0, 0.85],
                                   ),
                                 ),
                               ),
                             ],
                             lineTouchData: LineTouchData(
+                              handleBuiltInTouches: true,
+                              touchSpotThreshold: 20,
+                              getTouchedSpotIndicator: (barData, spotIndexes) {
+                                return spotIndexes.map((i) {
+                                  return TouchedSpotIndicatorData(
+                                    const FlLine(
+                                      color: Color(0x552F6BFF),
+                                      strokeWidth: 1.2,
+                                      dashArray: [3, 4],
+                                    ),
+                                    FlDotData(
+                                      getDotPainter: (spot, pct, bar, index) =>
+                                          FlDotCirclePainter(
+                                        radius: 5.5,
+                                        color: const Color(0xFF2F6BFF),
+                                        strokeWidth: 2.2,
+                                        strokeColor: const Color(0xFFF1F5F9),
+                                      ),
+                                    ),
+                                  );
+                                }).toList();
+                              },
                               touchTooltipData: LineTouchTooltipData(
-                                getTooltipColor: (_) => const Color(0xFF1A2540),
-                                tooltipRoundedRadius: 8,
-                                tooltipPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                getTooltipColor: (_) => const Color(0xF20E182D),
+                                tooltipRoundedRadius: 10,
+                                tooltipBorder: const BorderSide(
+                                  color: Color(0xFF2F6BFF),
+                                  width: 0.8,
+                                ),
+                                tooltipPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 7),
+                                fitInsideHorizontally: true,
+                                fitInsideVertically: true,
                                 getTooltipItems: (touchedSpots) {
                                   return touchedSpots.map((spot) {
+                                    final idx = spot.x.toInt();
+                                    final dayLabel = (idx >= 0 && idx < data.length)
+                                        ? (data[idx]['day'] as String)
+                                        : '';
+                                    final rawAmount = (idx >= 0 && idx < data.length)
+                                        ? (data[idx]['amount'] as num).toDouble()
+                                        : spot.y;
                                     return LineTooltipItem(
-                                      '₹${spot.y.toStringAsFixed(0)}',
+                                      dayLabel.isNotEmpty
+                                          ? '$dayLabel\n'
+                                          : '',
                                       const TextStyle(
-                                        color: Color(0xFFF1F5F9),
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 12,
+                                        color: Color(0xFF7E93A8),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w500,
+                                        height: 1.3,
                                       ),
+                                      children: [
+                                        TextSpan(
+                                          text:
+                                              '₹${NumberFormat('#,##,###').format(rawAmount.round())}',
+                                          style: const TextStyle(
+                                            color: Color(0xFFF1F5F9),
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
                                     );
                                   }).toList();
                                 },
                               ),
-                              handleBuiltInTouches: true,
                             ),
                           ),
                         ),
@@ -595,7 +623,6 @@ class _OverviewTab extends ConsumerWidget {
                   ),
           ),
           const SizedBox(height: 24),
-
           // Recent Activity Section
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -771,6 +798,122 @@ class _OverviewTab extends ConsumerWidget {
   }
 }
 
+// ─── Native Isolated Search Field ──────────────────────────────────────────
+class _ExpensesSearchField extends ConsumerStatefulWidget {
+  const _ExpensesSearchField();
+
+  @override
+  ConsumerState<_ExpensesSearchField> createState() => _ExpensesSearchFieldState();
+}
+
+class _ExpensesSearchFieldState extends ConsumerState<_ExpensesSearchField> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: ref.read(expenseSearchProvider));
+    _focusNode = FocusNode();
+    _focusNode.addListener(_onFocusChanged);
+  }
+
+  void _onFocusChanged() {
+    if (_isFocused != _focusNode.hasFocus) {
+      setState(() => _isFocused = _focusNode.hasFocus);
+    }
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChanged);
+    _focusNode.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<String>(expenseSearchProvider, (prev, next) {
+      if (_controller.text != next) {
+        _controller.text = next;
+      }
+    });
+
+    final hasText = _controller.text.isNotEmpty;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      height: 42,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0E1526),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: _isFocused ? const Color(0xFF2F6BFF) : const Color(0xFF1B2B48),
+          width: _isFocused ? 1.2 : 1.0,
+        ),
+        boxShadow: _isFocused
+            ? const [
+                BoxShadow(
+                  color: Color(0x332F6BFF),
+                  blurRadius: 8,
+                  offset: Offset(0, 1),
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(left: 12, right: 8),
+            child: Icon(LucideIcons.search, size: 16, color: Color(0xFF7E93A8)),
+          ),
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              style: const TextStyle(
+                color: Color(0xFFF1F5F9),
+                fontSize: 13.5,
+                fontWeight: FontWeight.w500,
+              ),
+              decoration: const InputDecoration(
+                hintText: 'Search expenses...',
+                hintStyle: TextStyle(
+                  color: Color(0xFF5A6F8A),
+                  fontSize: 13,
+                ),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(vertical: 10),
+              ),
+              onChanged: (val) {
+                ref.read(expenseSearchProvider.notifier).state = val;
+                setState(() {});
+              },
+            ),
+          ),
+          if (hasText)
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () {
+                _controller.clear();
+                ref.read(expenseSearchProvider.notifier).state = '';
+                setState(() {});
+              },
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10),
+                child: Icon(LucideIcons.x, size: 14, color: Color(0xFF7E93A8)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 // 2. EXPENSES TAB (FULL TRANSACTIONS)
 class _ExpensesTab extends ConsumerWidget {
   final VoidCallback onAddTap;
@@ -787,157 +930,136 @@ class _ExpensesTab extends ConsumerWidget {
     // Apply quick filters and search query
     final filtered = filterState.apply(expenses, searchQuery: searchQuery);
 
-    return Column(
-      children: [
-        // 1. Search Bar and Export PDF Action Row
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: 'Search description, category, or note...',
-                    hintStyle: const TextStyle(color: AppColors.textFaint, fontSize: 13),
-                    prefixIcon: const Icon(LucideIcons.search, color: AppColors.textDim, size: 18),
-                    suffixIcon: searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(LucideIcons.x, color: AppColors.textDim, size: 16),
-                            onPressed: () => ref.read(expenseSearchProvider.notifier).state = '',
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: OceanTheme.card,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.border),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF2F6BFF)),
-                    ),
-                  ),
-                  onChanged: (v) => ref.read(expenseSearchProvider.notifier).state = v,
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Column(
+        children: [
+          // 1. Search Bar and Export PDF Action Row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: _ExpensesSearchField(),
                 ),
-              ),
-              const SizedBox(width: 10),
-              // Money-Specific Export PDF Action Button
-              PressableScale(
-                scaleFactor: 0.95,
-                onTap: () {
-                  MoneyPdfExportDialog.show(
-                    context,
-                    expenses: filtered,
-                    filterState: filterState,
-                  );
-                },
-                child: Container(
-                  height: 44,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: OceanTheme.card,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF1B2B48)),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x18000000),
-                        blurRadius: 6,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(LucideIcons.fileDown, color: Color(0xFF2F6BFF), size: 16),
-                      SizedBox(width: 6),
-                      Text(
-                        'Export PDF',
-                        style: TextStyle(
-                          color: Color(0xFF2F6BFF),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12.5,
+                const SizedBox(width: 10),
+                // Compact Export PDF Action Button
+                PressableScale(
+                  scaleFactor: 0.95,
+                  onTap: () {
+                    MoneyPdfExportDialog.show(
+                      context,
+                      expenses: filtered,
+                      filterState: filterState,
+                    );
+                  },
+                  child: Container(
+                    height: 42,
+                    padding: const EdgeInsets.symmetric(horizontal: 13),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0E1526),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFF1B2B48)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x18000000),
+                          blurRadius: 6,
+                          offset: Offset(0, 2),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(LucideIcons.fileDown, color: Color(0xFF2F6BFF), size: 15),
+                        SizedBox(width: 6),
+                        Text(
+                          'Export PDF',
+                          style: TextStyle(
+                            color: Color(0xFF2F6BFF),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
 
-        // 2. Quick Filters Bar
-        const ExpenseFilterBar(),
-        const SizedBox(height: 8),
+          // 2. Quick Filters Bar
+          const ExpenseFilterBar(),
+          const SizedBox(height: 8),
 
-        // 3. Transactions List or Contextual Empty State
-        Expanded(
-          child: expensesAsync.isLoading && filtered.isEmpty
-              ? ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                  itemCount: 5,
-                  itemBuilder: (context, index) => _SkeletonTransactionItem(),
-                )
-              : filtered.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Center(
-                        child: _buildContextualEmptyState(
-                          context: context,
-                          ref: ref,
-                          expenses: expenses,
-                          searchQuery: searchQuery,
-                          filterState: filterState,
-                          onAddTap: onAddTap,
+          // 3. Transactions List or Contextual Empty State
+          Expanded(
+            child: expensesAsync.isLoading && filtered.isEmpty
+                ? ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                    itemCount: 5,
+                    itemBuilder: (context, index) => _SkeletonTransactionItem(),
+                  )
+                : filtered.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Center(
+                          child: _buildContextualEmptyState(
+                            context: context,
+                            ref: ref,
+                            expenses: expenses,
+                            searchQuery: searchQuery,
+                            filterState: filterState,
+                            onAddTap: onAddTap,
+                          ),
                         ),
+                      )
+                    : ListView.builder(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final expense = filtered[index];
+                          return TransactionListItem(
+                            key: ValueKey(expense.id),
+                            expense: expense,
+                            animateEntrance: expense.isOptimistic,
+                            onDelete: () async {
+                              final deletedItem = expense;
+                              try {
+                                await ref
+                                    .read(expensesProvider.notifier)
+                                    .deleteExpense(expense.id);
+                                ref.invalidate(trashedExpensesProvider);
+                                if (context.mounted) {
+                                  TrashConfirmationOverlay.show(
+                                    context: context,
+                                    message: 'Moved to Trash',
+                                    onUndo: () async {
+                                      await ref
+                                          .read(expensesProvider.notifier)
+                                          .restoreExpense(deletedItem);
+                                      ref.invalidate(trashedExpensesProvider);
+                                    },
+                                  );
+                                }
+                              } catch (_) {
+                                if (context.mounted) {
+                                  TrashConfirmationOverlay.showError(
+                                    context: context,
+                                    message: "Couldn't delete expense. Restored.",
+                                  );
+                                }
+                              }
+                            },
+                          );
+                        },
                       ),
-                    )
-                  : ListView.builder(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, index) {
-                        final expense = filtered[index];
-                        return TransactionListItem(
-                          key: ValueKey(expense.id),
-                          expense: expense,
-                          animateEntrance: expense.isOptimistic,
-                          onDelete: () async {
-                            final deletedItem = expense;
-                            try {
-                              await ref.read(expensesProvider.notifier).deleteExpense(expense.id);
-                              ref.invalidate(trashedExpensesProvider);
-                              if (context.mounted) {
-                                TrashConfirmationOverlay.show(
-                                  context: context,
-                                  message: 'Moved to Trash',
-                                  onUndo: () async {
-                                    await ref.read(expensesProvider.notifier).restoreExpense(deletedItem);
-                                    ref.invalidate(trashedExpensesProvider);
-                                  },
-                                );
-                              }
-                            } catch (_) {
-                              if (context.mounted) {
-                                TrashConfirmationOverlay.showError(
-                                  context: context,
-                                  message: "Couldn't delete expense. Restored.",
-                                );
-                              }
-                            }
-                          },
-                        );
-                      },
-                    ),
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -984,10 +1106,12 @@ class _ExpensesTab extends ConsumerWidget {
     }
 
     // Situation 3: No expenses for selected date period (when only date filter is active)
-    final hasAttributeFilters = (filterState.category != null && filterState.category != 'all') ||
-        (filterState.paymentMethod != null && filterState.paymentMethod != 'all') ||
-        filterState.amountRange != AmountFilterRange.all ||
-        searchQuery.trim().isNotEmpty;
+    final hasAttributeFilters =
+        (filterState.category != null && filterState.category != 'all') ||
+            (filterState.paymentMethod != null &&
+                filterState.paymentMethod != 'all') ||
+            filterState.amountRange != AmountFilterRange.all ||
+            searchQuery.trim().isNotEmpty;
 
     if (!hasAttributeFilters && filterState.dateFilter != QuickDateFilter.all) {
       return Column(
@@ -1381,6 +1505,147 @@ class _BudgetsTab extends ConsumerWidget {
                 ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Premium Money Tab Bar ──────────────────────────────────────────────────
+// Uses a Stack + AnimatedPositioned sliding pill so there are ZERO rectangular
+// artifacts and the indicator is always fully clipped by the outer capsule.
+class _MoneyTabBar extends StatefulWidget {
+  final TabController controller;
+
+  const _MoneyTabBar({required this.controller});
+
+  @override
+  State<_MoneyTabBar> createState() => _MoneyTabBarState();
+}
+
+class _MoneyTabBarState extends State<_MoneyTabBar> {
+  static const _tabs = ['Overview', 'Expenses', 'Categories', 'Budgets'];
+  static const double _height = 40;
+  static const double _pillVPad = 4;
+  static const double _outerRadius = 24.0;
+  static const double _pillRadius = 20.0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onTabChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalWidth = constraints.maxWidth;
+        final tabWidth = totalWidth / _tabs.length;
+                return SizedBox(
+          height: _height,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(_outerRadius),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xE0080E1A),
+                borderRadius: BorderRadius.circular(_outerRadius),
+                border: Border.all(color: const Color(0xFF1A2E4A), width: 1),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x30000000),
+                    blurRadius: 12,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: AnimatedBuilder(
+                animation: widget.controller.animation!,
+                builder: (context, _) {
+                  final anim = widget.controller.animation!.value;
+                  final pillLeft = anim * tabWidth + _pillVPad;
+                  final pillWidth = tabWidth - _pillVPad * 2;
+                  return Stack(
+                    children: [
+                      // Sliding pill — lives inside the ClipRRect so always clipped
+                      Positioned(
+                        top: _pillVPad,
+                        bottom: _pillVPad,
+                        left: pillLeft,
+                        width: pillWidth,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0F1C36),
+                            borderRadius: BorderRadius.circular(_pillRadius),
+                            border: Border.all(
+                              color: const Color(0xFF2F6BFF),
+                              width: 1,
+                            ),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x1F2F6BFF),
+                                blurRadius: 10,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      // Tab labels
+                      Row(
+                        children: List.generate(_tabs.length, (i) {
+                          // Compute interpolated selection weight for smooth colour transition
+                          final distance = (anim - i).abs();
+                          final weight = (1.0 - distance.clamp(0.0, 1.0));
+
+                          final labelColor = Color.lerp(
+                            const Color(0xFF7F91AA),
+                            const Color(0xFFF1F5F9),
+                            weight,
+                          )!;
+                          final fontWeight = weight > 0.5 ? FontWeight.w700 : FontWeight.w500;
+
+                          return Expanded(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => widget.controller.animateTo(i),
+                              child: Center(
+                                child: AnimatedDefaultTextStyle(
+                                  duration: const Duration(milliseconds: 220),
+                                  curve: Curves.easeOutCubic,
+                                  style: TextStyle(
+                                    color: labelColor,
+                                    fontSize: 12.5,
+                                    fontWeight: fontWeight,
+                                    letterSpacing: -0.1,
+                                  ),
+                                  child: Text(
+                                    _tabs[i],
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

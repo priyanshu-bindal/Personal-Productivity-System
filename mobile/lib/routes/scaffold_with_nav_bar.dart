@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -196,7 +195,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
         icon: LucideIcons.settings,
         color: AppColors.secondary,
         title: 'Settings',
-        subtitle: 'Practice defaults & account preferences',
+        subtitle: 'App preferences & account',
         isActive: currentPath.startsWith('/settings'),
       ),
     ];
@@ -215,7 +214,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
         );
       },
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: const Color(0xFF030508),
         extendBody: true,
         body: Stack(
           children: [
@@ -262,31 +261,63 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
             ),
             child: SafeArea(
               child: Container(
-                margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                 height: 64,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(26),
+                  borderRadius: BorderRadius.circular(28),
                   boxShadow: const [
                     BoxShadow(
-                      color: Color(0x40000000),
-                      blurRadius: 18,
-                      offset: Offset(0, 6),
+                      color: Color(0x50000000),
+                      blurRadius: 24,
+                      offset: Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: Color(0x0C2F6BFF),
+                      blurRadius: 20,
+                      offset: Offset(0, 0),
                     ),
                   ],
                 ),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(26),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xF2090F1C),
-                      borderRadius: BorderRadius.circular(26),
-                      border: Border.all(
-                        color: const Color(0xFF172A46),
-                        width: 1,
+                  borderRadius: BorderRadius.circular(28),
+                  child: Stack(
+                    children: [
+                      // Main glass body
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xE8080E1A),
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(
+                              color: const Color(0xFF1A2E4A),
+                              width: 1,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                    child: LayoutBuilder(
+                      // Inner top-edge highlight — subtle glass refraction
+                      Positioned(
+                        top: 0,
+                        left: 28,
+                        right: 28,
+                        height: 1,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.white.withValues(alpha: 0.0),
+                                Colors.white.withValues(alpha: 0.08),
+                                Colors.white.withValues(alpha: 0.0),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Nav items on top
+                      Positioned.fill(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                          child: LayoutBuilder(
                       builder: (context, constraints) {
                         final itemWidth = constraints.maxWidth / 5;
 
@@ -300,8 +331,8 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
                                 final alignmentX = -1.0 + (effectiveIndex * 0.5);
 
                                 return AnimatedAlign(
-                                  duration: const Duration(milliseconds: 240),
-                                  curve: Curves.easeOutCubic,
+                                  duration: const Duration(milliseconds: 280),
+                                  curve: Curves.easeInOutCubic,
                                   alignment: Alignment(alignmentX, 0.0),
                                   child: SizedBox(
                                     width: itemWidth,
@@ -373,7 +404,10 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
                           ],
                         );
                       },
-                    ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -539,21 +573,41 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 10),
 
-                                    // Menu Items (instant visibility without delay)
+                                    // Menu Items with fluid sequential fade + slide
                                     ...List.generate(menuItems.length, (index) {
                                       final item = menuItems[index];
-                                      return Padding(
-                                        padding: EdgeInsets.only(
-                                          bottom: index < menuItems.length - 1 ? 8 : 0,
-                                        ),
-                                        child: _FloatingMoreMenuItem(
-                                          icon: item.icon,
-                                          color: item.color,
-                                          title: item.title,
-                                          subtitle: item.subtitle,
-                                          badgeCount: item.badgeCount,
-                                          isActive: item.isActive,
-                                          onTap: () => onNavigate(item.route),
+                                      final start = (0.10 + index * 0.10).clamp(0.0, 1.0);
+                                      final end = (start + 0.45).clamp(0.0, 1.0);
+                                      final itemAnim = CurvedAnimation(
+                                        parent: menuController,
+                                        curve: Interval(start, end, curve: Curves.easeOutCubic),
+                                      );
+
+                                      return AnimatedBuilder(
+                                        animation: itemAnim,
+                                        builder: (context, child) {
+                                          final itemDy = (1.0 - itemAnim.value) * 6.0;
+                                          return Transform.translate(
+                                            offset: Offset(0, itemDy),
+                                            child: Opacity(
+                                              opacity: itemAnim.value.clamp(0.0, 1.0),
+                                              child: child,
+                                            ),
+                                          );
+                                        },
+                                        child: Padding(
+                                          padding: EdgeInsets.only(
+                                            bottom: index < menuItems.length - 1 ? 8 : 0,
+                                          ),
+                                          child: _FloatingMoreMenuItem(
+                                            icon: item.icon,
+                                            color: item.color,
+                                            title: item.title,
+                                            subtitle: item.subtitle,
+                                            badgeCount: item.badgeCount,
+                                            isActive: item.isActive,
+                                            onTap: () => onNavigate(item.route),
+                                          ),
                                         ),
                                       );
                                     }),
@@ -694,8 +748,8 @@ class _NavBarMoreItemState extends State<_NavBarMoreItem>
                 ),
                 const SizedBox(height: 3),
                 AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 240),
-                  curve: Curves.easeOutCubic,
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeInOutCubic,
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: highlighted ? FontWeight.w600 : FontWeight.w500,
@@ -740,9 +794,9 @@ class _NavBarItem extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             AnimatedScale(
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic,
-              scale: isSelected ? 1.05 : 1.0,
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeInOutCubic,
+              scale: isSelected ? 1.06 : 1.0,
               child: Icon(
                 icon,
                 size: 18.5,
@@ -751,8 +805,8 @@ class _NavBarItem extends StatelessWidget {
             ),
             const SizedBox(height: 3),
             AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutCubic,
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeInOutCubic,
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
@@ -798,17 +852,17 @@ class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
   Widget build(BuildContext context) {
     final bgColor = widget.isActive
         ? (_isPressed
-            ? widget.color.withValues(alpha: 0.16)
-            : widget.color.withValues(alpha: 0.09))
+            ? widget.color.withValues(alpha: 0.20)
+            : widget.color.withValues(alpha: 0.12))
         : (_isPressed
-            ? Colors.white.withValues(alpha: 0.08)
-            : Colors.white.withValues(alpha: 0.03));
+            ? const Color(0xFF1E293B).withValues(alpha: 0.6)
+            : const Color(0xFF0F172A).withValues(alpha: 0.55));
 
     final borderColor = widget.isActive
-        ? widget.color.withValues(alpha: 0.45)
+        ? widget.color.withValues(alpha: 0.55)
         : (_isPressed
-            ? widget.color.withValues(alpha: 0.35)
-            : Colors.white.withValues(alpha: 0.05));
+            ? widget.color.withValues(alpha: 0.4)
+            : const Color(0xFF1E2A42));
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
@@ -816,31 +870,47 @@ class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
       onTapCancel: () => setState(() => _isPressed = false),
       onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: borderColor,
-            width: widget.isActive ? 1.2 : 1.0,
-          ),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: widget.color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                widget.icon,
-                color: widget.color,
-                size: 20,
-              ),
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 140),
+        curve: Curves.easeOutCubic,
+        scale: _isPressed ? 0.975 : 1.0,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: borderColor,
+              width: widget.isActive ? 1.2 : 1.0,
             ),
+            boxShadow: widget.isActive
+                ? [
+                    BoxShadow(
+                      color: widget.color.withValues(alpha: 0.18),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: widget.color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Center(
+                  child: Icon(
+                    widget.icon,
+                    color: widget.color,
+                    size: 19,
+                  ),
+                ),
+              ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -916,6 +986,7 @@ class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
               size: 16,
             ),
           ],
+        ),
         ),
       ),
     );

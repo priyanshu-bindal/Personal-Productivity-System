@@ -33,6 +33,9 @@ void main() {
     longestStreak: 10,
     lastStreakDate: '2026-09-26',
   );
+  final now = DateTime.now();
+  final currentMonthDay = '${now.year}-${now.month.toString().padLeft(2, '0')}-15';
+
   final expenseA = Expense(
     id: 'exp_a1',
     userId: userAId,
@@ -40,8 +43,8 @@ void main() {
     description: 'User A Expense',
     category: 'groceries',
     paymentMethod: 'credit_card',
-    expenseDate: '2026-09-26',
-    createdAt: DateTime(2026, 9, 26),
+    expenseDate: currentMonthDay,
+    createdAt: now,
   );
   final sessionA = LearningSession(
     id: 'sess_a1',
@@ -115,8 +118,8 @@ void main() {
     description: 'User B Expense',
     category: 'transport',
     paymentMethod: 'upi',
-    expenseDate: '2026-09-26',
-    createdAt: DateTime(2026, 9, 26),
+    expenseDate: currentMonthDay,
+    createdAt: now,
   );
   final sessionB = LearningSession(
     id: 'sess_b1',
