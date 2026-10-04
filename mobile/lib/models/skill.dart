@@ -143,4 +143,23 @@ class Skill {
       'status': status,
     };
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'name': name,
+      'category': category,
+      'description': description,
+      'level': level,
+      'progress': progress,
+      'target': target,
+      'weekly_target': weeklyTarget,
+      'session_duration': sessionDuration,
+      'preferred_days': preferredDays,
+      'status': status,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
 }

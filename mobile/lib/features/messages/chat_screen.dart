@@ -7,6 +7,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../models/chat_message_model.dart';
 import '../../providers/chat_provider.dart';
 import '../../services/chat_service.dart';
+import '../../services/notification_router.dart';
 import 'widgets/chat_message_bubble.dart';
 import 'widgets/id_marker.dart';
 import 'widgets/message_composer.dart';
@@ -38,6 +39,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    NotificationRouter.activeConversationId = widget.conversationId;
     _scrollController.addListener(_onScroll);
   }
 
@@ -57,6 +59,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    if (NotificationRouter.activeConversationId == widget.conversationId) {
+      NotificationRouter.activeConversationId = null;
+    }
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();

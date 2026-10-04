@@ -36,4 +36,15 @@ class Budget {
       'month': month,
     };
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'category': category,
+      'monthly_limit': monthlyLimit,
+      'month': month,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
 }

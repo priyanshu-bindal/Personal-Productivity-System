@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/learning_session.dart';
 import '../services/supabase_service.dart';
+import '../services/cache_service.dart';
 import '../core/utils/session_generator.dart';
 import 'auth_provider.dart';
 import 'streak_provider.dart';
@@ -26,13 +27,33 @@ class SessionsNotifier
     }
   }
 
-  Future<void> fetchSessions() async {
+  Future<void> fetchSessions({bool forceRefresh = false}) async {
     final effectiveUserId = _userId ?? SupabaseService.currentUserId;
     if (effectiveUserId == null ||
         !mounted ||
         SupabaseService.currentUserId != effectiveUserId) {
       if (mounted) state = const AsyncValue.data([]);
       return;
+    }
+
+    // Cache-First check
+    if (!forceRefresh) {
+      final cached = await CacheService().get<List<LearningSession>>(
+        effectiveUserId,
+        'sessions',
+        (json) => (json as List)
+            .map((e) => LearningSession.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+
+      if (cached != null) {
+        if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+          state = AsyncValue.data(cached.data);
+        }
+        if (cached.isFresh) {
+          return; // Valid fresh data served instantly
+        }
+      }
     }
 
     try {
@@ -49,10 +70,20 @@ class SessionsNotifier
       final list = (res as List)
           .map((e) => LearningSession.fromJson(e as Map<String, dynamic>))
           .toList();
+
+      // Persist to user-scoped cache
+      await CacheService().set(
+        effectiveUserId,
+        'sessions',
+        list.map((s) => s.toJson()).toList(),
+      );
+
       state = AsyncValue.data(list);
     } catch (e, st) {
       if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
-      state = AsyncValue.error(e, st);
+      if (state.value == null || state.value!.isEmpty) {
+        state = AsyncValue.error(e, st);
+      }
     }
   }
 
@@ -98,6 +129,7 @@ class SessionsNotifier
           .eq('user_id', effectiveUserId);
 
       await fetchSessions();
+      CacheService().invalidate(effectiveUserId, 'sessions');
 
       // ── Streak check ──────────────────────────────────────────────────────
       if (mounted && SupabaseService.currentUserId == effectiveUserId) {

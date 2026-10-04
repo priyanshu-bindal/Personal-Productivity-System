@@ -10,7 +10,10 @@ import '../providers/sessions_provider.dart';
 import '../providers/skills_provider.dart';
 import '../providers/streak_provider.dart';
 import '../providers/trash_provider.dart';
+import 'cache_service.dart';
+import 'fcm_notification_service.dart';
 import 'firebase_service.dart';
+import 'notification_service.dart';
 import 'supabase_service.dart';
 
 /// Central coordinator for the authenticated user session lifecycle.
@@ -22,6 +25,7 @@ import 'supabase_service.dart';
 /// 3. Signs out and re-establishes the Firebase Auth bridge so Firestore
 ///    listeners never retain or leak the previous user's credentials or streams.
 /// 4. Discards all user-scoped Riverpod providers upon SIGNED_OUT or user change.
+/// 5. Ensures FCM device tokens, local reminders, and local disk cache are user-isolated.
 class UserSessionManager {
   final Ref _ref;
   String? _currentUserId;
@@ -74,24 +78,58 @@ class UserSessionManager {
   }
 
   /// Called before or during sign-out to clean up all user-scoped state,
-  /// terminate Firebase bridge session, and reset all user providers.
+  /// terminate Firebase bridge session, deactivate device FCM token,
+  /// clear local disk cache for the outgoing user, and reset all user providers.
+  ///
+  /// IMPORTANT: Cancels all scheduled notifications FIRST so that the previous
+  /// user's reminders can never fire after another user logs in.
   Future<void> onUserSignedOut() async {
+    final outgoingUser = _currentUserId;
+
+    // Step 1: Cancel all pending local notifications for the outgoing user
+    await NotificationService().cancelAllReminders();
+
+    // Step 1.5: Deactivate device FCM token so outgoing user receives no pushes
+    await FcmNotificationService().onUserSignedOut();
+
+    // Step 1.8: Clear all locally cached data for the outgoing user
+    if (outgoingUser != null && outgoingUser.isNotEmpty) {
+      await CacheService().clearUser(outgoingUser);
+    }
+
+    // Step 2: Clear local identity
     _currentUserId = null;
+
+    // Step 3: Sign out Firebase bridge
     await FirebaseService.signOut();
+
+    // Step 4: Purge all user-scoped Riverpod state
     _invalidateUserScopedProviders();
   }
 
   /// Called upon successful sign-in or auth user transition.
+  ///
+  /// On account switch (User A → User B): cancels all pending notifications,
+  /// clears old user's cache, and deactivates FCM device token for previous user
+  /// BEFORE invalidating providers, ensuring User A's data never appears under User B's session.
   Future<void> onUserSignedIn(String? newUserId) async {
     final prevUserId = _currentUserId;
-    _currentUserId = newUserId;
 
-    // If switching between different authenticated accounts, cleanly sign out Firebase first
+    // If this is an account switch, cancel old user's notifications and cache first.
     if (prevUserId != null && prevUserId != newUserId) {
+      await NotificationService().cancelAllReminders();
+      await FcmNotificationService().onUserSignedOut();
+      await CacheService().clearUser(prevUserId);
       await FirebaseService.signOut();
     }
 
+    _currentUserId = newUserId;
     _invalidateUserScopedProviders();
+
+    // Connect FCM device token to new user
+    if (newUserId != null && newUserId.isNotEmpty) {
+      await FcmNotificationService().onUserSignedIn(newUserId);
+    }
   }
 
   /// Synchronously and comprehensively invalidates all Riverpod providers

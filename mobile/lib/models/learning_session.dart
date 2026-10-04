@@ -64,6 +64,8 @@ class LearningSession {
       'status': status,
       'completed_at': completedAt?.toIso8601String(),
       'notes': notes,
+      'created_at': createdAt.toIso8601String(),
+      if (skillName != null) 'skill': {'name': skillName},
     };
   }
 

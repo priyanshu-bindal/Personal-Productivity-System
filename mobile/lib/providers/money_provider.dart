@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/expense.dart';
 import '../models/budget.dart';
 import '../services/supabase_service.dart';
+import '../services/cache_service.dart';
 import 'auth_provider.dart';
 
 import '../features/money/models/expense_filter_state.dart';
@@ -27,13 +28,33 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
     }
   }
 
-  Future<void> fetchExpenses() async {
+  Future<void> fetchExpenses({bool forceRefresh = false}) async {
     final effectiveUserId = _userId ?? SupabaseService.currentUserId;
     if (effectiveUserId == null ||
         !mounted ||
         SupabaseService.currentUserId != effectiveUserId) {
       if (mounted) state = const AsyncValue.data([]);
       return;
+    }
+
+    // Cache-first check
+    if (!forceRefresh) {
+      final cached = await CacheService().get<List<Expense>>(
+        effectiveUserId,
+        'expenses',
+        (json) => (json as List)
+            .map((e) => Expense.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+
+      if (cached != null) {
+        if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+          state = AsyncValue.data(cached.data);
+        }
+        if (cached.isFresh) {
+          return; // Serve fresh cached data immediately
+        }
+      }
     }
 
     try {
@@ -46,7 +67,14 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
 
       if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       final list = (res as List).map((e) => Expense.fromJson(e as Map<String, dynamic>)).toList();
-      
+
+      // Persist to user-scoped cache (only non-optimistic, persisted expenses)
+      await CacheService().set(
+        effectiveUserId,
+        'expenses',
+        list.map((e) => e.toJson()).toList(),
+      );
+
       // Preserve any in-flight optimistic expenses that haven't reconciled yet and are not deleted
       final current = state.value ?? [];
       final inFlightOptimistic = current.where((e) => e.isOptimistic && e.deletedAt == null).toList();
@@ -134,6 +162,8 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
           state = AsyncValue.data([confirmedExpense, ...latestList]);
         }
       }
+      // Invalidate cache so next open reflects the new expense
+      CacheService().invalidate(effectiveUserId, 'expenses');
       return confirmedExpense;
     } catch (e) {
       // 4. Rollback: remove the specific optimistic item without disturbing other transactions
@@ -207,6 +237,7 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
         latestList[latestIndex] = confirmed;
         state = AsyncValue.data(latestList);
       }
+      CacheService().invalidate(effectiveUserId, 'expenses');
     } catch (e) {
       if (mounted && SupabaseService.currentUserId == effectiveUserId) {
         final latestList = List<Expense>.from(state.value ?? []);
@@ -244,6 +275,7 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
           .update({'deleted_at': nowUtc.toIso8601String()})
           .eq('id', expenseId)
           .eq('user_id', effectiveUserId);
+      CacheService().invalidate(effectiveUserId, 'expenses');
     } catch (e) {
       // Rollback
       if (mounted && SupabaseService.currentUserId == effectiveUserId) {
@@ -279,6 +311,7 @@ class ExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>> {
           .update({'deleted_at': null})
           .eq('id', expense.id)
           .eq('user_id', effectiveUserId);
+      CacheService().invalidate(effectiveUserId, 'expenses');
     } catch (e) {
       // Rollback optimistic restoration
       if (mounted && SupabaseService.currentUserId == effectiveUserId) {
@@ -305,7 +338,7 @@ class BudgetsNotifier extends StateNotifier<AsyncValue<List<Budget>>> {
     }
   }
 
-  Future<void> fetchBudgets() async {
+  Future<void> fetchBudgets({bool forceRefresh = false}) async {
     final effectiveUserId = _userId ?? SupabaseService.currentUserId;
     if (effectiveUserId == null ||
         !mounted ||
@@ -314,18 +347,50 @@ class BudgetsNotifier extends StateNotifier<AsyncValue<List<Budget>>> {
       return;
     }
 
+    // Cache-first check (keyed by month so changing months auto-invalidates)
+    final now = DateTime.now();
+    final monthKey = DateFormat('yyyy-MM-01').format(now);
+    final cacheKey = 'budgets_$monthKey';
+
+    if (!forceRefresh) {
+      final cached = await CacheService().get<List<Budget>>(
+        effectiveUserId,
+        cacheKey,
+        (json) => (json as List)
+            .map((e) => Budget.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+
+      if (cached != null) {
+        if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+          state = AsyncValue.data(cached.data);
+        }
+        if (cached.isFresh) {
+          return; // Serve fresh cached data immediately
+        }
+      }
+    }
+
     try {
-      final now = DateTime.now();
-      final monthKey = DateFormat('yyyy-MM-01').format(now);
+      final now2 = DateTime.now();
+      final mk = DateFormat('yyyy-MM-01').format(now2);
 
       final res = await SupabaseService.client
           .from('budgets')
           .select('*')
           .eq('user_id', effectiveUserId)
-          .eq('month', monthKey);
+          .eq('month', mk);
 
       if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
       final list = (res as List).map((e) => Budget.fromJson(e as Map<String, dynamic>)).toList();
+
+      // Persist to user-scoped cache
+      await CacheService().set(
+        effectiveUserId,
+        cacheKey,
+        list.map((b) => b.toJson()).toList(),
+      );
+
       state = AsyncValue.data(list);
     } catch (e, st) {
       if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
@@ -369,7 +434,8 @@ class BudgetsNotifier extends StateNotifier<AsyncValue<List<Budget>>> {
         'month': monthKey,
       });
     }
-    await fetchBudgets();
+    await CacheService().invalidate(effectiveUserId, 'budgets_$monthKey');
+    await fetchBudgets(forceRefresh: true);
   }
 
   Future<void> deleteBudget(String budgetId) async {
@@ -385,7 +451,9 @@ class BudgetsNotifier extends StateNotifier<AsyncValue<List<Budget>>> {
         .delete()
         .eq('id', budgetId)
         .eq('user_id', effectiveUserId);
-    await fetchBudgets();
+    final monthKey = DateFormat('yyyy-MM-01').format(DateTime.now());
+    await CacheService().invalidate(effectiveUserId, 'budgets_$monthKey');
+    await fetchBudgets(forceRefresh: true);
   }
 }
 

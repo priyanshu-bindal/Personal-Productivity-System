@@ -607,7 +607,7 @@ class FakeBudgetsNotifier extends StateNotifier<AsyncValue<List<Budget>>>
   FakeBudgetsNotifier() : super(const AsyncValue.data([]));
 
   @override
-  Future<void> fetchBudgets() async {}
+  Future<void> fetchBudgets({bool forceRefresh = false}) async {}
 
   @override
   Future<void> setBudget({required String category, required double monthlyLimit}) async {}
@@ -621,7 +621,7 @@ class FakeExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>>
   FakeExpensesNotifier(List<Expense> initial) : super(AsyncValue.data(initial));
 
   @override
-  Future<void> fetchExpenses() async {}
+  Future<void> fetchExpenses({bool forceRefresh = false}) async {}
 
   @override
   Future<Expense?> addExpense({

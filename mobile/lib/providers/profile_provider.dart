@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_profile.dart';
 import '../services/supabase_service.dart';
 import '../services/supabase_jwt_recovery.dart';
+import '../services/notification_service.dart';
+import '../services/cache_service.dart';
 import 'auth_provider.dart';
 
 final profileProvider =
@@ -25,7 +27,7 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
 
   // --- Fetch ----------------------------------------------------------------
 
-  Future<void> fetchProfile() async {
+  Future<void> fetchProfile({bool forceRefresh = false}) async {
     final effectiveUserId = _userId ?? SupabaseService.currentUserId;
     if (effectiveUserId == null ||
         !mounted ||
@@ -34,12 +36,42 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
       return;
     }
 
+    // Cache-first check
+    if (!forceRefresh) {
+      final cached = await CacheService().get<UserProfile>(
+        effectiveUserId,
+        'profile',
+        (json) {
+          final user = SupabaseService.currentUser;
+          return UserProfile.fromJson(
+            json as Map<String, dynamic>,
+            email: user?.email ?? '',
+          );
+        },
+      );
+
+      if (cached != null) {
+        if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+          state = AsyncValue.data(cached.data);
+        }
+        if (cached.isFresh) {
+          return; // Serve fresh cached data immediately
+        }
+      }
+    }
+
     try {
       final result = await SupabaseJwtRecovery.withJwtRecovery(
         SupabaseService.client,
         () => _doFetch(effectiveUserId),
       );
       if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
+
+      // Persist to cache before updating state
+      if (result != null) {
+        await CacheService().set(effectiveUserId, 'profile', result.toJson());
+      }
+
       state = AsyncValue.data(result);
     } on PostgrestException catch (e, st) {
       if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
@@ -58,22 +90,30 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
         .eq('id', userId)
         .maybeSingle();
 
+    UserProfile profile;
     if (res != null) {
-      return UserProfile.fromJson(res, email: user?.email ?? '');
+      profile = UserProfile.fromJson(res, email: user?.email ?? '');
+    } else {
+      // Profile row missing — upsert a minimal one.
+      final newRes = await SupabaseService.client
+          .from('profiles')
+          .upsert({
+            'id': userId,
+            'full_name': user?.userMetadata?['full_name'] ?? '',
+            'avatar_url': user?.userMetadata?['avatar_url'] ?? '',
+          })
+          .select()
+          .single();
+
+      profile = UserProfile.fromJson(newRes, email: user?.email ?? '');
     }
 
-    // Profile row missing — upsert a minimal one.
-    final newRes = await SupabaseService.client
-        .from('profiles')
-        .upsert({
-          'id': userId,
-          'full_name': user?.userMetadata?['full_name'] ?? '',
-          'avatar_url': user?.userMetadata?['avatar_url'] ?? '',
-        })
-        .select()
-        .single();
-
-    return UserProfile.fromJson(newRes, email: user?.email ?? '');
+    // Check if user has an explicit local preference in SharedPreferences
+    final storedPref = await NotificationService().getStoredPreference(userId);
+    if (storedPref != null) {
+      profile = profile.copyWith(practiceReminders: storedPref);
+    }
+    return profile;
   }
 
   // --- Update ---------------------------------------------------------------
@@ -103,7 +143,8 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
         }
       },
     );
-    await fetchProfile();
+    await CacheService().invalidate(effectiveUserId, 'profile');
+    await fetchProfile(forceRefresh: true);
   }
 
   Future<void> updatePreferences({
@@ -116,6 +157,15 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
         !mounted ||
         SupabaseService.currentUserId != effectiveUserId) {
       return;
+    }
+
+    // Optimistically update Riverpod state so UI updates immediately without lag
+    if (state.hasValue && state.value != null) {
+      state = AsyncValue.data(state.value!.copyWith(
+        defaultSessionDuration: defaultSessionDuration,
+        practiceReminders: practiceReminders,
+        dailyReminderTime: dailyReminderTime,
+      ));
     }
 
     final updateData = <String, dynamic>{};
@@ -140,7 +190,8 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
     } catch (_) {
       // Preferences update failure is non-fatal; silently continue.
     }
-    await fetchProfile();
+    await CacheService().invalidate(effectiveUserId, 'profile');
+    await fetchProfile(forceRefresh: true);
   }
 
   // --- Account Deletion Scheduling ------------------------------------------
@@ -163,7 +214,8 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
         'deletion_scheduled_for': scheduledFor.toIso8601String(),
       }).eq('id', effectiveUserId),
     );
-    await fetchProfile();
+    await CacheService().invalidate(effectiveUserId, 'profile');
+    await fetchProfile(forceRefresh: true);
   }
 
   Future<void> cancelDeletion() async {
@@ -181,6 +233,7 @@ class ProfileNotifier extends StateNotifier<AsyncValue<UserProfile?>> {
         'deletion_scheduled_for': null,
       }).eq('id', effectiveUserId),
     );
-    await fetchProfile();
+    await CacheService().invalidate(effectiveUserId, 'profile');
+    await fetchProfile(forceRefresh: true);
   }
 }

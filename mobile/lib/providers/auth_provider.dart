@@ -4,7 +4,11 @@ import '../services/supabase_service.dart';
 import '../services/user_session_manager.dart';
 
 final authStateProvider = StreamProvider<AuthState>((ref) {
-  return SupabaseService.client.auth.onAuthStateChange;
+  try {
+    return SupabaseService.client.auth.onAuthStateChange;
+  } catch (_) {
+    return const Stream.empty();
+  }
 });
 
 final currentUserProvider = Provider<User?>((ref) {

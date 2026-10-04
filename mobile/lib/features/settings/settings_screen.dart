@@ -13,7 +13,11 @@ import '../../models/user_profile.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/profile_provider.dart';
+import '../../providers/sessions_provider.dart';
+import '../../services/cache_service.dart';
 import '../../services/supabase_service.dart';
+import '../../services/notification_service.dart';
+import '../../services/fcm_notification_service.dart';
 import 'services/pdf_export_service.dart';
 
 // ─── COLOR SYSTEM TOKENS ───────────────────────────────────────────────────────
@@ -641,87 +645,434 @@ class _FocusIdRowState extends ConsumerState<_FocusIdRow> {
 
 // ─── NOTIFICATIONS CARD ───────────────────────────────────────────────────────
 
-class _NotificationsCard extends ConsumerWidget {
+class _NotificationsCard extends ConsumerStatefulWidget {
   final UserProfile? profile;
 
   const _NotificationsCard({required this.profile});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final remindersEnabled = profile?.practiceReminders ?? true;
+  ConsumerState<_NotificationsCard> createState() => _NotificationsCardState();
+}
+
+class _NotificationsCardState extends ConsumerState<_NotificationsCard>
+    with WidgetsBindingObserver {
+  bool _isEnabled = false;
+  bool _isMessagesEnabled = true;
+  bool _isAnnouncementsEnabled = true;
+  bool? _permissionGranted;
+  bool _isInitialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initializeState();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NotificationsCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.profile?.practiceReminders != oldWidget.profile?.practiceReminders) {
+      if (_isInitialized && _permissionGranted == true) {
+        setState(() {
+          _isEnabled = widget.profile?.practiceReminders ?? false;
+        });
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPermissionAndSync();
+    }
+  }
+
+  Future<void> _initializeState() async {
+    final userId = widget.profile?.id.isNotEmpty == true
+        ? widget.profile!.id
+        : SupabaseService.currentUserId;
+    final permitted = await NotificationService().areNotificationsPermitted();
+    final savedPref = userId != null
+        ? await NotificationService().getPreference(
+            userId,
+            fallback: widget.profile?.practiceReminders ?? false,
+          )
+        : (widget.profile?.practiceReminders ?? false);
+
+    final msgPref = userId != null
+        ? await NotificationService().getMessageNotificationPreference(userId)
+        : true;
+
+    final annPref = userId != null
+        ? await NotificationService().getAnnouncementNotificationPreference(userId)
+        : true;
+
+    if (mounted) {
+      setState(() {
+        _permissionGranted = permitted;
+        _isEnabled = savedPref && permitted;
+        _isMessagesEnabled = msgPref && permitted;
+        _isAnnouncementsEnabled = annPref && permitted;
+        _isInitialized = true;
+      });
+    }
+  }
+
+  Future<void> _checkPermissionAndSync() async {
+    final permitted = await NotificationService().areNotificationsPermitted();
+    if (!mounted) return;
+
+    final userId = widget.profile?.id.isNotEmpty == true
+        ? widget.profile!.id
+        : SupabaseService.currentUserId;
+    final savedPref = userId != null
+        ? await NotificationService().getPreference(
+            userId,
+            fallback: widget.profile?.practiceReminders ?? false,
+          )
+        : (widget.profile?.practiceReminders ?? false);
+
+    final msgPref = userId != null
+        ? await NotificationService().getMessageNotificationPreference(userId)
+        : true;
+
+    final annPref = userId != null
+        ? await NotificationService().getAnnouncementNotificationPreference(userId)
+        : true;
+
+    setState(() {
+      _permissionGranted = permitted;
+      _isEnabled = savedPref && permitted;
+      _isMessagesEnabled = msgPref && permitted;
+      _isAnnouncementsEnabled = annPref && permitted;
+    });
+
+    if (userId != null) {
+      if (_isEnabled) {
+        final sessions = ref.read(sessionsProvider).valueOrNull ?? [];
+        final todayStr = DateTime.now().toIso8601String().split('T')[0];
+        final todaySessions =
+            sessions.where((s) => s.scheduledDate == todayStr).toList();
+        await NotificationService().updateDailyReminders(userId, todaySessions, true);
+      } else if (!permitted && savedPref) {
+        await NotificationService().cancelAllReminders();
+      }
+
+      // Sync FCM device token status with current permission
+      await FcmNotificationService().syncDeviceToken(
+        isEnabled: _isMessagesEnabled && permitted,
+      );
+    }
+  }
+
+  Future<void> _handleToggle(bool val) async {
+    final userId = widget.profile?.id.isNotEmpty == true
+        ? widget.profile!.id
+        : SupabaseService.currentUserId;
+
+    if (val) {
+      final permitted = await NotificationService().areNotificationsPermitted();
+      bool granted = permitted;
+
+      if (!granted) {
+        granted = await NotificationService().requestPermissions();
+      }
+
+      if (granted) {
+        if (mounted) {
+          setState(() {
+            _permissionGranted = true;
+            _isEnabled = true;
+          });
+        }
+
+        if (userId != null) {
+          await NotificationService().setPreference(userId, true);
+          await ref
+              .read(profileProvider.notifier)
+              .updatePreferences(practiceReminders: true);
+
+          var sessions = ref.read(sessionsProvider).valueOrNull ?? [];
+          if (sessions.isEmpty) {
+            await ref.read(sessionsProvider.notifier).fetchSessions();
+            sessions = ref.read(sessionsProvider).valueOrNull ?? [];
+          }
+          final todayStr = DateTime.now().toIso8601String().split('T')[0];
+          final todaySessions =
+              sessions.where((s) => s.scheduledDate == todayStr).toList();
+          await NotificationService()
+              .updateDailyReminders(userId, todaySessions, true);
+        }
+      } else {
+        _showPermissionDeniedBanner();
+        if (mounted) {
+          setState(() {
+            _permissionGranted = false;
+            _isEnabled = false;
+          });
+        }
+
+        if (userId != null) {
+          await NotificationService().setPreference(userId, false);
+          await ref
+              .read(profileProvider.notifier)
+              .updatePreferences(practiceReminders: false);
+          await NotificationService().cancelAllReminders();
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _isEnabled = false;
+        });
+      }
+
+      if (userId != null) {
+        await NotificationService().setPreference(userId, false);
+        await ref
+              .read(profileProvider.notifier)
+              .updatePreferences(practiceReminders: false);
+        await NotificationService().cancelAllReminders();
+      }
+    }
+  }
+
+  Future<void> _handleMessagesToggle(bool val) async {
+    final userId = widget.profile?.id.isNotEmpty == true
+        ? widget.profile!.id
+        : SupabaseService.currentUserId;
+
+    if (val) {
+      final permitted = await NotificationService().areNotificationsPermitted();
+      bool granted = permitted;
+
+      if (!granted) {
+        granted = await NotificationService().requestPermissions();
+      }
+
+      if (granted) {
+        if (mounted) {
+          setState(() {
+            _permissionGranted = true;
+            _isMessagesEnabled = true;
+          });
+        }
+
+        if (userId != null) {
+          await NotificationService().setMessageNotificationPreference(userId, true);
+          await FcmNotificationService().syncDeviceToken(isEnabled: true);
+        }
+      } else {
+        _showPermissionDeniedBanner();
+        if (mounted) {
+          setState(() {
+            _permissionGranted = false;
+            _isMessagesEnabled = false;
+          });
+        }
+
+        if (userId != null) {
+          await NotificationService().setMessageNotificationPreference(userId, false);
+          await FcmNotificationService().syncDeviceToken(isEnabled: false);
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _isMessagesEnabled = false;
+        });
+      }
+
+      if (userId != null) {
+        await NotificationService().setMessageNotificationPreference(userId, false);
+        await FcmNotificationService().syncDeviceToken(isEnabled: false);
+      }
+    }
+  }
+
+  Future<void> _handleAnnouncementsToggle(bool val) async {
+    final userId = widget.profile?.id.isNotEmpty == true
+        ? widget.profile!.id
+        : SupabaseService.currentUserId;
+
+    if (mounted) {
+      setState(() {
+        _isAnnouncementsEnabled = val;
+      });
+    }
+
+    if (userId != null) {
+      await NotificationService()
+          .setAnnouncementNotificationPreference(userId, val);
+    }
+  }
+
+  void _showPermissionDeniedBanner() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Notifications are blocked. Enable them in device Settings → Apps → FocusFlow → Notifications.',
+          style: GoogleFonts.inter(fontSize: 12.5),
+        ),
+        backgroundColor: _SettingsColors.card,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: _SettingsColors.border),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggleRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+    bool isWarning = false,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: _SettingsColors.surface,
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: _SettingsColors.border),
+          ),
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            color: isWarning
+                ? _SettingsColors.textMuted
+                : _SettingsColors.primaryBlue,
+            size: 16,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w600,
+                  color: _SettingsColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: isWarning
+                      ? _SettingsColors.destructive.withValues(alpha: 0.75)
+                      : _SettingsColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        Switch(
+          value: value,
+          activeTrackColor: _SettingsColors.primaryBlue,
+          activeThumbColor: Colors.white,
+          inactiveTrackColor: _SettingsColors.surface,
+          inactiveThumbColor: _SettingsColors.textMuted,
+          trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.selected)) {
+              return _SettingsColors.primaryBlue;
+            }
+            return _SettingsColors.border;
+          }),
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final permissionDeniedHint =
+        _isInitialized && _permissionGranted == false;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: _SettingsColors.card,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: _SettingsColors.border, width: 1),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: _SettingsColors.surface,
-              borderRadius: BorderRadius.circular(9),
-              border: Border.all(color: _SettingsColors.border),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              LucideIcons.bell,
-              color: _SettingsColors.primaryBlue,
-              size: 16,
-            ),
+          // 1. Daily Practice Reminders (Local Smart Reminders)
+          _buildToggleRow(
+            icon: LucideIcons.bell,
+            title: 'Daily Practice Reminders',
+            subtitle: permissionDeniedHint && !_isEnabled
+                ? 'Allow in device Settings to activate'
+                : _isEnabled
+                    ? 'Smart reminders are active'
+                    : 'Receive a prompt to stay on streak',
+            value: _isEnabled,
+            onChanged: _handleToggle,
+            isWarning: permissionDeniedHint && !_isEnabled,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Daily Practice Reminders',
-                  style: GoogleFonts.inter(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                    color: _SettingsColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Receive a prompt to stay on streak',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: _SettingsColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: Divider(color: _SettingsColors.border, height: 1, thickness: 0.8),
           ),
-          const SizedBox(width: 10),
-          Switch(
-            value: remindersEnabled,
-            activeTrackColor: _SettingsColors.primaryBlue,
-            activeThumbColor: Colors.white,
-            inactiveTrackColor: _SettingsColors.surface,
-            inactiveThumbColor: _SettingsColors.textMuted,
-            trackOutlineColor: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.selected)) {
-                return _SettingsColors.primaryBlue;
-              }
-              return _SettingsColors.border;
-            }),
-            onChanged: (val) {
-              ref
-                  .read(profileProvider.notifier)
-                  .updatePreferences(practiceReminders: val);
-            },
+
+          // 2. Direct Messages (FCM Remote Chat Alerts)
+          _buildToggleRow(
+            icon: LucideIcons.messageSquare,
+            title: 'Direct Messages',
+            subtitle: permissionDeniedHint && !_isMessagesEnabled
+                ? 'Allow in device Settings to activate'
+                : _isMessagesEnabled
+                    ? 'Instant alerts for 1-to-1 chats'
+                    : 'Chat notifications muted',
+            value: _isMessagesEnabled,
+            onChanged: _handleMessagesToggle,
+            isWarning: permissionDeniedHint && !_isMessagesEnabled,
+          ),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: Divider(color: _SettingsColors.border, height: 1, thickness: 0.8),
+          ),
+
+          // 3. Announcements & Updates (FCM Broadcast Alerts)
+          _buildToggleRow(
+            icon: LucideIcons.megaphone,
+            title: 'Announcements & Updates',
+            subtitle: _isAnnouncementsEnabled
+                ? 'Important FocusFlow news & feature updates'
+                : 'Announcements muted',
+            value: _isAnnouncementsEnabled,
+            onChanged: _handleAnnouncementsToggle,
           ),
         ],
       ),
     );
   }
 }
+
 
 // ─── DATA & PRIVACY CARD ──────────────────────────────────────────────────────
 
@@ -735,6 +1086,40 @@ class _DataAndPrivacyCard extends ConsumerStatefulWidget {
 
 class _DataAndPrivacyCardState extends ConsumerState<_DataAndPrivacyCard> {
   bool _isExporting = false;
+  bool _isClearingCache = false;
+  String _cacheSize = '…';
+  DateTime? _lastRefreshed;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCacheMetrics();
+  }
+
+  Future<void> _loadCacheMetrics() async {
+    try {
+      final userId = ref.read(profileProvider).value?.id ??
+          ref.read(currentUserIdProvider);
+      if (userId == null) return;
+      final size = await CacheService().getFormattedCacheSize(userId);
+      final last = await CacheService().getLastRefreshedTime(userId);
+      if (mounted) {
+        setState(() {
+          _cacheSize = size;
+          _lastRefreshed = last;
+        });
+      }
+    } catch (_) {}
+  }
+
+  String get _lastRefreshedLabel {
+    if (_lastRefreshed == null) return 'No cached data';
+    final diff = DateTime.now().difference(_lastRefreshed!);
+    if (diff.inSeconds < 60) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    return '${diff.inDays}d ago';
+  }
 
   Future<void> _handlePdfExport() async {
     if (_isExporting) return;
@@ -775,6 +1160,154 @@ class _DataAndPrivacyCardState extends ConsumerState<_DataAndPrivacyCard> {
     }
   }
 
+  Future<void> _handleClearCache() async {
+    if (_isClearingCache) return;
+
+    // Confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF080D17),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: Color(0xFF162640), width: 1),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Icon + title row
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2F6BFF).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      LucideIcons.refreshCw,
+                      color: Color(0xFF2F6BFF),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Text(
+                      'Clear Cache',
+                      style: TextStyle(
+                        color: Color(0xFFF1F5F9),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Cached data ($_cacheSize) will be removed. Your account, skills, and expenses are safe — they will simply reload from the server on your next visit.',
+                style: const TextStyle(
+                  color: Color(0xFF8291A7),
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(ctx).pop(false),
+                      child: Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF101A2D),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF162640)),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          'Cancel',
+                          style: TextStyle(
+                            color: Color(0xFF8291A7),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(ctx).pop(true),
+                      child: Container(
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2F6BFF),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text(
+                          'Clear',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isClearingCache = true);
+    try {
+      final userId = ref.read(profileProvider).value?.id ??
+          ref.read(currentUserIdProvider);
+      if (userId != null) {
+        await CacheService().clearUser(userId);
+      }
+
+      // Invalidate all user-scoped providers so they refetch fresh data
+      ref.invalidate(sessionsProvider);
+      ref.invalidate(profileProvider);
+
+      if (mounted) {
+        final messenger = ScaffoldMessenger.of(context);
+        await _loadCacheMetrics(); // Update the size display
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Cache cleared. Data refreshed.',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+            ),
+            backgroundColor: const Color(0xFF2F6BFF),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isClearingCache = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -808,6 +1341,29 @@ class _DataAndPrivacyCardState extends ConsumerState<_DataAndPrivacyCard> {
                       size: 16,
                     ),
               onTap: _handlePdfExport,
+            ),
+            const Divider(height: 1, color: _SettingsColors.border),
+            // Clear Cache
+            _SettingsNavigationTile(
+              icon: LucideIcons.refreshCw,
+              iconColor: _SettingsColors.primaryBlue,
+              title: 'Clear Cache',
+              subtitle: 'Cached: $_cacheSize · Last updated: $_lastRefreshedLabel',
+              trailing: _isClearingCache
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: _SettingsColors.primaryBlue,
+                      ),
+                    )
+                  : const Icon(
+                      LucideIcons.chevronRight,
+                      color: _SettingsColors.textSecondary,
+                      size: 16,
+                    ),
+              onTap: _handleClearCache,
             ),
             const Divider(height: 1, color: _SettingsColors.border),
             // Trash (fills full width properly)

@@ -251,7 +251,7 @@ class FakeExpensesNotifier extends StateNotifier<AsyncValue<List<Expense>>>
   FakeExpensesNotifier(super.initialState);
 
   @override
-  Future<void> fetchExpenses() async {}
+  Future<void> fetchExpenses({bool forceRefresh = false}) async {}
 
   @override
   Future<Expense?> addExpense({

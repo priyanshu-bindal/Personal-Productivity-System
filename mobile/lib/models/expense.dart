@@ -81,4 +81,19 @@ class Expense {
       'note': note,
     };
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'amount': amount,
+      'description': description,
+      'category': category,
+      'payment_method': paymentMethod,
+      'expense_date': expenseDate,
+      'note': note,
+      'created_at': createdAt.toIso8601String(),
+      'deleted_at': deletedAt?.toIso8601String(),
+    };
+  }
 }

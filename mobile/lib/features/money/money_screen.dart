@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:fl_chart/fl_chart.dart';
+
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
@@ -22,6 +22,7 @@ import 'set_budget_sheet.dart';
 import 'widgets/expense_filter_bar.dart';
 import 'widgets/financial_balance_card.dart';
 import 'widgets/money_pdf_export_dialog.dart';
+import 'widgets/spending_trend_chart.dart';
 import 'widgets/transaction_list_item.dart';
 
 class MoneyScreen extends ConsumerStatefulWidget {
@@ -383,246 +384,10 @@ class _OverviewTab extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
 
-          // Daily Spending Trend Chart
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
-              Text(
-                'SPENDING TREND (THIS MONTH)',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textDim,
-                  letterSpacing: 1.1,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF080F1E),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF172A46), width: 1),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x30000000),
-                  blurRadius: 18,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            child: summary.dailyChartData.isEmpty
-                ? const MoneyEmptyState(
-                    icon: LucideIcons.barChart3,
-                    title: 'No spending trend yet',
-                    description: 'Log your expenses to see daily spending patterns over time.',
-                    accentColor: AppColors.primary,
-                    minHeight: 200,
-                  )
-                : TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: 0.0, end: 1.0),
-                    duration: const Duration(milliseconds: 700),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, animValue, child) {
-                      final data = summary.dailyChartData;
-                      final totalCount = data.length;
-
-                      // Progressive left-to-right sweep:
-                      // Each spot rises sequentially as animValue travels from left to right
-                      final spots = <FlSpot>[];
-                      for (int i = 0; i < totalCount; i++) {
-                        final rawAmount = (data[i]['amount'] as num).toDouble();
-                        final start = totalCount > 1 ? (i / (totalCount - 0.5)) * 0.70 : 0.0;
-                        final spotProgress = ((animValue - start) / 0.30).clamp(0.0, 1.0);
-                        final curvedProgress = Curves.easeOutCubic.transform(spotProgress);
-                        spots.add(FlSpot(i.toDouble(), rawAmount * curvedProgress));
-                      }
-
-                      final maxY = data.fold<double>(
-                        0.0,
-                        (prev, e) {
-                          final amt = (e['amount'] as num).toDouble();
-                          return amt > prev ? amt : prev;
-                        },
-                      );
-                      final chartMaxY = maxY > 0 ? maxY * 1.25 : 100.0;
-                      final gridInterval = chartMaxY / 4;
-
-                      return Container(
-                        height: 200,
-                        padding: const EdgeInsets.fromLTRB(4, 18, 14, 8),
-                        child: LineChart(
-                          LineChartData(
-                            minY: 0,
-                            maxY: chartMaxY,
-                            clipData: const FlClipData.all(),
-                            gridData: FlGridData(
-                              show: true,
-                              drawVerticalLine: false,
-                              horizontalInterval: gridInterval,
-                              getDrawingHorizontalLine: (value) => FlLine(
-                                color: const Color(0xFF172A46).withValues(alpha: 0.7),
-                                strokeWidth: 0.6,
-                                dashArray: [4, 6],
-                              ),
-                            ),
-                            titlesData: FlTitlesData(
-                              leftTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                              rightTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                              topTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                              bottomTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  reservedSize: 22,
-                                  interval: data.length > 10
-                                      ? (data.length / 6).ceilToDouble()
-                                      : 1,
-                                  getTitlesWidget: (value, meta) {
-                                    final idx = value.toInt();
-                                    if (idx < 0 ||
-                                        idx >= data.length ||
-                                        value != value.roundToDouble()) {
-                                      return const SizedBox.shrink();
-                                    }
-                                    final dayLabel = data[idx]['day'] as String;
-                                    return Padding(
-                                      padding: const EdgeInsets.only(top: 5),
-                                      child: Text(
-                                        dayLabel,
-                                        style: const TextStyle(
-                                          fontSize: 9.5,
-                                          fontWeight: FontWeight.w500,
-                                          color: Color(0xFF5C7093),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                            borderData: FlBorderData(show: false),
-                            lineBarsData: [
-                              LineChartBarData(
-                                spots: spots,
-                                isCurved: true,
-                                curveSmoothness: 0.38,
-                                color: const Color(0xFF2F6BFF),
-                                barWidth: 2.4,
-                                isStrokeCapRound: true,
-                                dotData: FlDotData(
-                                  show: true,
-                                  getDotPainter: (spot, percent, barData, index) {
-                                    final start = totalCount > 1
-                                        ? (index / (totalCount - 0.5)) * 0.70
-                                        : 0.0;
-                                    final dotProgress = ((animValue - start) / 0.30).clamp(0.0, 1.0);
-                                    return FlDotCirclePainter(
-                                      radius: 2.2 * dotProgress,
-                                      color: const Color(0xFF2F6BFF).withValues(alpha: 0.75 * dotProgress),
-                                      strokeWidth: 1.2,
-                                      strokeColor: const Color(0xFF080F1E),
-                                    );
-                                  },
-                                ),
-                                belowBarData: BarAreaData(
-                                  show: true,
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      const Color(0xFF2F6BFF).withValues(
-                                          alpha: 0.16 * animValue),
-                                      const Color(0xFF2F6BFF)
-                                          .withValues(alpha: 0.0),
-                                    ],
-                                    stops: const [0.0, 0.85],
-                                  ),
-                                ),
-                              ),
-                            ],
-                            lineTouchData: LineTouchData(
-                              handleBuiltInTouches: true,
-                              touchSpotThreshold: 20,
-                              getTouchedSpotIndicator: (barData, spotIndexes) {
-                                return spotIndexes.map((i) {
-                                  return TouchedSpotIndicatorData(
-                                    const FlLine(
-                                      color: Color(0x552F6BFF),
-                                      strokeWidth: 1.2,
-                                      dashArray: [3, 4],
-                                    ),
-                                    FlDotData(
-                                      getDotPainter: (spot, pct, bar, index) =>
-                                          FlDotCirclePainter(
-                                        radius: 5.5,
-                                        color: const Color(0xFF2F6BFF),
-                                        strokeWidth: 2.2,
-                                        strokeColor: const Color(0xFFF1F5F9),
-                                      ),
-                                    ),
-                                  );
-                                }).toList();
-                              },
-                              touchTooltipData: LineTouchTooltipData(
-                                getTooltipColor: (_) => const Color(0xF20E182D),
-                                tooltipRoundedRadius: 10,
-                                tooltipBorder: const BorderSide(
-                                  color: Color(0xFF2F6BFF),
-                                  width: 0.8,
-                                ),
-                                tooltipPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 7),
-                                fitInsideHorizontally: true,
-                                fitInsideVertically: true,
-                                getTooltipItems: (touchedSpots) {
-                                  return touchedSpots.map((spot) {
-                                    final idx = spot.x.toInt();
-                                    final dayLabel = (idx >= 0 && idx < data.length)
-                                        ? (data[idx]['day'] as String)
-                                        : '';
-                                    final rawAmount = (idx >= 0 && idx < data.length)
-                                        ? (data[idx]['amount'] as num).toDouble()
-                                        : spot.y;
-                                    return LineTooltipItem(
-                                      dayLabel.isNotEmpty
-                                          ? '$dayLabel\n'
-                                          : '',
-                                      const TextStyle(
-                                        color: Color(0xFF7E93A8),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w500,
-                                        height: 1.3,
-                                      ),
-                                      children: [
-                                        TextSpan(
-                                          text:
-                                              '₹${NumberFormat('#,##,###').format(rawAmount.round())}',
-                                          style: const TextStyle(
-                                            color: Color(0xFFF1F5F9),
-                                            fontSize: 12.5,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  }).toList();
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
+          // Premium Spending Trend Chart
+          const SpendingTrendChart(),
           const SizedBox(height: 24),
+
           // Recent Activity Section
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

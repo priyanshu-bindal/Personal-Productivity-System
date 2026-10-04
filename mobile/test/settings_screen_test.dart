@@ -290,7 +290,7 @@ class _MockProfileNotifier extends ProfileNotifier {
   }
 
   @override
-  Future<void> fetchProfile() async {
+  Future<void> fetchProfile({bool forceRefresh = false}) async {
     state = AsyncValue.data(mockProfile);
   }
 

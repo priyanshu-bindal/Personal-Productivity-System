@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/skill.dart';
 import '../models/learning_session.dart';
 import '../services/supabase_service.dart';
+import '../services/cache_service.dart';
 import '../core/utils/session_generator.dart';
 import 'auth_provider.dart';
 import 'sessions_provider.dart';
@@ -144,13 +145,34 @@ class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
     );
   }
 
-  Future<void> fetchSkills() async {
+  Future<void> fetchSkills({bool forceRefresh = false}) async {
     final effectiveUserId = _userId ?? SupabaseService.currentUserId;
     if (effectiveUserId == null ||
         !mounted ||
         SupabaseService.currentUserId != effectiveUserId) {
       if (mounted) state = const AsyncValue.data([]);
       return;
+    }
+
+    // Cache-First check
+    if (!forceRefresh) {
+      final cached = await CacheService().get<List<Skill>>(
+        effectiveUserId,
+        'skills',
+        (json) => (json as List)
+            .map((e) => Skill.fromJson(e as Map<String, dynamic>,
+                allSessions: _sessions))
+            .toList(),
+      );
+
+      if (cached != null) {
+        if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+          state = AsyncValue.data(cached.data);
+        }
+        if (cached.isFresh) {
+          return; // Valid fresh data served instantly
+        }
+      }
     }
 
     try {
@@ -166,10 +188,19 @@ class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
               allSessions: _sessions))
           .toList();
 
+      // Persist to user-scoped cache
+      await CacheService().set(
+        effectiveUserId,
+        'skills',
+        list.map((s) => s.toJson()).toList(),
+      );
+
       state = AsyncValue.data(list);
     } catch (e, st) {
       if (!mounted || SupabaseService.currentUserId != effectiveUserId) return;
-      state = AsyncValue.error(e, st);
+      if (state.value == null || state.value!.isEmpty) {
+        state = AsyncValue.error(e, st);
+      }
     }
   }
 
@@ -214,6 +245,8 @@ class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
     }
 
     await SessionGenerator.autoGenerateSessions(effectiveUserId);
+    CacheService().invalidate(effectiveUserId, 'skills');
+    CacheService().invalidate(effectiveUserId, 'sessions');
     await fetchSkills();
   }
 
@@ -260,6 +293,8 @@ class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
     }
 
     await SessionGenerator.autoGenerateSessions(effectiveUserId);
+    CacheService().invalidate(effectiveUserId, 'skills');
+    CacheService().invalidate(effectiveUserId, 'sessions');
     await fetchSkills();
   }
 
@@ -276,6 +311,8 @@ class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
         .delete()
         .eq('id', skillId)
         .eq('user_id', effectiveUserId);
+    CacheService().invalidate(effectiveUserId, 'skills');
+    CacheService().invalidate(effectiveUserId, 'sessions');
     await fetchSkills();
   }
 }

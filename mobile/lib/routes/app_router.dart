@@ -292,7 +292,38 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const SettingsScreen(),
+        pageBuilder: (context, state) {
+          return CustomTransitionPage(
+            key: state.pageKey,
+            child: const SettingsScreen(),
+            // Exact mirror transition:
+            // OPEN:  opacity 0.85 → 1.0, offset 14px below → 0, Curves.easeOutCubic (300ms)
+            // CLOSE: opacity 1.0 → 0.85, offset 0 → 14px below, Curves.easeInCubic (250ms)
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              final curved = CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              );
+              final screenHeight = MediaQuery.sizeOf(context).height;
+              final dy = 14.0 / (screenHeight > 0 ? screenHeight : 800.0);
+
+              return FadeTransition(
+                opacity: Tween<double>(begin: 0.85, end: 1.0).animate(curved),
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: Offset(0.0, dy),
+                    end: Offset.zero,
+                  ).animate(curved),
+                  child: child,
+                ),
+              );
+            },
+            transitionDuration: const Duration(milliseconds: 300),
+            reverseTransitionDuration: const Duration(milliseconds: 250),
+          );
+        },
       ),
       GoRoute(
         path: '/streak',
