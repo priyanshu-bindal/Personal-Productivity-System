@@ -15,6 +15,11 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isAuthenticated();
       allow write: if isUser(uid);
+
+      // Devices subcollection rules for FCM registration tokens
+      match /devices/{deviceId} {
+        allow read, write: if isUser(uid);
+      }
     }
 
     // Short User ID lookup mapping collection rules:

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../models/chat_message_model.dart';
 import '../models/chat_user_profile.dart';
 import '../models/conversation_model.dart';
+import 'fcm_sender_service.dart';
 import 'firebase_service.dart';
 
 const String _allowedChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -209,6 +210,8 @@ class ChatService {
     required String senderId,
     required String receiverId,
     required String text,
+    String? senderName,
+    String? senderShortId,
   }) async {
     final cleanText = text.trim();
     if (cleanText.isEmpty) throw ArgumentError('Message text cannot be empty');
@@ -236,6 +239,17 @@ class ChatService {
       'lastSenderId': senderId,
       'unreadCounts.$receiverId': FieldValue.increment(1),
     });
+
+    // Trigger server-side FCM push notification asynchronously (fire-and-forget)
+    // Ensures App -> App push notifications work reliably without blocking the UI
+    FcmSenderService.triggerChatPushNotification(
+      conversationId: conversationId,
+      senderId: senderId,
+      receiverId: receiverId,
+      text: cleanText,
+      senderName: senderName,
+      senderShortId: senderShortId,
+    );
 
     return docRef.id;
   }

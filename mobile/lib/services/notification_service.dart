@@ -412,7 +412,10 @@ class NotificationService {
   // ─── Test & Debug Helpers (Dev-only) ──────────────────────────────────────
 
   /// Dispatches an immediate test local reminder for validation.
-  Future<void> sendTestLocalNotification() async {
+  Future<bool> sendTestLocalNotification({
+    String title = 'FocusFlow Test',
+    String body = 'Notifications are working correctly on this device.',
+  }) async {
     try {
       const androidDetails = AndroidNotificationDetails(
         'focusflow_reminders',
@@ -434,14 +437,16 @@ class NotificationService {
 
       await _notificationsPlugin.show(
         id: 99999,
-        title: 'Time to Focus! (Test)',
-        body: '🔥 DSA is still waiting for you. Complete it before the day ends.',
+        title: title,
+        body: body,
         notificationDetails: platformDetails,
         payload: jsonEncode({'type': 'reminder'}),
       );
       debugPrint('[Notifications] Test local notification sent');
+      return true;
     } catch (e) {
       debugPrint('[Notifications] Error sending test notification: $e');
+      return false;
     }
   }
 }

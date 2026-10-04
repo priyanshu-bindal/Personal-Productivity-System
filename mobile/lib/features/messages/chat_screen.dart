@@ -8,6 +8,7 @@ import '../../models/chat_message_model.dart';
 import '../../providers/chat_provider.dart';
 import '../../services/chat_service.dart';
 import '../../services/notification_router.dart';
+import '../../services/supabase_service.dart';
 import 'widgets/chat_message_bubble.dart';
 import 'widgets/id_marker.dart';
 import 'widgets/message_composer.dart';
@@ -93,12 +94,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         (id) => id != currentFbUid,
         orElse: () => currentFbUid,
       );
+      final senderShortId = await ref.read(currentChatUserShortIdProvider.future);
+      final user = SupabaseService.currentUser;
+      final senderName = user?.userMetadata?['full_name'] as String? ??
+          user?.userMetadata?['name'] as String? ??
+          user?.email?.split('@').first;
 
       await ChatService.sendMessage(
         conversationId: widget.conversationId,
         senderId: currentFbUid,
         receiverId: receiverId,
         text: text,
+        senderName: senderName,
+        senderShortId: senderShortId,
       );
 
       // Scroll to bottom after user sends

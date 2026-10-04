@@ -127,6 +127,10 @@ class NotificationRouter {
       case 'message':
         final convId = payload.conversationId;
         if (convId != null && convId.isNotEmpty) {
+          if (activeConversationId == convId) {
+            debugPrint('[Notifications] Already in conversation $convId — skipping duplicate route navigation');
+            return;
+          }
           _router!.push(
             '/messages/chat/$convId',
             extra: {

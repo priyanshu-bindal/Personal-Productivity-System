@@ -3,6 +3,12 @@ class AppConstants {
   static const String supabaseAnonKey =
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlrb29lYmJpb2RocWZqZnF3anNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwOTUyMTUsImV4cCI6MjEwMzY3MTIxNX0.jAbFJmpKxszbZougFUjYXKGGHj68Ys4tj7MWAj1c-2g';
 
+  /// Base URL for FocusFlow backend APIs (FCM push notification dispatcher, etc.).
+  static const String apiBaseUrl = String.fromEnvironment(
+    'FOCUSFLOW_API_URL',
+    defaultValue: 'http://10.0.2.2:3000',
+  );
+
   static const List<String> defaultPreferredDays = [
     'Monday',
     'Wednesday',

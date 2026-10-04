@@ -264,7 +264,57 @@ export async function sendMessage(
     [`unreadCounts.${receiverId}`]: increment(1)
   })
 
+  // Trigger server-side FCM notification asynchronously (fire-and-forget)
+  // Ensures Website -> App push notifications work reliably without blocking the UI
+  triggerChatPushNotification({
+    conversationId,
+    senderId,
+    receiverId,
+    text: cleanText
+  }).catch((err) => {
+    console.warn('[FCM] Server push notification dispatch notice:', err)
+  })
+
   return docRef.id
+}
+
+/**
+ * Triggers server-side FCM push notification for a chat message.
+ * Non-blocking: Failures will log warnings but never throw or block chat messaging.
+ */
+export async function triggerChatPushNotification(params: {
+  conversationId: string
+  senderId: string
+  receiverId: string
+  text: string
+  senderName?: string
+  senderShortId?: string
+}): Promise<void> {
+  try {
+    // Attempt to lookup sender profile for rich notification title
+    const profile = await getUserProfile(params.senderId).catch(() => null)
+
+    const payload = {
+      conversationId: params.conversationId,
+      senderId: params.senderId,
+      receiverId: params.receiverId,
+      text: params.text,
+      senderName: params.senderName || profile?.displayName || '',
+      senderShortId: params.senderShortId || profile?.shortUserId || ''
+    }
+
+    if (typeof window !== 'undefined') {
+      await fetch('/api/notify/chat-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+    }
+  } catch (err) {
+    console.warn('[FCM] Notice dispatching chat push notification:', err)
+  }
 }
 
 /**
