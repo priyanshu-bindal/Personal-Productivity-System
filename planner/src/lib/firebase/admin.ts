@@ -1,6 +1,7 @@
 import { initializeApp, getApps, cert, applicationDefault, App } from 'firebase-admin/app'
 import { getFirestore, Firestore } from 'firebase-admin/firestore'
 import { getMessaging, Messaging } from 'firebase-admin/messaging'
+import { getAuth, Auth } from 'firebase-admin/auth'
 
 /**
  * Server-only Firebase Admin SDK Singleton.
@@ -135,6 +136,17 @@ export function getAdminMessaging(): Messaging | null {
     return getMessaging(app)
   } catch (e: any) {
     console.error('[FCM] Error accessing Admin Messaging:', e?.message)
+    return null
+  }
+}
+
+export function getAdminAuth(): Auth | null {
+  const app = getFirebaseAdminApp()
+  if (!app) return null
+  try {
+    return getAuth(app)
+  } catch (e: any) {
+    console.error('[FCM] Error accessing Admin Auth:', e?.message)
     return null
   }
 }

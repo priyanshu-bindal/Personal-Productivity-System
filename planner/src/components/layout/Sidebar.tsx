@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -13,7 +14,8 @@ import {
   Settings,
   LogOut,
   IndianRupee,
-  MessageSquare
+  MessageSquare,
+  Megaphone
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { signout } from '@/app/auth/actions'
@@ -31,6 +33,28 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+    async function checkAdmin() {
+      try {
+        const res = await fetch('/api/auth/me')
+        if (res.ok) {
+          const data = await res.json()
+          if (isMounted && data?.isAdmin) {
+            setIsAdmin(true)
+          }
+        }
+      } catch {
+        // silent fail
+      }
+    }
+    checkAdmin()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   return (
     <aside className="hidden md:flex flex-col w-64 bg-card border-r h-screen sticky top-0">
@@ -63,6 +87,24 @@ export function Sidebar() {
             </Link>
           )
         })}
+
+        {/* Admin Announcements link - visible only for authorized admin account */}
+        {isAdmin && (
+          <div className="pt-2">
+            <Link
+              href="/admin/announcements"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                pathname.startsWith('/admin/announcements')
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <Megaphone className="h-5 w-5" />
+              <span>Announcements</span>
+            </Link>
+          </div>
+        )}
       </nav>
       
       <div className="p-4 border-t space-y-1">

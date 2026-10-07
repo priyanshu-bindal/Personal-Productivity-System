@@ -2,13 +2,15 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { 
   LayoutDashboard, 
   CheckSquare, 
   Calendar, 
   Menu,
   IndianRupee,
-  Search
+  Search,
+  Megaphone
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -38,6 +40,28 @@ const moreNavItems = [
 
 export function BottomNav() {
   const pathname = usePathname()
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    let isMounted = true
+    async function checkAdmin() {
+      try {
+        const res = await fetch('/api/auth/me')
+        if (res.ok) {
+          const data = await res.json()
+          if (isMounted && data?.isAdmin) {
+            setIsAdmin(true)
+          }
+        }
+      } catch {
+        // silent fail
+      }
+    }
+    checkAdmin()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t pb-safe z-50">
@@ -116,6 +140,15 @@ export function BottomNav() {
               </div>
               
               <div className="mt-auto px-2 space-y-1 border-t pt-4">
+                {isAdmin && (
+                  <Link
+                    href="/admin/announcements"
+                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 transition-colors"
+                  >
+                    <Megaphone className="h-5 w-5" />
+                    Announcements
+                  </Link>
+                )}
                 <Link
                   href="/settings"
                   className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"

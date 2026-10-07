@@ -1,6 +1,6 @@
 import { DocumentReference, FieldValue, QueryDocumentSnapshot } from 'firebase-admin/firestore'
 import { Message } from 'firebase-admin/messaging'
-import { getAdminFirestore, getAdminMessaging } from './admin'
+import { getAdminFirestore, getAdminMessaging, getAdminAuth } from './admin'
 
 export interface ChatPushPayload {
   conversationId: string
@@ -51,51 +51,72 @@ export async function sendPushNotificationForChatMessage(
     }
   }
 
-  // 1. Fetch active device tokens for the recipient user
+  // ─── 1. Fetch active device tokens for the recipient ───────────────────────
+  //
+  // Strategy:
+  //   Attempt A — query users/{receiverFirebaseUid}/devices   (correct path after fix)
+  //   Attempt B — resolve Supabase UID from Firebase Auth bridge email, then
+  //               query users/{supabaseUid}/devices            (path used before fix,
+  //               because auth.currentUser was null on first login → race condition)
+  //
+  // No Firestore collection-group index required.
+
   const deviceSnapshots: Array<{ docRef: DocumentReference; token: string; deviceId: string }> = []
 
+  // Add a device doc if it has an enabled, non-empty token; deduplicates by token value.
+  function collectDevice(doc: QueryDocumentSnapshot) {
+    const data = doc.data()
+    const token: string = typeof data?.fcmToken === 'string' ? data.fcmToken.trim() : ''
+    if (!token || data?.notificationEnabled === false) return
+    if (deviceSnapshots.some((d) => d.token === token)) return
+    deviceSnapshots.push({ docRef: doc.ref, token, deviceId: doc.id })
+  }
+
   try {
-    // Attempt A: Direct subcollection query users/{receiverId}/devices
-    const directSnap = await db
-      .collection('users')
-      .doc(receiverId)
-      .collection('devices')
-      .get()
+    // ── Attempt A: Direct path users/{receiverId}/devices ──────────────────
+    console.log(`[FCM API] Recipient ID: ${receiverId}`)
+    console.log(`[FCM API] Querying Firestore: users/${receiverId}/devices`)
+    const directSnap = await db.collection('users').doc(receiverId).collection('devices').get()
+    console.log(`[FCM API] Direct device docs: ${directSnap.size}`)
+    directSnap.forEach(collectDevice)
 
-    directSnap.forEach((doc: QueryDocumentSnapshot) => {
-      const data = doc.data()
-      if (data?.notificationEnabled !== false && typeof data?.fcmToken === 'string' && data.fcmToken.trim().length > 0) {
-        deviceSnapshots.push({
-          docRef: doc.ref,
-          token: data.fcmToken.trim(),
-          deviceId: doc.id
-        })
-      }
-    })
-
-    // Attempt B: If no tokens found, search by supabaseUserId in case receiverId is Supabase UUID
+    // ── Attempt B: Resolve Supabase UID via Firebase Admin Auth ────────────
+    // The Flutter auth bridge creates bridge email: "{supabaseUid}@focusflow.internal"
+    // Tokens stored before race-condition fix live at users/{supabaseUid}/devices.
     if (deviceSnapshots.length === 0) {
-      const fallbackSnap = await db
-        .collectionGroup('devices')
-        .where('supabaseUserId', '==', receiverId)
-        .get()
+      const adminAuth = getAdminAuth()
+      let supabaseUid: string | null = null
 
-      fallbackSnap.forEach((doc: QueryDocumentSnapshot) => {
-        const data = doc.data()
-        if (data?.notificationEnabled !== false && typeof data?.fcmToken === 'string' && data.fcmToken.trim().length > 0) {
-          // Avoid duplicates
-          if (!deviceSnapshots.some((d) => d.token === data.fcmToken.trim())) {
-            deviceSnapshots.push({
-              docRef: doc.ref,
-              token: data.fcmToken.trim(),
-              deviceId: doc.id
-            })
+      if (adminAuth) {
+        try {
+          const firebaseUser = await adminAuth.getUser(receiverId)
+          const email = firebaseUser.email ?? ''
+          if (email.endsWith('@focusflow.internal')) {
+            supabaseUid = email.slice(0, -('@focusflow.internal'.length))
+            console.log(`[FCM API] Resolved Supabase UID from bridge email`)
+          } else {
+            console.warn(`[FCM API] Unexpected Firebase Auth email format: ${email.split('@')[1] ?? '(none)'}`)
           }
+        } catch (authErr: any) {
+          console.warn(`[FCM API] Could not look up Firebase Auth user ${receiverId}:`, authErr?.message)
         }
-      })
+      }
+
+      if (supabaseUid && supabaseUid !== receiverId) {
+        console.log(`[FCM API] Querying Firestore: users/<supabaseUid>/devices`)
+        const supabasePathSnap = await db
+          .collection('users')
+          .doc(supabaseUid)
+          .collection('devices')
+          .get()
+        console.log(`[FCM API] Supabase-path device docs: ${supabasePathSnap.size}`)
+        supabasePathSnap.forEach(collectDevice)
+      } else if (!supabaseUid) {
+        console.log('[FCM API] Supabase UID not resolvable — no further fallback available')
+      }
     }
   } catch (err: any) {
-    console.error(`[FCM] FCM error while retrieving tokens for recipient ${receiverId}:`, err?.message)
+    console.error(`[FCM] Error retrieving tokens for recipient ${receiverId}:`, err?.message)
     return {
       success: false,
       tokenCount: 0,
@@ -156,13 +177,13 @@ export async function sendPushNotificationForChatMessage(
     }
   }))
 
-  console.log(`[FCM] Sending notification: to ${deviceSnapshots.length} device(s) - Title: "${title}"`)
+  console.log(`[FCM API] Token count: ${deviceSnapshots.length}`)
+  console.log(`[FCM] Sending to ${deviceSnapshots.length} device(s) — title: "${title}"`)
 
   try {
     const batchResponse = await messaging.sendEach(messagesToSend)
-    console.log(
-      `[FCM] FCM response: success=${batchResponse.successCount}, failure=${batchResponse.failureCount}`
-    )
+    console.log(`[FCM] Success count: ${batchResponse.successCount}`)
+    console.log(`[FCM] Failure count: ${batchResponse.failureCount}`)
 
     let staleCount = 0
     const errors: string[] = []

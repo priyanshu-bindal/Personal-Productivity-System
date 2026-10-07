@@ -154,6 +154,10 @@ class FcmNotificationService {
     }
 
     _currentUserId = userId;
+
+    // Ensure Firebase Auth is bridge-authenticated for this Supabase user
+    // so Firestore security rules permit device registration under users/{fbUid}/devices/{deviceId}
+    await FirebaseService.ensureFirebaseAuth(userId);
     await syncDeviceToken();
   }
 
@@ -202,8 +206,13 @@ class FcmNotificationService {
           await NotificationService()
               .getMessageNotificationPreference(userId);
 
-      // Use Firebase UID if bridged, falling back to userId
-      final fbUid = FirebaseService.auth.currentUser?.uid ?? userId;
+      final annPref = await NotificationService()
+          .getAnnouncementNotificationPreference(userId);
+
+      // Ensure Firebase Auth is authenticated for this Supabase user
+      final fbUid = await FirebaseService.ensureFirebaseAuth(userId) ??
+          FirebaseService.auth.currentUser?.uid ??
+          userId;
 
       final docRef = FirebaseService.firestore
           .collection('users')
@@ -224,6 +233,7 @@ class FcmNotificationService {
         'updatedAt': FieldValue.serverTimestamp(),
         'appVersion': '1.0.0',
         'notificationEnabled': userPref,
+        'announcementsEnabled': annPref,
         'supabaseUserId': userId,
       };
 
