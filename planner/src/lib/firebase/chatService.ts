@@ -5,6 +5,7 @@ import {
   setDoc, 
   updateDoc, 
   addDoc, 
+  deleteDoc,
   collection, 
   query, 
   where, 
@@ -436,4 +437,48 @@ export function subscribeToMessages(
   }, (err) => {
     console.error(`Error listening to messages for conversation ${conversationId}:`, err)
   })
+}
+
+// ─── Hidden Chats ─────────────────────────────────────────────────────────────
+
+/**
+ * Hides a conversation for the current user only.
+ * Writes to users/{firebaseUid}/hiddenChats/{convId}.
+ * Does NOT modify the shared conversation document.
+ */
+export async function hideConversation(firebaseUid: string, convId: string): Promise<void> {
+  if (!firebaseUid || !convId) return
+  const ref = doc(db, 'users', firebaseUid, 'hiddenChats', convId)
+  await setDoc(ref, { hiddenAt: serverTimestamp() })
+}
+
+/**
+ * Unhides a conversation for the current user only.
+ * Deletes the document at users/{firebaseUid}/hiddenChats/{convId}.
+ */
+export async function unhideConversation(firebaseUid: string, convId: string): Promise<void> {
+  if (!firebaseUid || !convId) return
+  const ref = doc(db, 'users', firebaseUid, 'hiddenChats', convId)
+  await deleteDoc(ref)
+}
+
+/**
+ * Real-time listener that returns the set of conversation IDs hidden by the current user.
+ * Listens to users/{firebaseUid}/hiddenChats.
+ */
+export function subscribeToHiddenConversationIds(
+  firebaseUid: string,
+  onUpdate: (hiddenIds: Set<string>) => void
+): Unsubscribe {
+  const colRef = collection(db, 'users', firebaseUid, 'hiddenChats')
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      const ids = new Set<string>(snapshot.docs.map((d) => d.id))
+      onUpdate(ids)
+    },
+    (err) => {
+      console.error('Error listening to hidden chats:', err)
+    }
+  )
 }

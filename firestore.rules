@@ -20,6 +20,11 @@ service cloud.firestore {
       match /devices/{deviceId} {
         allow read, write: if isUser(uid);
       }
+
+      // Hidden chats subcollection — private per-user hide list, never touches shared conversation docs
+      match /hiddenChats/{convId} {
+        allow read, write: if isUser(uid);
+      }
     }
 
     // Short User ID lookup mapping collection rules:

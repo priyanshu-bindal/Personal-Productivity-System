@@ -11,6 +11,9 @@ import {
   markMessagesAsSeen,
   subscribeToConversations,
   subscribeToMessages,
+  hideConversation,
+  unhideConversation,
+  subscribeToHiddenConversationIds,
   Conversation,
   Message,
   getUserShortId,
@@ -30,7 +33,11 @@ import {
   Search,
   MessageSquare,
   AlertCircle,
-  X
+  X,
+  EyeOff,
+  Eye,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -427,6 +434,125 @@ function NewChatPanel({
   )
 }
 
+// ─── Hidden Chats Panel / Modal ──────────────────────────────────────────────
+
+function HiddenChatsPanel({
+  onClose,
+  hiddenConversations,
+  firebaseUid,
+  userProfiles,
+  shortIdCache,
+  onUnhideConversation,
+  onOpenConversation
+}: {
+  onClose: () => void
+  hiddenConversations: Conversation[]
+  firebaseUid: string | null
+  userProfiles: Record<string, UserProfile>
+  shortIdCache: Record<string, string>
+  onUnhideConversation: (convId: string) => void
+  onOpenConversation: (convId: string, shortId: string) => void
+}) {
+  const [isClosing, setIsClosing] = useState(false)
+
+  const handleClose = () => {
+    setIsClosing(true)
+    setTimeout(() => {
+      onClose()
+    }, 250)
+  }
+
+  return (
+    <div
+      className={`flex flex-col h-full bg-[#18181b] text-[#f1f1f3] ${
+        isClosing ? 'animate-panel-out' : 'animate-panel-in'
+      }`}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-3 px-5 py-4 border-b border-[#2a2a31] bg-[#18181b]">
+        <button
+          onClick={handleClose}
+          className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-[#202025] text-[#9a9aa5] hover:text-[#f1f1f3] transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <div>
+          <p className="text-sm font-bold text-[#f1f1f3] flex items-center gap-1.5">
+            <EyeOff className="h-4 w-4 text-[#7E9ED4]" />
+            Hidden Chats ({hiddenConversations.length})
+          </p>
+          <p className="text-[11px] text-[#9a9aa5]">Conversations only hidden for your account.</p>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3 space-y-2 msg-scrollbar">
+        {hiddenConversations.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full px-6 py-12 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-[#202025] border border-[#2a2a31] flex items-center justify-center mx-auto mb-3 text-[#70707a]">
+              <Eye className="h-6 w-6" />
+            </div>
+            <h3 className="text-sm font-semibold text-[#f1f1f3] mb-1">No hidden chats</h3>
+            <p className="text-xs text-[#9a9aa5] max-w-[200px]">
+              Chats you hide will appear here so you can access or restore them anytime.
+            </p>
+          </div>
+        ) : (
+          hiddenConversations.map((conv) => {
+            const otherUid = conv.participants.find(p => p !== firebaseUid) || ''
+            const profile = conv.participantProfiles?.[otherUid] || userProfiles[otherUid]
+            const displayId = (conv.otherUserShortId && conv.otherUserShortId.length <= 6 ? conv.otherUserShortId : null) || profile?.shortUserId || shortIdCache[otherUid] || '···'
+            const displayName = profile?.displayName
+
+            return (
+              <div
+                key={conv.id}
+                className="ios-glass-card p-3 flex items-center justify-between gap-3 group"
+              >
+                <div
+                  className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                  onClick={() => {
+                    handleClose()
+                    onOpenConversation(conv.id, displayId)
+                  }}
+                >
+                  <IdMarker id={displayId} name={displayName} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-[#f1f1f3] truncate">
+                      {displayName ? (
+                        <>
+                          {displayName}{' '}
+                          <span className="font-mono text-[11px] font-normal text-[#70707a]">({displayId})</span>
+                        </>
+                      ) : (
+                        <span className="font-mono font-bold tracking-wide">#{displayId}</span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-[#70707a] truncate mt-0.5">
+                      {conv.lastMessage || 'No messages yet'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onUnhideConversation(conv.id)
+                  }}
+                  className="px-2.5 py-1.5 rounded-lg border border-white/20 bg-white/10 hover:bg-white/15 text-[11px] font-semibold text-[#BFDBFE] hover:text-[#FFFFFF] transition-all flex items-center gap-1.5 shrink-0"
+                  title="Unhide conversation"
+                >
+                  <Eye className="h-3.5 w-3.5" />
+                  Unhide
+                </button>
+              </div>
+            )
+          })
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page Component ──────────────────────────────────────────────────────
 
 export default function MessagesPage() {
@@ -449,6 +575,9 @@ export default function MessagesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [copiedId, setCopiedId] = useState(false)
   const [activeMenuMsgId, setActiveMenuMsgId] = useState<string | null>(null)
+  const [hiddenConvIds, setHiddenConvIds] = useState<Set<string>>(new Set())
+  const [showHiddenPanel, setShowHiddenPanel] = useState(false)
+  const [convMenuOpenId, setConvMenuOpenId] = useState<string | null>(null)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -510,6 +639,15 @@ export default function MessagesPage() {
         setUserProfiles(prev => ({ ...prev, ...entries }))
         setShortIdCache(prev => ({ ...prev, ...sidEntries }))
       }
+    })
+    return () => unsub()
+  }, [firebaseUid])
+
+  // 2b. Subscribe to Hidden Conversation IDs
+  useEffect(() => {
+    if (!firebaseUid) return
+    const unsub = subscribeToHiddenConversationIds(firebaseUid, (ids) => {
+      setHiddenConvIds(ids)
     })
     return () => unsub()
   }, [firebaseUid])
@@ -577,8 +715,9 @@ export default function MessagesPage() {
     setActiveMenuMsgId(null)
   }
 
-  // Filter conversations by search query
-  const filteredConversations = conversations.filter(conv => {
+  // Filter conversations by search query, excluding hidden ones for the main list
+  const visibleConversations = conversations.filter(conv => {
+    if (hiddenConvIds.has(conv.id)) return false
     if (!searchQuery.trim()) return true
     const q = searchQuery.toLowerCase()
     const otherUid = conv.participants.find(p => p !== firebaseUid) || ''
@@ -587,6 +726,21 @@ export default function MessagesPage() {
     const name = profile?.displayName || ''
     return shortId.toLowerCase().includes(q) || name.toLowerCase().includes(q)
   })
+
+  // Hidden conversations list (no search filter applied — always show all hidden)
+  const hiddenConversations = conversations.filter(conv => hiddenConvIds.has(conv.id))
+
+  const handleHideConversation = async (convId: string) => {
+    if (!firebaseUid) return
+    setConvMenuOpenId(null)
+    if (activeConvId === convId) setActiveConvId(null)
+    await hideConversation(firebaseUid, convId)
+  }
+
+  const handleUnhideConversation = async (convId: string) => {
+    if (!firebaseUid) return
+    await unhideConversation(firebaseUid, convId)
+  }
 
   // ─── Loading ──────────────────────────────────────────────────────────────
   if (isLoadingAuth) {
@@ -805,9 +959,9 @@ export default function MessagesPage() {
         {/* ── LEFT PANEL (Conversations Sidebar) ── */}
         <div
           className={`flex flex-col border-r border-[#2a2a31] bg-[#18181b] shrink-0 transition-all duration-200 ${
-            showNewChat || activeConvId ? 'w-0 md:w-72 lg:w-80 overflow-hidden' : 'w-full md:w-72 lg:w-80'
+            showNewChat || showHiddenPanel || activeConvId ? 'w-0 md:w-72 lg:w-80 overflow-hidden' : 'w-full md:w-72 lg:w-80'
           } ${
-            showNewChat ? 'hidden md:flex' : activeConvId ? 'hidden md:flex' : 'flex'
+            showNewChat || showHiddenPanel ? 'hidden md:flex' : activeConvId ? 'hidden md:flex' : 'flex'
           }`}
         >
           {/* Header */}
@@ -818,13 +972,58 @@ export default function MessagesPage() {
                 <p className="text-[11px] text-[#9a9aa5]">Private conversations, simply connected.</p>
               </div>
 
-              <button
-                onClick={() => { setShowNewChat(true); setActiveConvId(null) }}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 ios-glass-button text-xs font-bold active:scale-95 shrink-0"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                New Chat
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={() => { setShowNewChat(true); setShowHiddenPanel(false); setActiveConvId(null) }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 ios-glass-button text-xs font-bold active:scale-95"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  New Chat
+                </button>
+
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setConvMenuOpenId(prev => prev === 'sidebar_menu' ? null : 'sidebar_menu')
+                    }}
+                    className={`w-8 h-8 rounded-xl border border-[#2a2a31] flex items-center justify-center transition-colors ${
+                      convMenuOpenId === 'sidebar_menu'
+                        ? 'bg-[#2a2a31] text-[#f1f1f3]'
+                        : 'bg-[#202025] hover:bg-[#26262c] text-[#9a9aa5] hover:text-[#f1f1f3]'
+                    }`}
+                    title="More options"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+
+                  {convMenuOpenId === 'sidebar_menu' && (
+                    <div
+                      className="absolute right-0 top-full mt-1.5 z-50 w-48 py-1 rounded-xl shadow-2xl border border-[#2a2a31] bg-[#18181b]"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => {
+                          setConvMenuOpenId(null)
+                          setShowHiddenPanel(true)
+                          setShowNewChat(false)
+                        }}
+                        className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs text-[#9a9aa5] hover:text-[#f1f1f3] hover:bg-[#202025] transition-colors text-left"
+                      >
+                        <span className="flex items-center gap-2">
+                          <EyeOff className="h-3.5 w-3.5 text-[#7E9ED4]" />
+                          Hidden Chats
+                        </span>
+                        {hiddenConversations.length > 0 && (
+                          <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[#3B5B8C]/20 text-[#7E9ED4] border border-[#3B5B8C]/40">
+                            {hiddenConversations.length}
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Search Input */}
@@ -869,12 +1068,17 @@ export default function MessagesPage() {
           )}
 
           {/* Conversation List */}
-          <div className="flex-1 overflow-y-auto msg-scrollbar">
-            {filteredConversations.length === 0 ? (
+          <div
+            className="flex-1 overflow-y-auto msg-scrollbar"
+            onClick={() => setConvMenuOpenId(null)}
+          >
+            {visibleConversations.length === 0 && hiddenConversations.length === 0 ? (
               <EmptyConversations onNew={() => { setShowNewChat(true); setActiveConvId(null) }} />
             ) : (
               <div className="py-1 space-y-0.5 px-1.5">
-                {filteredConversations.map((conv) => {
+
+                {/* ── Visible conversations ── */}
+                {visibleConversations.map((conv) => {
                   const otherUid = conv.participants.find(p => p !== firebaseUid) || ''
                   const profile = conv.participantProfiles?.[otherUid] || userProfiles[otherUid]
                   const displayId = (conv.otherUserShortId && conv.otherUserShortId.length <= 6 ? conv.otherUserShortId : null) || profile?.shortUserId || shortIdCache[otherUid] || '···'
@@ -882,6 +1086,7 @@ export default function MessagesPage() {
                   const isActive = conv.id === activeConvId
                   const timeStr = shortAgo(conv.lastMessageAt)
                   const unreadCount = conv.unreadCounts?.[firebaseUid || ''] || 0
+                  const isMenuOpen = convMenuOpenId === conv.id
 
                   return (
                     <button
@@ -891,7 +1096,7 @@ export default function MessagesPage() {
                         background: isActive ? 'rgba(59, 91, 140, 0.10)' : undefined,
                         borderLeft: isActive ? '2px solid #3B5B8C' : '2px solid transparent'
                       }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors duration-150 group ${
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors duration-150 ${
                         !isActive ? 'hover:bg-[#202025]' : ''
                       }`}
                     >
@@ -936,9 +1141,33 @@ export default function MessagesPage() {
                     </button>
                   )
                 })}
+
               </div>
             )}
           </div>
+        </div>
+
+        {/* ── HIDDEN CHATS PANEL Overlay ── */}
+        <div
+          className={`flex flex-col shrink-0 transition-all duration-200 ${
+            showHiddenPanel ? 'w-full md:w-72 lg:w-80 flex' : 'w-0 hidden'
+          }`}
+        >
+          {showHiddenPanel && (
+            <HiddenChatsPanel
+              onClose={() => setShowHiddenPanel(false)}
+              hiddenConversations={hiddenConversations}
+              firebaseUid={firebaseUid}
+              userProfiles={userProfiles}
+              shortIdCache={shortIdCache}
+              onUnhideConversation={handleUnhideConversation}
+              onOpenConversation={(convId, sid) => {
+                setShowHiddenPanel(false)
+                setActiveConvId(convId)
+                setActiveOtherShortId(sid)
+              }}
+            />
+          )}
         </div>
 
         {/* ── NEW CHAT PANEL Overlay ── */}
@@ -963,7 +1192,10 @@ export default function MessagesPage() {
         </div>
 
         {/* ── RIGHT CHAT AREA ── */}
-        <div className={`flex-1 flex flex-col min-w-0 bg-[#1d1d21] ${activeConvId ? 'flex' : 'hidden md:flex'}`}>
+        <div
+          className={`flex-1 flex flex-col min-w-0 bg-[#1d1d21] ${activeConvId ? 'flex' : 'hidden md:flex'}`}
+          onClick={() => setConvMenuOpenId(null)}
+        >
           {activeConvId ? (
             <>
               {/* Chat Header */}
@@ -997,9 +1229,59 @@ export default function MessagesPage() {
                       </div>
                     </div>
 
-                    <button className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-[#202025] text-[#9a9aa5] transition-colors">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setConvMenuOpenId(prev => prev === 'header' ? null : 'header')
+                        }}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                          convMenuOpenId === 'header'
+                            ? 'bg-[#2a2a31] text-[#f1f1f3]'
+                            : 'hover:bg-[#202025] text-[#9a9aa5]'
+                        }`}
+                        title="Conversation options"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+
+                      {convMenuOpenId === 'header' && (
+                        <div
+                          className="absolute right-0 top-full mt-1.5 z-50 w-48 py-1 rounded-xl shadow-2xl border border-[#2a2a31] bg-[#18181b]"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={() => {
+                              setConvMenuOpenId(null)
+                              handleHideConversation(activeConvId!)
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-[#9a9aa5] hover:text-[#f1f1f3] hover:bg-[#202025] transition-colors text-left"
+                          >
+                            <EyeOff className="h-3.5 w-3.5 text-amber-400/80 shrink-0" />
+                            Hide chat
+                          </button>
+                          <div className="border-t border-[#2a2a31] my-1" />
+                          <button
+                            onClick={() => {
+                              setConvMenuOpenId(null)
+                              setShowHiddenPanel(true)
+                              setShowNewChat(false)
+                            }}
+                            className="w-full flex items-center justify-between px-3.5 py-2.5 text-xs text-[#9a9aa5] hover:text-[#f1f1f3] hover:bg-[#202025] transition-colors text-left"
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <Eye className="h-3.5 w-3.5 text-[#7E9ED4] shrink-0" />
+                              Hidden Chats
+                            </span>
+                            {hiddenConversations.length > 0 && (
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-[#3B5B8C]/20 text-[#7E9ED4] border border-[#3B5B8C]/40">
+                                {hiddenConversations.length}
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )
               })()}
