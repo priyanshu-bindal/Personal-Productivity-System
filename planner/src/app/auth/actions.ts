@@ -98,8 +98,29 @@ export async function signup(formData: FormData) {
   return { success: true }
 }
 
+export async function resetPassword(formData: FormData) {
+  const supabase = await createClient()
+  const email = (formData.get('email') as string || '').trim()
+
+  if (!email) {
+    return { error: 'Please enter your email address.' }
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/auth/callback?next=/settings`,
+  })
+
+  if (error) {
+    console.error('[SUPABASE RESET PASSWORD ERROR]', error)
+    return { error: error.message || 'Unable to send reset instructions. Please try again.' }
+  }
+
+  return { success: true }
+}
+
 export async function signout() {
   const supabase = await createClient()
   await supabase.auth.signOut()
   revalidatePath('/', 'layout')
 }
+
