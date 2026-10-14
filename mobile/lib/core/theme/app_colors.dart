@@ -1,29 +1,29 @@
 import 'package:flutter/material.dart';
-import 'ocean_theme.dart';
+import 'oled_theme.dart';
 
 class AppColors {
-  // Bioluminescent Ocean Palette Delegation
-  static const Color background = OceanTheme.bg;
-  static const Color backgroundGradientTop = OceanTheme.bgGradientTop;
-  static const Color backgroundGradientBottom = OceanTheme.bg;
+  // ── True OLED Black & Surfaces ────────────────────────────────────────────
+  static const Color background = OledTheme.bg;
+  static const Color backgroundGradientTop = OledTheme.bgSecondary;
+  static const Color backgroundGradientBottom = OledTheme.bg;
 
-  static const Color surface = OceanTheme.card;
-  static const Color surfaceElevated = OceanTheme.cardHi;
-  static const Color card = OceanTheme.card;
-  static const Color cardHi = OceanTheme.cardHi;
-  static const Color cardElevated = OceanTheme.cardHi;
-  static const Color cardHover = OceanTheme.cardHi;
+  static const Color surface = OledTheme.subtleSurface;
+  static const Color surfaceElevated = OledTheme.cardElevated;
+  static const Color card = OledTheme.card;
+  static const Color cardHi = OledTheme.cardElevated;
+  static const Color cardElevated = OledTheme.cardElevated;
+  static const Color cardHover = OledTheme.subtleSurface;
 
-  static const Color border = OceanTheme.border;
-  static const Color borderActive = OceanTheme.primary;
-  static const Color borderSubtle = OceanTheme.border;
-  static const Color input = OceanTheme.card;
+  static const Color border = OledTheme.border;
+  static const Color borderActive = OledTheme.electricBlue;
+  static const Color borderSubtle = OledTheme.borderSubtle;
+  static const Color input = OledTheme.card;
 
-  static const Color textPrimary = OceanTheme.textPrimary;
-  static const Color textSecondary = OceanTheme.textDim;
-  static const Color textDim = OceanTheme.textDim;
-  static const Color textMuted = OceanTheme.textFaint;
-  static const Color textFaint = OceanTheme.textFaint;
+  static const Color textPrimary = OledTheme.textPrimary;
+  static const Color textSecondary = OledTheme.textSecondary;
+  static const Color textDim = OledTheme.textSecondary;
+  static const Color textMuted = OledTheme.textMuted;
+  static const Color textFaint = OledTheme.textMuted;
 
   // ─── Liquid Glass Design System Tokens ─────────────────────────
   static const Color liquidBackground = Color(0xFF020817); // #020817 Deep Midnight Navy
@@ -42,54 +42,55 @@ class AppColors {
   static const Color liquidGlassStrong = Color(0x1FFFFFFF); // rgba(255,255,255,0.12)
   static const Color liquidGlassBorder = Color(0x2EFFFFFF); // rgba(255,255,255,0.18)
 
-  // Primary Accent — Premium Emerald-Teal #14C8A8
-  static const Color primary = OceanTheme.primary;
-  static const Color primaryBright = OceanTheme.primaryHover;
-  static const Color primaryDark = OceanTheme.primaryDim;
-  static const Color primaryHover = OceanTheme.primaryHover;
-  // Soft glow: rgba(20, 200, 168, 0.18)
-  static const Color primaryGlow = Color(0x2E14C8A8);
-  // Subtle glow for box shadows: rgba(20,200,168,0.15)
-  static const Color primaryGlowSoft = Color(0x2614C8A8);
-  static const Color primaryBg = OceanTheme.primaryDim;
-  static const Color primaryForeground = OceanTheme.bg;
+  // Primary Accent — Emerald #20D6A1
+  static const Color primary = OledTheme.emerald;
+  static const Color primaryBright = Color(0xFF38EFBC);
+  static const Color primaryDark = Color(0xFF0B4634);
+  static const Color primaryHover = Color(0xFF38EFBC);
+  static const Color primaryGlow = Color(0x2E20D6A1);
+  static const Color primaryGlowSoft = Color(0x2620D6A1);
+  static const Color primaryBg = Color(0xFF0D2820);
+  static const Color primaryForeground = OledTheme.bg;
 
-  // Secondary Accent — Sapphire Blue #3B82F6
-  static const Color secondary = OceanTheme.secondary;
-  static const Color blue = OceanTheme.secondary;
-  static const Color blueHighlight = OceanTheme.secondaryHighlight;
-  static const Color blueDim = OceanTheme.secondaryDim;
-  static const Color secondaryBg = OceanTheme.secondaryDim;
-  static const Color secondaryForeground = OceanTheme.textPrimary;
+  // Secondary Accent — Electric Blue #5B8CFF
+  static const Color secondary = OledTheme.electricBlue;
+  static const Color blue = OledTheme.electricBlue;
+  static const Color blueHighlight = Color(0xFF7FA7FF);
+  static const Color blueDim = Color(0xFF122347);
+  static const Color secondaryBg = Color(0xFF122347);
+  static const Color secondaryForeground = OledTheme.textPrimary;
 
-  // Amber (Streaks #FFB020)
-  static const Color amber = OceanTheme.amber;
-  static const Color accentAmber = OceanTheme.amber;
-  static const Color streak = OceanTheme.amber;
+  // Amber (Streaks #FFC66D)
+  static const Color amber = OledTheme.amber;
+  static const Color accentAmber = OledTheme.amber;
+  static const Color streak = OledTheme.amber;
 
   // Session Card Colors
-  static const Color activeCardBg = OceanTheme.primaryDim;
-  static const Color activeCardBorder = OceanTheme.primary;
-  static const Color completedCardBg = OceanTheme.card;
-  static const Color completedCardBorder = OceanTheme.border;
+  static const Color activeCardBg = Color(0xFF0D2820);
+  static const Color activeCardBorder = OledTheme.emerald;
+  static const Color completedCardBg = OledTheme.card;
+  static const Color completedCardBorder = OledTheme.border;
 
   // Status & Semantic Colors
-  static const Color success = OceanTheme.primary;
-  static const Color successBg = OceanTheme.primaryDim;
-  static const Color warning = OceanTheme.amber;
-  static const Color error = Color(0xFFEF5B5B);
-  static const Color errorBg = Color(0x1AEF5B5B);   // rgba(239,91,91,0.10)
-  static const Color errorBorder = Color(0x59EF5B5B); // rgba(239,91,91,0.35)
-  static const Color coralRed = Color(0xFFEF5B5B);
-  static const Color info = OceanTheme.secondary;
-  static const Color infoBg = OceanTheme.secondaryDim;
+  static const Color success = OledTheme.emerald;
+  static const Color successBg = Color(0x2420D6A1);
+  static const Color warning = OledTheme.amber;
+  static const Color error = OledTheme.coral;
+  static const Color errorBg = Color(0x24FF7D87);
+  static const Color errorBorder = Color(0x59FF7D87);
+  static const Color coralRed = OledTheme.coral;
+  static const Color info = OledTheme.cyan;
+  static const Color infoBg = Color(0x2435D9F8);
 
-  static const Color accentEmerald = OceanTheme.primary;
-  static const Color accentRose = Color(0xFFEF5B5B);
-  static const Color accentBlue = OceanTheme.secondary;
-  static const Color accentPurple = OceanTheme.secondary;
-  static const Color accentCyan = OceanTheme.primary;
+  static const Color accentEmerald = OledTheme.emerald;
+  static const Color accentRose = OledTheme.coral;
+  static const Color accentCoral = OledTheme.coral;
+  static const Color accentBlue = OledTheme.electricBlue;
+  static const Color accentPurple = OledTheme.violet;
+  static const Color accentViolet = OledTheme.violet;
+  static const Color accentCyan = OledTheme.cyan;
+  static const Color accentPink = OledTheme.pink;
 
   static const BoxDecoration backgroundGradientDecoration =
-      OceanTheme.backgroundGradientDecoration;
+      OledTheme.backgroundDecoration;
 }

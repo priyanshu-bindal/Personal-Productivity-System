@@ -17,6 +17,7 @@ class SessionsNotifier
     extends StateNotifier<AsyncValue<List<LearningSession>>> {
   final Ref _ref;
   final String? _userId;
+  final Set<String> _pendingSessionIds = {};
 
   SessionsNotifier(this._ref, [this._userId])
       : super(_userId == null
@@ -26,6 +27,9 @@ class SessionsNotifier
       fetchSessions();
     }
   }
+
+  bool isSessionPending(String sessionId) =>
+      _pendingSessionIds.contains(sessionId);
 
   Future<void> fetchSessions({bool forceRefresh = false}) async {
     final effectiveUserId = _userId ?? SupabaseService.currentUserId;
@@ -96,26 +100,48 @@ class SessionsNotifier
       return;
     }
 
-    final currentList = state.value ?? [];
-    final nowIso = DateTime.now().toIso8601String();
-    final dur = actualDuration ?? 60;
+    // Prevent duplicate concurrent requests for the same session
+    if (_pendingSessionIds.contains(sessionId)) return;
+    _pendingSessionIds.add(sessionId);
 
-    // Optimistic UI update
-    state = AsyncValue.data(
-      currentList.map((s) {
-        if (s.id == sessionId) {
-          return s.copyWith(
-            status: 'completed',
-            actualDuration: dur,
-            completedAt: DateTime.parse(nowIso),
-            notes: notes,
-          );
-        }
-        return s;
-      }).toList(),
+    final currentList = state.value ?? [];
+    final sessionIndex = currentList.indexWhere((s) => s.id == sessionId);
+    if (sessionIndex == -1) {
+      _pendingSessionIds.remove(sessionId);
+      return;
+    }
+
+    final targetSession = currentList[sessionIndex];
+    if (targetSession.status == 'completed') {
+      _pendingSessionIds.remove(sessionId);
+      return;
+    }
+
+    final nowIso = DateTime.now().toIso8601String();
+    final dur = actualDuration ?? targetSession.plannedDuration;
+
+    final updatedSession = targetSession.copyWith(
+      status: 'completed',
+      actualDuration: dur,
+      completedAt: DateTime.parse(nowIso),
+      notes: notes,
+    );
+
+    final updatedList = List<LearningSession>.from(currentList);
+    updatedList[sessionIndex] = updatedSession;
+
+    // 1. Optimistic UI update: State is updated immediately
+    state = AsyncValue.data(updatedList);
+
+    // 2. Synchronize user-scoped cache immediately so subsequent reads never see stale 'planned' state
+    await CacheService().set(
+      effectiveUserId,
+      'sessions',
+      updatedList.map((s) => s.toJson()).toList(),
     );
 
     try {
+      // 3. Persist completion to Supabase exactly once
       await SupabaseService.client
           .from('learning_sessions')
           .update({
@@ -128,18 +154,28 @@ class SessionsNotifier
           .eq('id', sessionId)
           .eq('user_id', effectiveUserId);
 
-      await fetchSessions();
-      CacheService().invalidate(effectiveUserId, 'sessions');
+      // Invalidate calendar cache so it reconciles on next visit
+      CacheService().invalidate(effectiveUserId, 'calendar');
 
-      // ── Streak check ──────────────────────────────────────────────────────
+      // 4. Streak check with authoritative updated session list
       if (mounted && SupabaseService.currentUserId == effectiveUserId) {
         await _ref
             .read(streakProvider.notifier)
-            .checkAndUpdateStreak(state.value ?? []);
+            .checkAndUpdateStreak(updatedList);
       }
     } catch (e) {
-      fetchSessions();
+      // 5. Rollback on failure: restore previous state and cache
+      if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+        state = AsyncValue.data(currentList);
+        await CacheService().set(
+          effectiveUserId,
+          'sessions',
+          currentList.map((s) => s.toJson()).toList(),
+        );
+      }
       rethrow;
+    } finally {
+      _pendingSessionIds.remove(sessionId);
     }
   }
 
@@ -151,15 +187,32 @@ class SessionsNotifier
       return;
     }
 
-    final currentList = state.value ?? [];
+    if (_pendingSessionIds.contains(sessionId)) return;
+    _pendingSessionIds.add(sessionId);
 
-    state = AsyncValue.data(
-      currentList.map((s) {
-        if (s.id == sessionId) {
-          return s.copyWith(status: 'skipped');
-        }
-        return s;
-      }).toList(),
+    final currentList = state.value ?? [];
+    final sessionIndex = currentList.indexWhere((s) => s.id == sessionId);
+    if (sessionIndex == -1) {
+      _pendingSessionIds.remove(sessionId);
+      return;
+    }
+
+    final targetSession = currentList[sessionIndex];
+    if (targetSession.status == 'skipped') {
+      _pendingSessionIds.remove(sessionId);
+      return;
+    }
+
+    final updatedSession = targetSession.copyWith(status: 'skipped');
+    final updatedList = List<LearningSession>.from(currentList);
+    updatedList[sessionIndex] = updatedSession;
+
+    state = AsyncValue.data(updatedList);
+
+    await CacheService().set(
+      effectiveUserId,
+      'sessions',
+      updatedList.map((s) => s.toJson()).toList(),
     );
 
     try {
@@ -168,10 +221,20 @@ class SessionsNotifier
           .update({'status': 'skipped'})
           .eq('id', sessionId)
           .eq('user_id', effectiveUserId);
-      await fetchSessions();
+
+      CacheService().invalidate(effectiveUserId, 'calendar');
     } catch (e) {
-      fetchSessions();
+      if (mounted && SupabaseService.currentUserId == effectiveUserId) {
+        state = AsyncValue.data(currentList);
+        await CacheService().set(
+          effectiveUserId,
+          'sessions',
+          currentList.map((s) => s.toJson()).toList(),
+        );
+      }
       rethrow;
+    } finally {
+      _pendingSessionIds.remove(sessionId);
     }
   }
 }

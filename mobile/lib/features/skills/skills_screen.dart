@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/oled_theme.dart';
 import '../../core/widgets/animated_card.dart';
 import '../../core/widgets/custom_bottom_sheet.dart';
 import '../../core/widgets/micro_interactions/branded_refresh_indicator.dart';
@@ -41,8 +40,13 @@ class SkillsScreen extends ConsumerWidget {
     final skillsAsync = ref.watch(skillsProvider);
     final skills = skillsAsync.value ?? [];
 
+    final totalHours = skills.fold<double>(0.0, (sum, s) => sum + s.learningHours);
+    final avgConsistency = skills.isNotEmpty
+        ? (skills.fold<int>(0, (sum, s) => sum + s.consistencyPct) / skills.length).round()
+        : 0;
+
     return Container(
-      decoration: AppColors.backgroundGradientDecoration,
+      decoration: OledTheme.backgroundDecoration,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
@@ -50,8 +54,8 @@ class SkillsScreen extends ConsumerWidget {
             onRefresh: () async {
               await ref.read(skillsProvider.notifier).fetchSkills();
             },
-            color: AppColors.primary,
-            backgroundColor: AppColors.card,
+            color: OledTheme.cyan,
+            backgroundColor: OledTheme.card,
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
@@ -61,16 +65,29 @@ class SkillsScreen extends ConsumerWidget {
                   sliver: SliverToBoxAdapter(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('My Skills', style: AppTextStyles.displayTitle),
+                              const Text(
+                                'My Skills',
+                                style: TextStyle(
+                                  color: OledTheme.textPrimary,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.6,
+                                ),
+                              ),
                               const SizedBox(height: 4),
                               Text(
                                 '${skills.length} active learning areas',
-                                style: AppTextStyles.bodySecondary,
+                                style: const TextStyle(
+                                  color: OledTheme.textSecondary,
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ],
                           ),
@@ -81,15 +98,15 @@ class SkillsScreen extends ConsumerWidget {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
-                              color: AppColors.cardHi,
-                              borderRadius: BorderRadius.circular(16),
+                              color: OledTheme.cardElevated,
+                              borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: AppColors.primary.withValues(alpha: 0.45),
+                                color: OledTheme.cyan.withValues(alpha: 0.4),
                                 width: 1.2,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.15),
+                                  color: OledTheme.cyan.withValues(alpha: 0.15),
                                   blurRadius: 12,
                                   offset: const Offset(0, 2),
                                 ),
@@ -97,12 +114,16 @@ class SkillsScreen extends ConsumerWidget {
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(LucideIcons.plus, color: AppColors.primary, size: 18),
-                                const SizedBox(width: 6),
+                              children: const [
+                                Icon(LucideIcons.plus, color: OledTheme.cyan, size: 17),
+                                SizedBox(width: 6),
                                 Text(
                                   'Add Skill',
-                                  style: AppTextStyles.buttonText.copyWith(color: AppColors.textPrimary),
+                                  style: TextStyle(
+                                    color: OledTheme.textPrimary,
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ],
                             ),
@@ -112,6 +133,52 @@ class SkillsScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+
+                // Overview Stats Bar (When skills are present)
+                if (skills.isNotEmpty)
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+                    sliver: SliverToBoxAdapter(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: OledTheme.card,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: OledTheme.border, width: 1),
+                        ),
+                        child: Row(
+                          children: [
+                            // 1. Total Skills
+                            Expanded(
+                              child: _SkillMetricItem(
+                                label: 'SKILLS',
+                                value: '${skills.length}',
+                                color: OledTheme.cyan,
+                              ),
+                            ),
+                            Container(width: 1, height: 32, color: OledTheme.border),
+                            // 2. Practiced Hours
+                            Expanded(
+                              child: _SkillMetricItem(
+                                label: 'HOURS',
+                                value: '${totalHours.toStringAsFixed(1)}h',
+                                color: OledTheme.violet,
+                              ),
+                            ),
+                            Container(width: 1, height: 32, color: OledTheme.border),
+                            // 3. Avg Consistency
+                            Expanded(
+                              child: _SkillMetricItem(
+                                label: 'CONSISTENCY',
+                                value: '$avgConsistency%',
+                                color: OledTheme.emerald,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
 
                 // Content Body
                 if (skillsAsync.isLoading && skills.isEmpty)
@@ -128,37 +195,47 @@ class SkillsScreen extends ConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Container(
-                              padding: const EdgeInsets.all(20),
+                              padding: const EdgeInsets.all(22),
                               decoration: BoxDecoration(
-                                color: AppColors.card,
+                                color: OledTheme.card,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: AppColors.border),
+                                border: Border.all(color: OledTheme.border),
                               ),
-                              child: const Icon(LucideIcons.bookOpen, size: 48, color: AppColors.textMuted),
+                              child: const Icon(LucideIcons.bookOpen, size: 44, color: OledTheme.textMuted),
                             ),
                             const SizedBox(height: 20),
-                            Text('No skills created yet', style: AppTextStyles.headingMedium),
+                            const Text(
+                              'No skills created yet',
+                              style: TextStyle(
+                                color: OledTheme.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                             const SizedBox(height: 8),
-                            Text(
+                            const Text(
                               'Add your first skill to start tracking consistent learning sessions.',
                               textAlign: TextAlign.center,
-                              style: AppTextStyles.bodySecondary,
+                              style: TextStyle(
+                                color: OledTheme.textSecondary,
+                                fontSize: 13.5,
+                              ),
                             ),
                             const SizedBox(height: 24),
                             PressableScale(
                               onTap: () => _openAddSkillModal(context, ref),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: AppColors.cardHi,
+                                  color: OledTheme.cardElevated,
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: AppColors.primary.withValues(alpha: 0.45),
+                                    color: OledTheme.cyan.withValues(alpha: 0.45),
                                     width: 1.2,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: AppColors.primary.withValues(alpha: 0.15),
+                                      color: OledTheme.cyan.withValues(alpha: 0.15),
                                       blurRadius: 12,
                                       offset: const Offset(0, 2),
                                     ),
@@ -166,12 +243,16 @@ class SkillsScreen extends ConsumerWidget {
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(LucideIcons.plus, color: AppColors.primary, size: 18),
-                                    const SizedBox(width: 8),
+                                  children: const [
+                                    Icon(LucideIcons.plus, color: OledTheme.cyan, size: 18),
+                                    SizedBox(width: 8),
                                     Text(
                                       'Add Skill Now',
-                                      style: AppTextStyles.buttonText.copyWith(color: AppColors.textPrimary),
+                                      style: TextStyle(
+                                        color: OledTheme.textPrimary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -184,7 +265,7 @@ class SkillsScreen extends ConsumerWidget {
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
@@ -204,6 +285,46 @@ class SkillsScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _SkillMetricItem extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _SkillMetricItem({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          style: const TextStyle(
+            color: OledTheme.textMuted,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -238,79 +359,138 @@ class _SkillCardState extends State<_SkillCard> {
 
   @override
   Widget build(BuildContext context) {
+    final accent = OledTheme.getCategoryAccent(widget.skill.category, widget.skill.name);
+    final icon = OledTheme.getCategoryIcon(widget.skill.category, widget.skill.name);
+
     return AnimatedCard(
       index: widget.index,
       onTap: _handleTap,
+      backgroundColor: OledTheme.card,
+      border: Border.all(color: OledTheme.border, width: 1.1),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Name, Category, Level
+          // Header: Category Icon, Name, Category badge, Level
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(
+                    color: accent.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
                 ),
-                child: const Icon(LucideIcons.code2, color: AppColors.primary, size: 22),
+                child: Center(
+                  child: Icon(icon, color: accent, size: 22),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(widget.skill.name, style: AppTextStyles.bodyStrong),
+                    Text(
+                      widget.skill.name,
+                      style: const TextStyle(
+                        color: OledTheme.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Text(widget.skill.category, style: AppTextStyles.bodySecondary),
-                        const SizedBox(width: 8),
                         Container(
-                          width: 4,
-                          height: 4,
-                          decoration: const BoxDecoration(
-                            color: AppColors.textMuted,
-                            shape: BoxShape.circle,
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: accent.withValues(alpha: 0.25),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Text(
+                            widget.skill.category,
+                            style: TextStyle(
+                              color: accent,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(widget.skill.level, style: AppTextStyles.labelSmall),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: OledTheme.subtleSurface,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: OledTheme.border,
+                              width: 0.8,
+                            ),
+                          ),
+                          child: Text(
+                            widget.skill.level,
+                            style: const TextStyle(
+                              color: OledTheme.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ],
                 ),
               ),
-              const Icon(LucideIcons.chevronRight, color: AppColors.textMuted, size: 20),
+              const Icon(LucideIcons.chevronRight, color: OledTheme.textMuted, size: 18),
             ],
           ),
           const SizedBox(height: 16),
 
-          // Practice Target & Days Chips
+          // Target & Learning Hours
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Text(
-                  'Target: ${widget.skill.weeklyTarget} sessions / week (${widget.skill.sessionDuration}m)',
-                  style: AppTextStyles.bodySecondary,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
               Text(
-                '${widget.skill.learningHours}h practiced',
-                style: AppTextStyles.bodySecondary.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
+                'Target: ${widget.skill.weeklyTarget} sessions / week (${widget.skill.sessionDuration}m)',
+                style: const TextStyle(
+                  color: OledTheme.textSecondary,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: OledTheme.cardElevated,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: OledTheme.border),
+                ),
+                child: Text(
+                  '${widget.skill.learningHours}h practiced',
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
 
-          // Automated Consistency Progress Bar
+          // Consistency & Streak Progress Bar
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -319,34 +499,48 @@ class _SkillCardState extends State<_SkillCard> {
                 children: [
                   Row(
                     children: [
-                      Text('Consistency', style: AppTextStyles.labelSmall),
-                      const SizedBox(width: 8),
+                      const Text(
+                        'Consistency',
+                        style: TextStyle(
+                          color: OledTheme.textMuted,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
                       Text(
                         '${widget.skill.consistencyPct}%',
-                        style: AppTextStyles.bodySecondary.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                        style: const TextStyle(
+                          color: OledTheme.textPrimary,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
                   ),
-                  Text(
-                    '🔥 ${widget.skill.streak} day streak',
-                    style: AppTextStyles.bodySecondary.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.accentAmber,
-                    ),
+                  Row(
+                    children: [
+                      const Text('🔥 ', style: TextStyle(fontSize: 12)),
+                      Text(
+                        '${widget.skill.streak} day streak',
+                        style: const TextStyle(
+                          color: OledTheme.amber,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               ClipRRect(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: (widget.skill.consistencyPct / 100).clamp(0.0, 1.0),
-                  minHeight: 6,
-                  backgroundColor: AppColors.blueDim,
-                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.blue),
+                  minHeight: 5,
+                  backgroundColor: OledTheme.cardElevated,
+                  valueColor: AlwaysStoppedAnimation<Color>(accent),
                 ),
               ),
             ],

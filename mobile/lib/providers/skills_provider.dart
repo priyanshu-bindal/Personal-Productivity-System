@@ -69,7 +69,17 @@ class SkillsNotifier extends StateNotifier<AsyncValue<List<Skill>>> {
       // sessions instead of re-fetching the skill row from the DB.
       return _recomputeSkill(s, sessions);
     }).toList();
-    if (mounted) state = AsyncValue.data(recomputed);
+    if (mounted) {
+      state = AsyncValue.data(recomputed);
+      final effectiveUserId = _userId ?? SupabaseService.currentUserId;
+      if (effectiveUserId != null) {
+        CacheService().set(
+          effectiveUserId,
+          'skills',
+          recomputed.map((s) => s.toJson()).toList(),
+        );
+      }
+    }
   }
 
   /// Reconstructs a [Skill] with updated session-derived stats.

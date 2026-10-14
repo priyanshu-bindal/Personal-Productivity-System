@@ -17,60 +17,33 @@ import '../../models/skill.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/sessions_provider.dart';
 import '../../providers/skills_provider.dart';
+import '../../core/theme/oled_theme.dart';
 import '../../providers/streak_provider.dart';
 
 // ── Design System Tokens for Today Screen ──────────────────────────────────
 class _TodayPalette {
-  static const Color oledBg = Color(0xFF030508);
-  static const Color surfaceDark = Color(0xFF0B1222);
-  static const Color surfaceElevated = Color(0xFF0E1729);
-  static const Color border = Color(0xFF172642);
-  static const Color borderHighlight = Color(0xFF1E3256);
+  static const Color oledBg = OledTheme.bg;
+  static const Color surfaceDark = OledTheme.card;
+  static const Color surfaceElevated = OledTheme.cardElevated;
+  static const Color border = OledTheme.border;
+  static const Color borderHighlight = OledTheme.borderHighlight;
 
-  static const Color blueSoft = Color(0xFF4D7CFF);
-  static const Color blueElectric = Color(0xFF3B82F6);
-  static const Color violet = Color(0xFF8B7CFF);
-  static const Color successTeal = Color(0xFF19D3C5);
-  static const Color streakAmber = Color(0xFFF59E0B);
+  static const Color blueSoft = Color(0xFF7FA7FF);
+  static const Color blueElectric = OledTheme.electricBlue;
+  static const Color cyan = OledTheme.cyan;
+  static const Color violet = OledTheme.violet;
+  static const Color emerald = OledTheme.emerald;
+  static const Color successTeal = OledTheme.emerald;
+  static const Color streakAmber = OledTheme.amber;
+  static const Color accentRose = OledTheme.coral;
 
-  static const Color textPrimary = Color(0xFFF1F5F9);
-  static const Color textSecondary = Color(0xFF8A9AB2);
-  static const Color textMuted = Color(0xFF5A6E87);
+  static const Color textPrimary = OledTheme.textPrimary;
+  static const Color textSecondary = OledTheme.textSecondary;
+  static const Color textMuted = OledTheme.textMuted;
 }
 
 Color _getSkillAccentColor(String name, String category) {
-  final lowerName = name.toLowerCase();
-  if (lowerName.contains('java') && !lowerName.contains('script')) {
-    return _TodayPalette.blueElectric; // Java -> blue
-  }
-  if (lowerName.contains('c++') || lowerName.contains('cpp')) {
-    return _TodayPalette.violet; // C++ -> violet
-  }
-  if (lowerName.contains('flutter') || lowerName.contains('dart')) {
-    return _TodayPalette.successTeal; // Flutter -> teal
-  }
-  if (lowerName.contains('python')) {
-    return const Color(0xFF38BDF8); // Sky blue
-  }
-  if (lowerName.contains('react') || lowerName.contains('web') || lowerName.contains('js')) {
-    return const Color(0xFF60A5FA); // Light blue
-  }
-  if (lowerName.contains('rust') || lowerName.contains('swift')) {
-    return const Color(0xFFF472B6); // Rose
-  }
-  if (lowerName.contains('design') || lowerName.contains('ui')) {
-    return const Color(0xFFC084FC); // Purple
-  }
-  const palette = [
-    Color(0xFF38BDF8),
-    Color(0xFF818CF8),
-    Color(0xFF8B7CFF),
-    Color(0xFF34D399),
-    Color(0xFFF472B6),
-    Color(0xFF4D7CFF),
-  ];
-  final hash = name.codeUnits.fold<int>(0, (prev, curr) => prev + curr);
-  return palette[hash % palette.length];
+  return OledTheme.getCategoryAccent(category, name);
 }
 
 class TodayScreen extends ConsumerWidget {
@@ -380,8 +353,24 @@ class TodayScreen extends ConsumerWidget {
                             key: ValueKey(session.id),
                             session: session,
                             index: index,
-                            onComplete: () {
-                              ref.read(sessionsProvider.notifier).completeSession(session.id);
+                            onComplete: () async {
+                              try {
+                                await ref
+                                    .read(sessionsProvider.notifier)
+                                    .completeSession(session.id);
+                              } catch (err) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Failed to complete session: $err'),
+                                      backgroundColor: _TodayPalette.accentRose,
+                                      behavior: SnackBarBehavior.floating,
+                                      duration: const Duration(seconds: 3),
+                                    ),
+                                  );
+                                }
+                                rethrow;
+                              }
                             },
                           );
                         },
@@ -560,25 +549,29 @@ class _TodayProgressHeroCardState extends State<_TodayProgressHeroCard>
     final progressFraction = widget.totalSessions > 0
         ? (widget.completedSessions / widget.totalSessions).clamp(0.0, 1.0)
         : (widget.completedMinutes > 0 ? 1.0 : 0.0);
-    final pctText = '${(progressFraction * 100).round()}%';
+    final remainingSessions = (widget.totalSessions - widget.completedSessions).clamp(0, widget.totalSessions);
+    final isAllDone = widget.totalSessions > 0 && remainingSessions == 0;
 
     return Container(
       decoration: BoxDecoration(
         color: _TodayPalette.surfaceDark,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: _TodayPalette.border,
+          color: isAllDone
+              ? _TodayPalette.emerald.withValues(alpha: 0.35)
+              : _TodayPalette.border,
           width: 1,
         ),
         boxShadow: [
           const BoxShadow(
-            color: Color(0x50000000),
-            blurRadius: 22,
+            color: Color(0x60000000),
+            blurRadius: 24,
             offset: Offset(0, 8),
           ),
           BoxShadow(
-            color: _TodayPalette.blueElectric.withValues(alpha: 0.08),
-            blurRadius: 18,
+            color: (isAllDone ? _TodayPalette.emerald : _TodayPalette.blueElectric)
+                .withValues(alpha: 0.08),
+            blurRadius: 20,
             spreadRadius: 0,
           ),
         ],
@@ -614,159 +607,141 @@ class _TodayProgressHeroCardState extends State<_TodayProgressHeroCard>
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Modern Glass Icon Box
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: _TodayPalette.surfaceElevated,
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(
-                            color: _TodayPalette.blueElectric.withValues(alpha: 0.25),
-                            width: 1,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _TodayPalette.blueElectric.withValues(alpha: 0.15),
-                              blurRadius: 12,
-                              offset: const Offset(0, 3),
+                      // Animated Circular Ring Progress Indicator
+                      AnimatedBuilder(
+                        animation: _progressAnim,
+                        builder: (context, _) {
+                          final curVal = progressFraction * _progressAnim.value;
+                          final pct = (curVal * 100).round();
+                          return SizedBox(
+                            width: 68,
+                            height: 68,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 68,
+                                  height: 68,
+                                  child: CircularProgressIndicator(
+                                    value: curVal,
+                                    strokeWidth: 6.5,
+                                    strokeCap: StrokeCap.round,
+                                    backgroundColor: _TodayPalette.surfaceElevated,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      curVal >= 1.0
+                                          ? _TodayPalette.emerald
+                                          : _TodayPalette.cyan,
+                                    ),
+                                  ),
+                                ),
+                                Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '$pct%',
+                                      style: TextStyle(
+                                        color: curVal >= 1.0
+                                            ? _TodayPalette.emerald
+                                            : _TodayPalette.textPrimary,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Icon(
-                            LucideIcons.timer,
-                            color: _TodayPalette.blueSoft,
-                            size: 22,
-                          ),
-                        ),
+                          );
+                        },
                       ),
-                      const SizedBox(width: 16),
-                      // Text metrics
+                      const SizedBox(width: 18),
+
+                      // 3-Metric Summary Column
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  Text(
-                                    '${widget.completedMinutes}',
-                                    style: const TextStyle(
-                                      color: _TodayPalette.textPrimary,
-                                      fontSize: 26,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: -0.5,
-                                    ),
+                            // 1. Completed sessions
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: _TodayPalette.emerald,
+                                    shape: BoxShape.circle,
                                   ),
-                                  const SizedBox(width: 5),
-                                  const Text(
-                                    'mins completed today',
-                                    style: TextStyle(
-                                      color: _TodayPalette.textSecondary,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${widget.completedSessions} of ${widget.totalSessions} sessions completed',
+                                  style: const TextStyle(
+                                    color: _TodayPalette.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              widget.totalSessions == 0
-                                  ? 'No scheduled sessions today'
-                                  : '${widget.completedSessions} of ${widget.totalSessions} sessions done',
-                              style: const TextStyle(
-                                color: _TodayPalette.textSecondary,
-                                fontSize: 12.5,
-                              ),
+                            const SizedBox(height: 6),
+
+                            // 2. Practiced time
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: _TodayPalette.cyan,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${widget.completedMinutes} mins focused today',
+                                  style: const TextStyle(
+                                    color: _TodayPalette.textSecondary,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+
+                            // 3. Remaining sessions / All Done
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: isAllDone
+                                        ? _TodayPalette.emerald
+                                        : _TodayPalette.streakAmber,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isAllDone
+                                      ? 'All tasks completed today! 🎉'
+                                      : '$remainingSessions task${remainingSessions == 1 ? '' : 's'} remaining',
+                                  style: TextStyle(
+                                    color: isAllDone
+                                        ? _TodayPalette.emerald
+                                        : _TodayPalette.streakAmber,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
                     ],
-                  ),
-
-                  // Animated Progress Line / Bar
-                  const SizedBox(height: 18),
-                  AnimatedBuilder(
-                    animation: _progressAnim,
-                    builder: (context, _) {
-                      final currentProgress = progressFraction * _progressAnim.value;
-                      return Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Daily Goal Progress',
-                                style: TextStyle(
-                                  color: _TodayPalette.textSecondary,
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              Text(
-                                pctText,
-                                style: TextStyle(
-                                  color: currentProgress >= 1.0
-                                      ? _TodayPalette.successTeal
-                                      : _TodayPalette.blueSoft,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Stack(
-                            children: [
-                              // Background track
-                              Container(
-                                height: 6,
-                                width: double.infinity,
-                                decoration: BoxDecoration(
-                                  color: _TodayPalette.surfaceElevated,
-                                  borderRadius: BorderRadius.circular(3),
-                                ),
-                              ),
-                              // Animated progress fill
-                              LayoutBuilder(
-                                builder: (context, constraints) {
-                                  final fillWidth = constraints.maxWidth * currentProgress;
-                                  return Container(
-                                    height: 6,
-                                    width: fillWidth,
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(3),
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          _TodayPalette.blueElectric,
-                                          currentProgress >= 1.0
-                                              ? _TodayPalette.successTeal
-                                              : _TodayPalette.violet,
-                                        ],
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: _TodayPalette.blueElectric.withValues(alpha: 0.35),
-                                          blurRadius: 6,
-                                          offset: const Offset(0, 1),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ],
-                      );
-                    },
                   ),
                 ],
               ),
@@ -782,7 +757,7 @@ class _TodayProgressHeroCardState extends State<_TodayProgressHeroCard>
 class _TodaySessionCard extends StatefulWidget {
   final LearningSession session;
   final int index;
-  final VoidCallback onComplete;
+  final Future<void> Function() onComplete;
 
   const _TodaySessionCard({
     super.key,
@@ -883,19 +858,27 @@ class _TodaySessionCardState extends State<_TodaySessionCard>
     super.dispose();
   }
 
-  void _handleComplete() {
-    if (_isProcessing) return;
+  Future<void> _handleComplete() async {
+    if (_isProcessing || widget.session.status == 'completed') return;
     HapticFeedback.mediumImpact();
     setState(() => _isProcessing = true);
     _popController.forward(from: 0);
     _confettiController.forward(from: 0);
-    widget.onComplete();
+    try {
+      await widget.onComplete();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isCompleted = widget.session.status == 'completed';
     final showDone = isCompleted || _isProcessing;
+    final accent = OledTheme.getCategoryAccent(null, widget.session.skillName);
+    final icon = OledTheme.getCategoryIcon(null, widget.session.skillName);
 
     return ScaleTransition(
       scale: _popScale,
@@ -910,7 +893,7 @@ class _TodaySessionCardState extends State<_TodaySessionCard>
           backgroundColor: _TodayPalette.surfaceDark,
           border: Border.all(
             color: showDone
-                ? _TodayPalette.blueElectric.withValues(alpha: 0.35)
+                ? _TodayPalette.emerald.withValues(alpha: 0.35)
                 : _TodayPalette.border,
             width: 1.2,
           ),
@@ -946,12 +929,12 @@ class _TodaySessionCardState extends State<_TodaySessionCard>
                       decoration: BoxDecoration(
                         color: showDone
                             ? _TodayPalette.surfaceElevated
-                            : _TodayPalette.blueElectric.withValues(alpha: 0.12),
+                            : accent.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(13),
                         border: Border.all(
                           color: showDone
-                              ? _TodayPalette.blueElectric.withValues(alpha: 0.4)
-                              : _TodayPalette.borderHighlight,
+                              ? _TodayPalette.emerald.withValues(alpha: 0.4)
+                              : accent.withValues(alpha: 0.3),
                           width: 1,
                         ),
                       ),
@@ -968,9 +951,9 @@ class _TodaySessionCardState extends State<_TodaySessionCard>
                             ),
                           ),
                           child: Icon(
-                            showDone ? LucideIcons.check : LucideIcons.bookOpen,
-                            key: ValueKey(showDone),
-                            color: showDone ? _TodayPalette.successTeal : _TodayPalette.blueSoft,
+                            showDone ? LucideIcons.check : icon,
+                            key: ValueKey(showDone ? 'done' : '${widget.session.skillName}'),
+                            color: showDone ? _TodayPalette.emerald : accent,
                             size: 20,
                           ),
                         ),
@@ -1022,10 +1005,10 @@ class _TodaySessionCardState extends State<_TodaySessionCard>
                             key: ValueKey(showDone),
                             style: TextStyle(
                               color: showDone
-                                  ? _TodayPalette.successTeal
-                                  : _TodayPalette.blueSoft,
+                                  ? _TodayPalette.emerald
+                                  : accent,
                               fontSize: 12.5,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
@@ -1056,19 +1039,19 @@ class _TodaySessionCardState extends State<_TodaySessionCard>
                           color: _TodayPalette.surfaceElevated,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: _TodayPalette.blueElectric.withValues(alpha: 0.3),
+                            color: _TodayPalette.emerald.withValues(alpha: 0.3),
                             width: 1,
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: const [
-                            Icon(LucideIcons.check, color: _TodayPalette.successTeal, size: 15),
+                            Icon(LucideIcons.check, color: _TodayPalette.emerald, size: 15),
                             SizedBox(width: 5),
                             Text(
                               'Done',
                               style: TextStyle(
-                                color: _TodayPalette.successTeal,
+                                color: _TodayPalette.emerald,
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -1082,16 +1065,16 @@ class _TodaySessionCardState extends State<_TodaySessionCard>
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
+                            gradient: LinearGradient(
                               colors: [
-                                _TodayPalette.blueElectric,
-                                _TodayPalette.blueSoft,
+                                accent,
+                                accent.withValues(alpha: 0.85),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: _TodayPalette.blueElectric.withValues(alpha: 0.35),
+                                color: accent.withValues(alpha: 0.35),
                                 blurRadius: 10,
                                 offset: const Offset(0, 2),
                               ),
@@ -1100,9 +1083,9 @@ class _TodaySessionCardState extends State<_TodaySessionCard>
                           child: const Text(
                             'Complete',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Color(0xFF000000),
                               fontSize: 13,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
@@ -1142,11 +1125,28 @@ class _SkillOverviewCompactCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Row: Title, Category Badge, Chevron
+          // Top Row: Icon, Title, Category, Chevron
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(
+                    color: accent.withValues(alpha: 0.25),
+                    width: 1,
+                  ),
+                ),
+                child: Icon(
+                  OledTheme.getCategoryIcon(skill.category, skill.name),
+                  size: 18,
+                  color: accent,
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1160,24 +1160,13 @@ class _SkillOverviewCompactCard extends StatelessWidget {
                         letterSpacing: -0.2,
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(
-                          color: accent.withValues(alpha: 0.25),
-                          width: 0.8,
-                        ),
-                      ),
-                      child: Text(
-                        skill.category,
-                        style: TextStyle(
-                          color: accent,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                        ),
+                    const SizedBox(height: 3),
+                    Text(
+                      skill.category,
+                      style: TextStyle(
+                        color: accent,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],

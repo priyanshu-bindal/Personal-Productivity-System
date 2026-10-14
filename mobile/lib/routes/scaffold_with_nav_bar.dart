@@ -1,10 +1,54 @@
+import 'dart:math' as math;
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../core/theme/app_colors.dart';
+import '../core/theme/oled_theme.dart';
 import '../providers/chat_provider.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Per-destination accent colors for the glass navbar
+// ─────────────────────────────────────────────────────────────────────────────
+const _kNavAccents = <Color>[
+  OledTheme.electricBlue, // Today
+  OledTheme.cyan,         // Skills
+  OledTheme.violet,       // Calendar
+  OledTheme.amber,        // Progress
+  OledTheme.electricBlue, // More
+];
+
+/// Height of the floating glass capsule (without bottom safe-area inset).
+const double _kNavBarHeight = 68.0;
+
+/// Bottom margin between the capsule and the safe-area bottom edge.
+const double _kNavBarBottomMargin = 14.0;
+
+/// Horizontal margin as a fraction of screen width (clamped).
+const double _kNavBarHorizontalPaddingFraction = 0.04;
+
+/// Calculates the bottom positioning for the floating navbar,
+/// guaranteeing the 14 px gap is measured strictly above the device's bottom safe
+/// area / system navigation controls (gesture pill or 3-button bar).
+double getFloatingNavBarBottom(BuildContext context) {
+  final mediaQuery = MediaQuery.of(context);
+  final systemBottomInset =
+      math.max(mediaQuery.padding.bottom, mediaQuery.viewPadding.bottom);
+  // Ensure at least a minimal 10 px clearance even on devices reporting 0 safe area
+  final effectiveBottomSafe = math.max(systemBottomInset, 10.0);
+  return effectiveBottomSafe + _kNavBarBottomMargin;
+}
+
+/// Total clearance needed above the bottom of the screen so scrolling content
+/// is never obscured behind the floating glass capsule.
+double getNavBarClearance(BuildContext context) {
+  final bottomPos = getFloatingNavBarBottom(context);
+  return bottomPos + _kNavBarHeight + 12.0;
+}
 
 class ScaffoldWithNavBar extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -20,12 +64,13 @@ class ScaffoldWithNavBar extends ConsumerStatefulWidget {
 
 class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
     with TickerProviderStateMixin {
+  // ── More-menu animations ────────────────────────────────────────────────
   late final AnimationController _menuController;
   late final Animation<double> _curvedAnimation;
   late final Animation<double> _fadeAnimation;
   late final Animation<double> _scaleAnimation;
 
-  // Main app coordinated entrance animations (runs smoothly once on authentication entrance)
+  // ── Entrance animations (run once on auth) ──────────────────────────────
   late final AnimationController _entranceController;
   late final Animation<double> _contentFade;
   late final Animation<Offset> _contentSlide;
@@ -39,7 +84,8 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
   @override
   void initState() {
     super.initState();
-    // Smooth 230ms open animation with easeOutCubic (reversible on close in 200ms)
+
+    // ── More-menu controller (230 ms open / 200 ms close) ─────────────────
     _menuController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 230),
@@ -52,11 +98,12 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
       reverseCurve: Curves.easeInCubic,
     );
 
-    // Fade 0.0 -> 1.0 and subtle scale 0.95 -> 1.0
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_curvedAnimation);
-    _scaleAnimation = Tween<double>(begin: 0.95, end: 1.0).animate(_curvedAnimation);
+    _fadeAnimation =
+        Tween<double>(begin: 0.0, end: 1.0).animate(_curvedAnimation);
+    _scaleAnimation =
+        Tween<double>(begin: 0.95, end: 1.0).animate(_curvedAnimation);
 
-    // 480ms coordinated entrance into main app
+    // ── 480 ms coordinated entrance ─────────────────────────────────────
     _entranceController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 480),
@@ -91,7 +138,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
       ),
     );
     _navBarSlide = Tween<Offset>(
-      begin: const Offset(0, 8.0),
+      begin: const Offset(0, 24.0),
       end: Offset.zero,
     ).animate(
       CurvedAnimation(
@@ -111,6 +158,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
     super.dispose();
   }
 
+  // ── More-menu helpers ─────────────────────────────────────────────────
   void _openMoreMenu() {
     if (_isMenuOpenNotifier.value) return;
     _isMenuOpenNotifier.value = true;
@@ -158,6 +206,8 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
   Widget build(BuildContext context) {
     final currentIndex = widget.navigationShell.currentIndex;
     final totalUnread = ref.watch(totalUnreadChatCountProvider).value ?? 0;
+    final navBarBottom = getFloatingNavBarBottom(context);
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 80;
 
     String currentPath = '';
     try {
@@ -218,7 +268,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
         extendBody: true,
         body: Stack(
           children: [
-            // Main navigation content wrapped in RepaintBoundary to avoid repaints on menu animation
+            // ── Main content ─────────────────────────────────────────────
             RepaintBoundary(
               child: AnimatedBuilder(
                 animation: _entranceController,
@@ -236,7 +286,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
               ),
             ),
 
-            // Docked Floating More Menu & Barrier Overlay with instant responsiveness
+            // ── More-menu overlay ────────────────────────────────────────
             _DockedMoreMenuOverlay(
               menuController: _menuController,
               isOpenNotifier: _isMenuOpenNotifier,
@@ -247,171 +297,166 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
               onNavigate: _navigateFromMore,
               menuItems: menuItems,
             ),
-          ],
-        ),
-        bottomNavigationBar: RepaintBoundary(
-          child: AnimatedBuilder(
-            animation: _entranceController,
-            builder: (context, child) => Transform.translate(
-              offset: _navBarSlide.value,
-              child: Opacity(
-                opacity: _navBarFade.value.clamp(0.0, 1.0),
-                child: child,
-              ),
-            ),
-            child: SafeArea(
-              child: Container(
-                margin: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-                height: 64,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x50000000),
-                      blurRadius: 24,
-                      offset: Offset(0, 8),
+
+            // ── Floating Glass Navbar (Smooth keyboard hide/restore) ──────
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: navBarBottom,
+              child: RepaintBoundary(
+                child: AnimatedSlide(
+                  offset: isKeyboardOpen ? const Offset(0, 1.8) : Offset.zero,
+                  duration: const Duration(milliseconds: 240),
+                  curve: isKeyboardOpen ? Curves.easeInCubic : Curves.easeOutCubic,
+                  child: AnimatedOpacity(
+                    opacity: isKeyboardOpen ? 0.0 : 1.0,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    child: IgnorePointer(
+                      ignoring: isKeyboardOpen,
+                      child: AnimatedBuilder(
+                        animation: _entranceController,
+                        builder: (context, child) => Transform.translate(
+                          offset: _navBarSlide.value,
+                          child: Opacity(
+                            opacity: _navBarFade.value.clamp(0.0, 1.0),
+                            child: child,
+                          ),
+                        ),
+                        child: _FloatingGlassNavBar(
+                          currentIndex: currentIndex,
+                          isMenuOpenNotifier: _isMenuOpenNotifier,
+                          onTap: _onTap,
+                          hasBadge: totalUnread > 0,
+                        ),
+                      ),
                     ),
-                    BoxShadow(
-                      color: Color(0x0C2F6BFF),
-                      blurRadius: 20,
-                      offset: Offset(0, 0),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(28),
-                  child: Stack(
-                    children: [
-                      // Main glass body
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xE8080E1A),
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: const Color(0xFF1A2E4A),
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Inner top-edge highlight — subtle glass refraction
-                      Positioned(
-                        top: 0,
-                        left: 28,
-                        right: 28,
-                        height: 1,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.white.withValues(alpha: 0.0),
-                                Colors.white.withValues(alpha: 0.08),
-                                Colors.white.withValues(alpha: 0.0),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      // Nav items on top
-                      Positioned.fill(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                          child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final itemWidth = constraints.maxWidth / 5;
-
-                        return Stack(
-                          children: [
-                            // Localized Active Pill Indicator - slides smoothly with easeOutCubic
-                            ValueListenableBuilder<bool>(
-                              valueListenable: _isMenuOpenNotifier,
-                              builder: (context, isMenuOpen, _) {
-                                final effectiveIndex = isMenuOpen ? 4 : currentIndex;
-                                final alignmentX = -1.0 + (effectiveIndex * 0.5);
-
-                                return AnimatedAlign(
-                                  duration: const Duration(milliseconds: 280),
-                                  curve: Curves.easeInOutCubic,
-                                  alignment: Alignment(alignmentX, 0.0),
-                                  child: SizedBox(
-                                    width: itemWidth,
-                                    height: double.infinity,
-                                    child: Container(
-                                      margin: const EdgeInsets.symmetric(horizontal: 3, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF14223E),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: const Color(0xFF2F6BFF),
-                                          width: 1,
-                                        ),
-                                        boxShadow: const [
-                                          BoxShadow(
-                                            color: Color(0x332F6BFF),
-                                            blurRadius: 8,
-                                            spreadRadius: 0,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-
-                            // Tab Items with localized rebuilds
-                            ValueListenableBuilder<bool>(
-                              valueListenable: _isMenuOpenNotifier,
-                              builder: (context, isMenuOpen, _) {
-                                return Row(
-                                  children: [
-                                    _NavBarItem(
-                                      icon: LucideIcons.layoutGrid,
-                                      label: 'Today',
-                                      isSelected: currentIndex == 0 && !isMenuOpen,
-                                      onTap: () => _onTap(0),
-                                    ),
-                                    _NavBarItem(
-                                      icon: LucideIcons.bookOpen,
-                                      label: 'Skills',
-                                      isSelected: currentIndex == 1 && !isMenuOpen,
-                                      onTap: () => _onTap(1),
-                                    ),
-                                    _NavBarItem(
-                                      icon: LucideIcons.calendar,
-                                      label: 'Calendar',
-                                      isSelected: currentIndex == 2 && !isMenuOpen,
-                                      onTap: () => _onTap(2),
-                                    ),
-                                    _NavBarItem(
-                                      icon: LucideIcons.trendingUp,
-                                      label: 'Progress',
-                                      isSelected: currentIndex == 3 && !isMenuOpen,
-                                      onTap: () => _onTap(3),
-                                    ),
-                                    _NavBarMoreItem(
-                                      icon: LucideIcons.moreHorizontal,
-                                      label: 'More',
-                                      isOpenNotifier: _isMenuOpenNotifier,
-                                      hasBadge: totalUnread > 0,
-                                      onTap: () => _onTap(4),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ],
-                        );
-                      },
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  _FloatingGlassNavBar — The main glass capsule widget
+// ═══════════════════════════════════════════════════════════════════════════════
+class _FloatingGlassNavBar extends StatelessWidget {
+  final int currentIndex;
+  final ValueNotifier<bool> isMenuOpenNotifier;
+  final ValueChanged<int> onTap;
+  final bool hasBadge;
+
+  const _FloatingGlassNavBar({
+    required this.currentIndex,
+    required this.isMenuOpenNotifier,
+    required this.onTap,
+    this.hasBadge = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final horizontalPadding =
+        (screenWidth * _kNavBarHorizontalPaddingFraction).clamp(12.0, 28.0);
+    final navWidth = (screenWidth - horizontalPadding * 2).clamp(280.0, 520.0);
+
+    // Adaptive blur: 12.0 sigma for excellent 60/120fps performance on mobile,
+    // with automatic 0-blur high-opacity OLED fallback for accessibility/reduced motion
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final double blurSigma = reduceMotion ? 0.0 : 12.0;
+    final glassColor = blurSigma > 0
+        ? const Color(0xFF101722).withValues(alpha: 0.82)
+        : const Color(0xF40D1420); // 96% opaque OLED surface fallback
+
+    Widget glassBody = Container(
+      decoration: BoxDecoration(
+        color: glassColor,
+        borderRadius: BorderRadius.circular(_kNavBarHeight / 2),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.08),
+          width: 0.8,
+        ),
+      ),
+      child: Stack(
+        children: [
+          // ── Top edge highlight (glass refraction line) ────────
+          Positioned(
+            top: 0,
+            left: _kNavBarHeight / 2,
+            right: _kNavBarHeight / 2,
+            height: 0.6,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.0),
+                    Colors.white.withValues(alpha: 0.10),
+                    Colors.white.withValues(alpha: 0.0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ── Nav items with sliding capsule ───────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            child: ValueListenableBuilder<bool>(
+              valueListenable: isMenuOpenNotifier,
+              builder: (context, isMenuOpen, _) {
+                return _GlassNavBarContent(
+                  currentIndex: currentIndex,
+                  isMenuOpen: isMenuOpen,
+                  onTap: onTap,
+                  hasBadge: hasBadge,
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // Apply BackdropFilter only if blur is enabled
+    if (blurSigma > 0) {
+      glassBody = BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+        child: glassBody,
+      );
+    }
+
+    return Center(
+      child: SizedBox(
+        width: navWidth,
+        height: _kNavBarHeight,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(_kNavBarHeight / 2),
+            // Soft floating shadow
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.55),
+                blurRadius: 28,
+                spreadRadius: -4,
+                offset: const Offset(0, 10),
+              ),
+              // Ambient accent glow
+              BoxShadow(
+                color: OledTheme.electricBlue.withValues(alpha: 0.06),
+                blurRadius: 32,
+                spreadRadius: -2,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(_kNavBarHeight / 2),
+            child: glassBody,
           ),
         ),
       ),
@@ -419,6 +464,284 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  _GlassNavBarContent — Layout with animated sliding capsule + items
+// ═══════════════════════════════════════════════════════════════════════════════
+class _GlassNavBarContent extends StatelessWidget {
+  final int currentIndex;
+  final bool isMenuOpen;
+  final ValueChanged<int> onTap;
+  final bool hasBadge;
+
+  const _GlassNavBarContent({
+    required this.currentIndex,
+    required this.isMenuOpen,
+    required this.onTap,
+    required this.hasBadge,
+  });
+
+  static const _icons = <IconData>[
+    LucideIcons.layoutGrid,
+    LucideIcons.bookOpen,
+    LucideIcons.calendar,
+    LucideIcons.trendingUp,
+    LucideIcons.moreHorizontal,
+  ];
+
+  static const _labels = <String>[
+    'Today',
+    'Skills',
+    'Calendar',
+    'Progress',
+    'More',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = constraints.maxWidth / 5;
+        final itemHeight = constraints.maxHeight;
+        final effectiveIndex = isMenuOpen ? 4 : currentIndex;
+        final accent = _kNavAccents[effectiveIndex];
+
+        return Stack(
+          children: [
+            // ── Snappy sliding active capsule (200ms easeOutCubic: no lag) ─
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              left: effectiveIndex * itemWidth + 3,
+              top: 2,
+              width: itemWidth - 6,
+              height: itemHeight - 4,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(itemHeight / 2),
+                  border: Border.all(
+                    color: accent.withValues(alpha: 0.30),
+                    width: 0.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: accent.withValues(alpha: 0.15),
+                      blurRadius: 10,
+                      spreadRadius: -2,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Navigation items ──────────────────────────────────────
+            Row(
+              children: List.generate(5, (index) {
+                final isSelected =
+                    (index == 4) ? isMenuOpen : (currentIndex == index && !isMenuOpen);
+
+                return SizedBox(
+                  width: itemWidth,
+                  height: itemHeight,
+                  child: _GlassNavItem(
+                    icon: _icons[index],
+                    label: _labels[index],
+                    accent: _kNavAccents[index],
+                    isSelected: isSelected,
+                    isMore: index == 4,
+                    isMenuOpen: isMenuOpen,
+                    hasBadge: index == 4 && hasBadge,
+                    onTap: () => onTap(index),
+                  ),
+                );
+              }),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  _GlassNavItem — Individual destination with immediate tactile feedback
+// ═══════════════════════════════════════════════════════════════════════════════
+class _GlassNavItem extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final Color accent;
+  final bool isSelected;
+  final bool isMore;
+  final bool isMenuOpen;
+  final bool hasBadge;
+  final VoidCallback onTap;
+
+  const _GlassNavItem({
+    required this.icon,
+    required this.label,
+    required this.accent,
+    required this.isSelected,
+    this.isMore = false,
+    this.isMenuOpen = false,
+    this.hasBadge = false,
+    required this.onTap,
+  });
+
+  @override
+  State<_GlassNavItem> createState() => _GlassNavItemState();
+}
+
+class _GlassNavItemState extends State<_GlassNavItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pressController;
+  bool _isPressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Fast, crisp press animation: 70ms in, 100ms out — immediate, not bouncy
+    _pressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 70),
+      reverseDuration: const Duration(milliseconds: 100),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pressController.dispose();
+    super.dispose();
+  }
+
+  void _handleTapDown(TapDownDetails _) {
+    if (!_isPressed) {
+      _isPressed = true;
+      _pressController.forward();
+      setState(() {});
+    }
+  }
+
+  void _handleTapUp(TapUpDetails _) {
+    _isPressed = false;
+    _pressController.reverse();
+    setState(() {});
+  }
+
+  void _handleTapCancel() {
+    _isPressed = false;
+    _pressController.reverse();
+    setState(() {});
+  }
+
+  void _handleTap() {
+    HapticFeedback.selectionClick();
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sel = widget.isSelected;
+    final accent = widget.accent;
+    const inactiveColor = Color(0xFF5A6678);
+    final iconColor = sel ? accent : inactiveColor;
+    final labelColor = sel ? accent : const Color(0xFF7A8899);
+
+    return GestureDetector(
+      onTapDown: _handleTapDown,
+      onTapUp: _handleTapUp,
+      onTapCancel: _handleTapCancel,
+      onTap: _handleTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedBuilder(
+        animation: _pressController,
+        builder: (context, child) {
+          // Snappy 0.94x press scale
+          final pressScale = 1.0 - (_pressController.value * 0.06);
+          return Transform.scale(scale: pressScale, child: child);
+        },
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // ── Icon with snappy 1.12x scale transition ─────────────
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AnimatedScale(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  scale: sel ? 1.12 : 1.0,
+                  child: widget.isMore
+                      ? AnimatedRotation(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutCubic,
+                          turns: widget.isMenuOpen ? 0.25 : 0.0,
+                          child: Icon(
+                            widget.icon,
+                            size: 19,
+                            color: iconColor,
+                          ),
+                        )
+                      : Icon(
+                          widget.icon,
+                          size: 19,
+                          color: iconColor,
+                        ),
+                ),
+
+                // ── Unread badge on More ──────────────────────────────
+                if (widget.hasBadge)
+                  Positioned(
+                    top: -2,
+                    right: -3,
+                    child: Container(
+                      width: 7,
+                      height: 7,
+                      decoration: BoxDecoration(
+                        color: OledTheme.coral,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: OledTheme.coral.withValues(alpha: 0.6),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+
+            const SizedBox(height: 4),
+
+            // ── Label with smooth style transition ───────────────────
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              style: TextStyle(
+                fontSize: sel ? 10.0 : 9.5,
+                fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                color: labelColor,
+                letterSpacing: sel ? 0.2 : 0.0,
+                height: 1.1,
+              ),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 160),
+                opacity: sel ? 1.0 : 0.75,
+                child: Text(widget.label, maxLines: 1),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Data class for More-menu items
+// ═══════════════════════════════════════════════════════════════════════════════
 class _MoreItemData {
   final String route;
   final IconData icon;
@@ -439,6 +762,9 @@ class _MoreItemData {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+//  _DockedMoreMenuOverlay — Floating overlay popup from the More button
+// ═══════════════════════════════════════════════════════════════════════════════
 class _DockedMoreMenuOverlay extends StatelessWidget {
   final AnimationController menuController;
   final ValueNotifier<bool> isOpenNotifier;
@@ -462,6 +788,8 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final navBarBottom = getFloatingNavBarBottom(context);
+
     return ValueListenableBuilder<bool>(
       valueListenable: isOpenNotifier,
       builder: (context, isOpen, _) {
@@ -484,17 +812,17 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
                       child: FadeTransition(
                         opacity: fadeAnimation,
                         child: Container(
-                          color: const Color(0x73000000), // 45% black barrier
+                          color: const Color(0x73000000),
                         ),
                       ),
                     ),
                   ),
 
-                  // Docked Floating More Menu
+                  // Docked Floating More Menu — precisely positioned above the floating capsule
                   Positioned(
                     left: 16,
                     right: 16,
-                    bottom: MediaQuery.of(context).padding.bottom + 86,
+                    bottom: navBarBottom + _kNavBarHeight + 12,
                     child: Align(
                       alignment: Alignment.bottomRight,
                       child: ConstrainedBox(
@@ -507,30 +835,34 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
                             child: AnimatedBuilder(
                               animation: curvedAnimation,
                               builder: (context, child) {
-                                // 2-4px upward movement (3px) as it appears
-                                final dy = (1.0 - curvedAnimation.value) * 3.0;
+                                final dy =
+                                    (1.0 - curvedAnimation.value) * 3.0;
                                 return Transform.translate(
                                   offset: Offset(0, dy),
                                   child: child,
                                 );
                               },
                               child: Container(
-                                padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                                padding: const EdgeInsets.fromLTRB(
+                                    14, 12, 14, 14),
                                 decoration: BoxDecoration(
                                   color: const Color(0xF80E1526),
                                   borderRadius: BorderRadius.circular(22),
                                   border: Border.all(
-                                    color: AppColors.border.withValues(alpha: 0.75),
+                                    color: AppColors.border
+                                        .withValues(alpha: 0.75),
                                     width: 1,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.5),
+                                      color: Colors.black
+                                          .withValues(alpha: 0.5),
                                       blurRadius: 28,
                                       offset: const Offset(0, 10),
                                     ),
                                     BoxShadow(
-                                      color: AppColors.primary.withValues(alpha: 0.08),
+                                      color: AppColors.primary
+                                          .withValues(alpha: 0.08),
                                       blurRadius: 16,
                                       offset: const Offset(0, 2),
                                     ),
@@ -538,7 +870,8 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
                                 ),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     // Header
                                     Row(
@@ -557,15 +890,18 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
                                           onTap: onClose,
                                           behavior: HitTestBehavior.opaque,
                                           child: Container(
-                                            padding: const EdgeInsets.all(4),
+                                            padding:
+                                                const EdgeInsets.all(4),
                                             decoration: BoxDecoration(
-                                              color: Colors.white.withValues(alpha: 0.06),
+                                              color: Colors.white
+                                                  .withValues(alpha: 0.06),
                                               shape: BoxShape.circle,
                                             ),
                                             child: const Icon(
                                               LucideIcons.x,
                                               size: 14,
-                                              color: AppColors.textSecondary,
+                                              color:
+                                                  AppColors.textSecondary,
                                             ),
                                           ),
                                         ),
@@ -573,31 +909,40 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 10),
 
-                                    // Menu Items with fluid sequential fade + slide
-                                    ...List.generate(menuItems.length, (index) {
+                                    // Menu Items with sequential fade + slide
+                                    ...List.generate(menuItems.length,
+                                        (index) {
                                       final item = menuItems[index];
-                                      final start = (0.10 + index * 0.10).clamp(0.0, 1.0);
-                                      final end = (start + 0.45).clamp(0.0, 1.0);
+                                      final start = (0.10 + index * 0.10)
+                                          .clamp(0.0, 1.0);
+                                      final end = (start + 0.45)
+                                          .clamp(0.0, 1.0);
                                       final itemAnim = CurvedAnimation(
                                         parent: menuController,
-                                        curve: Interval(start, end, curve: Curves.easeOutCubic),
+                                        curve: Interval(start, end,
+                                            curve: Curves.easeOutCubic),
                                       );
 
                                       return AnimatedBuilder(
                                         animation: itemAnim,
                                         builder: (context, child) {
-                                          final itemDy = (1.0 - itemAnim.value) * 6.0;
+                                          final itemDy =
+                                              (1.0 - itemAnim.value) * 6.0;
                                           return Transform.translate(
                                             offset: Offset(0, itemDy),
                                             child: Opacity(
-                                              opacity: itemAnim.value.clamp(0.0, 1.0),
+                                              opacity: itemAnim.value
+                                                  .clamp(0.0, 1.0),
                                               child: child,
                                             ),
                                           );
                                         },
                                         child: Padding(
                                           padding: EdgeInsets.only(
-                                            bottom: index < menuItems.length - 1 ? 8 : 0,
+                                            bottom:
+                                                index < menuItems.length - 1
+                                                    ? 8
+                                                    : 0,
                                           ),
                                           child: _FloatingMoreMenuItem(
                                             icon: item.icon,
@@ -606,7 +951,8 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
                                             subtitle: item.subtitle,
                                             badgeCount: item.badgeCount,
                                             isActive: item.isActive,
-                                            onTap: () => onNavigate(item.route),
+                                            onTap: () =>
+                                                onNavigate(item.route),
                                           ),
                                         ),
                                       );
@@ -630,198 +976,9 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
   }
 }
 
-class _NavBarMoreItem extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final ValueNotifier<bool> isOpenNotifier;
-  final bool hasBadge;
-  final VoidCallback onTap;
-
-  const _NavBarMoreItem({
-    required this.icon,
-    required this.label,
-    required this.isOpenNotifier,
-    this.hasBadge = false,
-    required this.onTap,
-  });
-
-  @override
-  State<_NavBarMoreItem> createState() => _NavBarMoreItemState();
-}
-
-class _NavBarMoreItemState extends State<_NavBarMoreItem>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pressController;
-  late final Animation<double> _pressScaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    // Subtle press-scale effect: 1.0 -> 0.94 -> 1.0
-    _pressController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 180),
-    );
-    _pressScaleAnimation = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 1.0, end: 0.94)
-            .chain(CurveTween(curve: Curves.easeOutCubic)),
-        weight: 45,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 0.94, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeOutCubic)),
-        weight: 55,
-      ),
-    ]).animate(_pressController);
-  }
-
-  @override
-  void dispose() {
-    _pressController.dispose();
-    super.dispose();
-  }
-
-  void _handleTap() {
-    _pressController.forward(from: 0.0);
-    widget.onTap();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const activeColor = Color(0xFF2F6BFF);
-    const activeTextColor = Color(0xFFF1F5F9);
-    const inactiveColor = Color(0xFF7E93A8);
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: _handleTap,
-        behavior: HitTestBehavior.opaque,
-        child: ValueListenableBuilder<bool>(
-          valueListenable: widget.isOpenNotifier,
-          builder: (context, isOpen, _) {
-            final highlighted = isOpen;
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    ScaleTransition(
-                      scale: _pressScaleAnimation,
-                      child: AnimatedScale(
-                        duration: const Duration(milliseconds: 240),
-                        curve: Curves.easeOutCubic,
-                        scale: highlighted ? 1.05 : 1.0,
-                        child: AnimatedRotation(
-                          duration: const Duration(milliseconds: 240),
-                          turns: isOpen ? 0.25 : 0.0,
-                          curve: Curves.easeOutCubic,
-                          child: Icon(
-                            widget.icon,
-                            size: 18.5,
-                            color: highlighted ? activeColor : inactiveColor,
-                          ),
-                        ),
-                      ),
-                    ),
-                    if (widget.hasBadge)
-                      Positioned(
-                        top: -1,
-                        right: -2,
-                        child: Container(
-                          width: 7,
-                          height: 7,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF2F6BFF),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Color(0x662F6BFF),
-                                blurRadius: 4,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                AnimatedDefaultTextStyle(
-                  duration: const Duration(milliseconds: 280),
-                  curve: Curves.easeInOutCubic,
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: highlighted ? FontWeight.w600 : FontWeight.w500,
-                    color: highlighted ? activeTextColor : inactiveColor,
-                    letterSpacing: 0.1,
-                  ),
-                  child: Text(widget.label, maxLines: 1),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _NavBarItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _NavBarItem({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const activeColor = Color(0xFF2F6BFF);
-    const activeTextColor = Color(0xFFF1F5F9);
-    const inactiveColor = Color(0xFF7E93A8);
-
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedScale(
-              duration: const Duration(milliseconds: 280),
-              curve: Curves.easeInOutCubic,
-              scale: isSelected ? 1.06 : 1.0,
-              child: Icon(
-                icon,
-                size: 18.5,
-                color: isSelected ? activeColor : inactiveColor,
-              ),
-            ),
-            const SizedBox(height: 3),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 280),
-              curve: Curves.easeInOutCubic,
-              style: TextStyle(
-                fontSize: 10.5,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? activeTextColor : inactiveColor,
-                letterSpacing: 0.1,
-              ),
-              child: Text(label, maxLines: 1),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
+// ═══════════════════════════════════════════════════════════════════════════════
+//  _FloatingMoreMenuItem — Individual item in the More popup
+// ═══════════════════════════════════════════════════════════════════════════════
 class _FloatingMoreMenuItem extends StatefulWidget {
   final IconData icon;
   final Color color;
@@ -911,82 +1068,87 @@ class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
                   ),
                 ),
               ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        widget.title,
-                        style: TextStyle(
-                          color: widget.isActive
-                              ? widget.color
-                              : AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      if (widget.isActive) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 5,
-                          height: 5,
-                          decoration: BoxDecoration(
-                            color: widget.color,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: widget.color.withValues(alpha: 0.6),
-                                blurRadius: 4,
-                              ),
-                            ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          widget.title,
+                          style: TextStyle(
+                            color: widget.isActive
+                                ? widget.color
+                                : AppColors.textPrimary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
                           ),
                         ),
+                        if (widget.isActive) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            width: 5,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: widget.color,
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      widget.color.withValues(alpha: 0.6),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    widget.subtitle,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11.5,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            if (widget.badgeCount > 0) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0x333B82F6),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0x663B82F6)),
-                ),
-                child: Text(
-                  widget.badgeCount > 99 ? '99+' : widget.badgeCount.toString(),
-                  style: const TextStyle(
-                    color: Color(0xFF93C5FD),
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
+                    const SizedBox(height: 1),
+                    Text(
+                      widget.subtitle,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 6),
+              if (widget.badgeCount > 0) ...[
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0x333B82F6),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0x663B82F6)),
+                  ),
+                  child: Text(
+                    widget.badgeCount > 99
+                        ? '99+'
+                        : widget.badgeCount.toString(),
+                    style: const TextStyle(
+                      color: Color(0xFF93C5FD),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              Icon(
+                LucideIcons.chevronRight,
+                color:
+                    widget.isActive ? widget.color : AppColors.textMuted,
+                size: 16,
+              ),
             ],
-            Icon(
-              LucideIcons.chevronRight,
-              color: widget.isActive ? widget.color : AppColors.textMuted,
-              size: 16,
-            ),
-          ],
-        ),
+          ),
         ),
       ),
     );
