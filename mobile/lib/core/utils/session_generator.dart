@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/supabase_service.dart';
 
 class SessionGenerator {
@@ -16,6 +17,16 @@ class SessionGenerator {
     if (userId == null) return;
 
     try {
+      // Throttle: avoid redundant heavy upserts on every app launch.
+      // Run at most once per 12 hours per user.
+      final prefs = await SharedPreferences.getInstance();
+      final cacheKey = 'last_session_gen_ts_$userId';
+      final lastGen = prefs.getInt(cacheKey);
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      if (lastGen != null && (nowMs - lastGen) < const Duration(hours: 12).inMilliseconds) {
+        return; // Already generated recently
+      }
+
       final supabase = SupabaseService.client;
       final List<dynamic> skillsResponse = await supabase
           .from('skills')
@@ -35,10 +46,12 @@ class SessionGenerator {
         final dateStr = d.toIso8601String().split('T')[0];
 
         for (final skill in skills) {
-          final prefDays = (skill['preferred_days'] as List?)
-                  ?.map((e) => e.toString())
-                  .toList() ??
+          final rawDays = skill['preferred_days'] as List?;
+          // If preferred_days is explicitly empty or ['None'], do not schedule
+          if (rawDays != null && rawDays.isEmpty) continue;
+          final prefDays = rawDays?.map((e) => e.toString()).toList() ??
               ['Monday', 'Wednesday', 'Friday'];
+          if (prefDays.contains('None')) continue;
 
           if (prefDays.contains(dayName)) {
             sessionsToInsert.add({
@@ -62,6 +75,9 @@ class SessionGenerator {
               ignoreDuplicates: true,
             );
       }
+
+      // Record successful generation timestamp
+      await prefs.setInt(cacheKey, nowMs);
     } catch (e) {
       // Fire & forget background handling
     }

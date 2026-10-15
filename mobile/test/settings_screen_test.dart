@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:focus_flow/core/widgets/micro_interactions/premium_success_overlay.dart';
 import 'package:focus_flow/features/settings/settings_screen.dart';
 import 'package:focus_flow/models/user_profile.dart';
 import 'package:focus_flow/providers/chat_provider.dart';
 import 'package:focus_flow/providers/profile_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('SettingsScreen renders header, profile info, and sections', (tester) async {
     final testProfile = UserProfile(
       id: 'test-user-123',
@@ -280,6 +286,58 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('CONFIRM NEW PASSWORD'), findsNothing);
+  });
+
+  testWidgets('Tapping CLEAR in Clear Cache dialog triggers PremiumSuccessOverlay', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final testProfile = UserProfile(
+      id: 'test-user-123',
+      email: 'test@example.com',
+      fullName: 'Jane Doe',
+      avatarUrl: '',
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          profileProvider.overrideWith((ref) => _MockProfileNotifier(testProfile)),
+          currentChatUserShortIdProvider.overrideWith((ref) => Future.value('ABC12')),
+        ],
+        child: const MaterialApp(
+          home: SettingsScreen(),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Scroll to and tap Clear Cache
+    await tester.scrollUntilVisible(find.text('Clear Cache'), 200);
+    await tester.tap(find.text('Clear Cache'));
+    await tester.pumpAndSettle();
+
+    // Verify confirmation dialog
+    expect(find.text('Cancel'), findsOneWidget);
+    expect(find.text('Clear'), findsOneWidget);
+
+    // Tap Clear to execute cache clearing
+    await tester.tap(find.text('Clear'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    // Verify PremiumSuccessOverlay is displayed with custom drawing & texts
+    expect(find.byType(PremiumSuccessOverlay), findsOneWidget);
+    expect(find.text('Cache Cleared Successfully'), findsOneWidget);
+    expect(find.text('Your app is refreshed and ready.'), findsOneWidget);
+
+    // Wait for auto-dismissal
+    await tester.pump(const Duration(milliseconds: 2000));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(PremiumSuccessOverlay), findsNothing);
   });
 }
 

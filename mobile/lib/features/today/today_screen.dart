@@ -7,7 +7,9 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/animation/tab_activation_scope.dart';
 import '../../core/widgets/animated_card.dart';
+import '../../core/widgets/micro_interactions/animated_consistency_bar.dart';
 import '../../core/widgets/micro_interactions/branded_refresh_indicator.dart';
 import '../../core/widgets/pressable_scale.dart';
 import '../../core/widgets/streak_button.dart';
@@ -17,8 +19,8 @@ import '../../models/skill.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/sessions_provider.dart';
 import '../../providers/skills_provider.dart';
+import '../../routes/scaffold_with_nav_bar.dart';
 import '../../core/theme/oled_theme.dart';
-import '../../providers/streak_provider.dart';
 
 // ── Design System Tokens for Today Screen ──────────────────────────────────
 class _TodayPalette {
@@ -62,13 +64,6 @@ class TodayScreen extends ConsumerWidget {
     final sessionsAsync = ref.watch(sessionsProvider);
     final skillsAsync = ref.watch(skillsProvider);
 
-    // Bootstrap streak from profile when profile first loads
-    ref.listen(profileProvider, (prev, next) {
-      if (next.hasValue && next.value != null) {
-        ref.read(streakProvider.notifier).syncFromProfile();
-      }
-    });
-
     final userName = profileAsync.value?.fullName.split(' ').first ?? 'Friend';
     final dateStr = DateFormat('EEEE, MMMM d').format(DateTime.now());
     final todayIsoDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -88,9 +83,12 @@ class TodayScreen extends ConsumerWidget {
 
     // Determine whether to show an inline profile error banner.
     final bool showProfileError = profileAsync.hasError && !profileAsync.hasValue;
+    final bottomClearance = math.max(110.0, getNavBarClearance(context));
 
-    return Scaffold(
-      backgroundColor: _TodayPalette.oledBg,
+    return TabCardScope(
+      tabIndex: 0,
+      child: Scaffold(
+        backgroundColor: _TodayPalette.oledBg,
       body: Stack(
         children: [
           // ── Ambient background light behind header ─────────────────────────
@@ -120,15 +118,14 @@ class TodayScreen extends ConsumerWidget {
             child: BrandedRefreshIndicator(
               onRefresh: () async {
                 ref.read(profileProvider.notifier).fetchProfile();
-                await ref.read(sessionsProvider.notifier).fetchSessions();
-                await ref.read(skillsProvider.notifier).fetchSkills();
+                await ref.read(sessionsProvider.notifier).fetchSessions(forceRefresh: true);
+                await ref.read(skillsProvider.notifier).fetchSkills(forceRefresh: true);
               },
               color: _TodayPalette.blueElectric,
               backgroundColor: _TodayPalette.surfaceDark,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                // Bottom padding of 110 ensures content is fully visible above floating navbar
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
+                padding: EdgeInsets.fromLTRB(20, 16, 20, bottomClearance),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -235,10 +232,17 @@ class TodayScreen extends ConsumerWidget {
                     if (showProfileError) const SizedBox(height: 16),
 
                     // ── Today's Progress Card ───────────────────────────────
-                    _TodayProgressHeroCard(
-                      completedMinutes: todayCompletedMinutes,
-                      completedSessions: completedCount,
-                      totalSessions: totalCount,
+                    AnimatedCard(
+                      index: 0,
+                      margin: EdgeInsets.zero,
+                      padding: EdgeInsets.zero,
+                      backgroundColor: Colors.transparent,
+                      border: Border.all(color: Colors.transparent, width: 0),
+                      child: _TodayProgressHeroCard(
+                        completedMinutes: todayCompletedMinutes,
+                        completedSessions: completedCount,
+                        totalSessions: totalCount,
+                      ),
                     ),
                     const SizedBox(height: 28),
 
@@ -352,7 +356,7 @@ class TodayScreen extends ConsumerWidget {
                           return _TodaySessionCard(
                             key: ValueKey(session.id),
                             session: session,
-                            index: index,
+                            index: index + 1,
                             onComplete: () async {
                               try {
                                 await ref
@@ -478,7 +482,7 @@ class TodayScreen extends ConsumerWidget {
                           final skill = skills[index];
                           return _SkillOverviewCompactCard(
                             skill: skill,
-                            index: index,
+                            index: todaySessions.length + index + 1,
                             onTap: () => context.push('/skills/${skill.id}'),
                           );
                         },
@@ -490,8 +494,9 @@ class TodayScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ─── Today's Progress Hero Card ─────────────────────────────────────────────
@@ -1179,46 +1184,14 @@ class _SkillOverviewCompactCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // Metrics Row: Consistency on Left, Streak on Right (Amber)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Consistency: ${skill.consistencyPct}%',
-                style: const TextStyle(
-                  color: _TodayPalette.textSecondary,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Row(
-                children: [
-                  const Text('🔥 ', style: TextStyle(fontSize: 13)),
-                  Text(
-                    '${skill.streak} day streak',
-                    style: const TextStyle(
-                      color: _TodayPalette.streakAmber,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          // Progress Bar: Colored by skill accent
-          ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: LinearProgressIndicator(
-              value: (skill.consistencyPct / 100).clamp(0.0, 1.0),
-              minHeight: 4.5,
-              backgroundColor: _TodayPalette.surfaceElevated,
-              valueColor: AlwaysStoppedAnimation<Color>(accent),
-            ),
+          // Animated Consistency & Streak Progress Bar
+          AnimatedConsistencyBar(
+            percentage: skill.consistencyPct,
+            accentColor: accent,
+            index: index,
+            streakDays: skill.streak,
           ),
         ],
       ),

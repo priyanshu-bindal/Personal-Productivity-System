@@ -1,11 +1,14 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import 'lottie_fire.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+
+import '../theme/oled_theme.dart';
 import '../../providers/streak_provider.dart';
 
+/// Compact, static OLED streak indicator for the top-right app header.
+/// Replaces the heavy Lottie animation with an instant-rendering, high-performance
+/// vector flame icon and streak count, preserving full streak data and navigation.
 class StreakButton extends ConsumerStatefulWidget {
   const StreakButton({super.key});
 
@@ -22,26 +25,27 @@ class _StreakButtonState extends ConsumerState<StreakButton>
 
   int _displayedStreak = 0;
   bool _wasIncremented = false;
+  bool _isPressed = false;
 
   @override
   void initState() {
     super.initState();
 
-    // Slight scale bounce when streak increments
+    // Gentle scale bounce when streak increments
     _scaleController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 500),
     );
     _scaleAnim = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.28), weight: 40),
-      TweenSequenceItem(tween: Tween(begin: 1.28, end: 0.94), weight: 30),
-      TweenSequenceItem(tween: Tween(begin: 0.94, end: 1.0), weight: 30),
-    ]).animate(CurvedAnimation(parent: _scaleController, curve: Curves.easeOut));
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.15), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 1.15, end: 0.96), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 0.96, end: 1.0), weight: 30),
+    ]).animate(CurvedAnimation(parent: _scaleController, curve: Curves.easeOutCubic));
 
     // Number count-up animation
     _numberController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 700),
+      duration: const Duration(milliseconds: 600),
     );
     _numberAnim = CurvedAnimation(
       parent: _numberController,
@@ -57,6 +61,8 @@ class _StreakButtonState extends ConsumerState<StreakButton>
   }
 
   void _playIncrement(int newStreak) {
+    final disableAnimations = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    if (disableAnimations) return;
     _scaleController.forward(from: 0);
     _numberController.forward(from: 0);
   }
@@ -75,79 +81,76 @@ class _StreakButtonState extends ConsumerState<StreakButton>
       _wasIncremented = false;
     }
 
-    // Update displayed number
     final targetStreak = streak.currentStreak;
     if (_displayedStreak != targetStreak && !streak.justIncremented) {
       _displayedStreak = targetStreak;
     }
 
     return GestureDetector(
-      onTap: () => context.push('/streak'),
-      child: ScaleTransition(
-        scale: _scaleAnim,
-        child: _GlassCircle(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const LottieFire(size: 28),
-              const SizedBox(height: 2),
-              // Animated streak count
-              AnimatedBuilder(
-                animation: _numberAnim,
-                builder: (context, _) {
-                  final displayed = streak.justIncremented
-                      ? ((_displayedStreak) +
-                              (_numberAnim.value * 1).round())
-                          .clamp(0, targetStreak)
-                      : targetStreak;
-                  return Text(
-                    '$displayed',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFFFB020),
-                      height: 1,
-                    ),
-                  );
-                },
+      onTapDown: (_) => setState(() => _isPressed = true),
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        HapticFeedback.selectionClick();
+      },
+      onTapCancel: () => setState(() => _isPressed = false),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _isPressed ? 0.94 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOutCubic,
+        child: ScaleTransition(
+          scale: _scaleAnim,
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: OledTheme.cardElevated,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: OledTheme.amber.withValues(alpha: 0.35),
+                width: 1.2,
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GlassCircle extends StatelessWidget {
-  final Widget child;
-  const _GlassCircle({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipOval(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: const Color(0xFF0E1526).withValues(alpha: 0.85),
-            border: Border.all(
-              color: const Color(0xFF1C2C46),
-              width: 1.2,
+              boxShadow: [
+                BoxShadow(
+                  color: OledTheme.amber.withValues(alpha: 0.12),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFFB020).withValues(alpha: 0.08),
-                blurRadius: 16,
-                spreadRadius: 1,
-              ),
-            ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Icon(
+                  LucideIcons.flame,
+                  size: 19,
+                  color: OledTheme.amber,
+                ),
+                const SizedBox(width: 6),
+                AnimatedBuilder(
+                  animation: _numberAnim,
+                  builder: (context, _) {
+                    final displayed = streak.justIncremented
+                        ? ((_displayedStreak) +
+                                (_numberAnim.value * 1).round())
+                            .clamp(0, targetStreak)
+                        : targetStreak;
+                    return Text(
+                      '$displayed',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: OledTheme.amber,
+                        letterSpacing: -0.2,
+                        height: 1.1,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
-          child: child,
         ),
       ),
     );

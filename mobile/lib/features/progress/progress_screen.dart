@@ -5,10 +5,13 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../core/animation/tab_activation_scope.dart';
 import '../../core/theme/oled_theme.dart';
 import '../../core/widgets/animated_card.dart';
+import '../../core/widgets/micro_interactions/branded_refresh_indicator.dart';
 import '../../providers/sessions_provider.dart';
 import '../../providers/skills_provider.dart';
+import '../../routes/scaffold_with_nav_bar.dart';
 
 class ProgressScreen extends ConsumerWidget {
   const ProgressScreen({super.key});
@@ -89,16 +92,26 @@ class ProgressScreen extends ConsumerWidget {
 
     final maxVal = weeklyBarValues.reduce((a, b) => a > b ? a : b);
     final chartMaxY = maxVal > 0 ? math.max((maxVal * 1.25).ceilToDouble(), 2.0) : 3.0;
+    final bottomClearance = math.max(110.0, getNavBarClearance(context));
 
-    return Container(
-      decoration: OledTheme.backgroundDecoration,
+    return TabCardScope(
+      tabIndex: 3,
+      child: Container(
+        decoration: OledTheme.backgroundDecoration,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
-          child: SingleChildScrollView(
-            // Bottom padding 110 ensures clearance above the floating navbar
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
-            child: Column(
+          child: BrandedRefreshIndicator(
+            onRefresh: () async {
+              await ref.read(sessionsProvider.notifier).fetchSessions(forceRefresh: true);
+              await ref.read(skillsProvider.notifier).fetchSkills(forceRefresh: true);
+            },
+            color: OledTheme.amber,
+            backgroundColor: OledTheme.card,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, bottomClearance),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── Header ──────────────────────────────────────────────────
@@ -207,14 +220,20 @@ class ProgressScreen extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 12),
-                Container(
-                  height: 220,
-                  padding: const EdgeInsets.fromLTRB(12, 20, 16, 14),
-                  decoration: BoxDecoration(
-                    color: OledTheme.card,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: OledTheme.border),
-                  ),
+                AnimatedCard(
+                  index: 4,
+                  margin: EdgeInsets.zero,
+                  padding: EdgeInsets.zero,
+                  backgroundColor: Colors.transparent,
+                  border: Border.all(color: Colors.transparent, width: 0),
+                  child: Container(
+                    height: 220,
+                    padding: const EdgeInsets.fromLTRB(12, 20, 16, 14),
+                    decoration: BoxDecoration(
+                      color: OledTheme.card,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: OledTheme.border),
+                    ),
                   child: BarChart(
                     BarChartData(
                       alignment: BarChartAlignment.spaceAround,
@@ -350,6 +369,7 @@ class ProgressScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+              ),
                 const SizedBox(height: 28),
 
                 // ── Monthly Overview ──────────────────────────────────────────
@@ -412,9 +432,11 @@ class ProgressScreen extends ConsumerWidget {
             ),
           ),
         ),
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ─── OLED Multi-Accent Metric Card ───────────────────────────────────────────

@@ -9,6 +9,7 @@ enum QuickDateFilter {
   thisWeek,
   thisMonth,
   lastMonth,
+  selectedMonth,
   customRange,
 }
 
@@ -25,6 +26,7 @@ enum AmountFilterRange {
 class ExpenseFilterState {
   final QuickDateFilter dateFilter;
   final DateTimeRange? customDateRange;
+  final DateTime? selectedMonthDate;
   final String? category;
   final String? paymentMethod;
   final AmountFilterRange amountRange;
@@ -32,6 +34,7 @@ class ExpenseFilterState {
   const ExpenseFilterState({
     this.dateFilter = QuickDateFilter.all,
     this.customDateRange,
+    this.selectedMonthDate,
     this.category,
     this.paymentMethod,
     this.amountRange = AmountFilterRange.all,
@@ -62,6 +65,11 @@ class ExpenseFilterState {
         return 'This Month';
       case QuickDateFilter.lastMonth:
         return 'Last Month';
+      case QuickDateFilter.selectedMonth:
+        if (selectedMonthDate != null) {
+          return DateFormat('MMM yyyy').format(selectedMonthDate!);
+        }
+        return 'Selected Month';
       case QuickDateFilter.customRange:
         if (customDateRange != null) {
           final s = DateFormat('MMM d').format(customDateRange!.start);
@@ -114,6 +122,9 @@ class ExpenseFilterState {
       case QuickDateFilter.lastMonth:
         final lastMonth = DateTime(now.year, now.month - 1, 1);
         return DateFormat('MMMM yyyy').format(lastMonth);
+      case QuickDateFilter.selectedMonth:
+        final target = selectedMonthDate ?? now;
+        return DateFormat('MMMM yyyy').format(target);
       case QuickDateFilter.customRange:
         if (customDateRange != null) {
           final s = DateFormat('MMMM d, yyyy').format(customDateRange!.start);
@@ -169,6 +180,11 @@ class ExpenseFilterState {
         case QuickDateFilter.lastMonth:
           if (!e.expenseDate.startsWith(lastMonthStr)) return false;
           break;
+        case QuickDateFilter.selectedMonth:
+          final target = selectedMonthDate ?? now;
+          final selMonthStr = DateFormat('yyyy-MM').format(target);
+          if (!e.expenseDate.startsWith(selMonthStr)) return false;
+          break;
         case QuickDateFilter.customRange:
           if (customDateRange != null) {
             final startStr = DateFormat('yyyy-MM-dd').format(customDateRange!.start);
@@ -217,6 +233,8 @@ class ExpenseFilterState {
     QuickDateFilter? dateFilter,
     DateTimeRange? customDateRange,
     bool clearCustomDateRange = false,
+    DateTime? selectedMonthDate,
+    bool clearSelectedMonthDate = false,
     String? category,
     bool clearCategory = false,
     String? paymentMethod,
@@ -226,6 +244,7 @@ class ExpenseFilterState {
     return ExpenseFilterState(
       dateFilter: dateFilter ?? this.dateFilter,
       customDateRange: clearCustomDateRange ? null : (customDateRange ?? this.customDateRange),
+      selectedMonthDate: clearSelectedMonthDate ? null : (selectedMonthDate ?? this.selectedMonthDate),
       category: clearCategory ? null : (category ?? this.category),
       paymentMethod: clearPaymentMethod ? null : (paymentMethod ?? this.paymentMethod),
       amountRange: amountRange ?? this.amountRange,
@@ -241,6 +260,7 @@ class ExpenseFilterState {
           runtimeType == other.runtimeType &&
           dateFilter == other.dateFilter &&
           customDateRange == other.customDateRange &&
+          selectedMonthDate == other.selectedMonthDate &&
           category == other.category &&
           paymentMethod == other.paymentMethod &&
           amountRange == other.amountRange;
@@ -249,6 +269,7 @@ class ExpenseFilterState {
   int get hashCode =>
       dateFilter.hashCode ^
       customDateRange.hashCode ^
+      selectedMonthDate.hashCode ^
       category.hashCode ^
       paymentMethod.hashCode ^
       amountRange.hashCode;

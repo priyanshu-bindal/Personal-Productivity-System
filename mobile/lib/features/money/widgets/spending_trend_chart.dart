@@ -81,77 +81,102 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
 
   // ─── Data computation ────────────────────────────────────────────────────
 
-  List<_ChartPoint> _computePoints(List<Expense> expenses) {
+  List<_ChartPoint> _computePoints(List<Expense> expenses, DateTime selectedMonth) {
     final now = DateTime.now();
+    final isCurrent =
+        selectedMonth.year == now.year && selectedMonth.month == now.month;
 
     switch (_period) {
       case _TrendPeriod.week:
-        return _dailyPoints(expenses, now, 7, DateFormat('E'));
+        final anchor = isCurrent
+            ? now
+            : DateTime(selectedMonth.year, selectedMonth.month + 1, 0);
+        return _weekPoints(expenses, anchor);
 
       case _TrendPeriod.month:
-        return _dailyPoints(expenses, now, 30, DateFormat('d'));
+        return _monthPoints(expenses, selectedMonth);
 
       case _TrendPeriod.threeMonths:
-        return _weeklyPoints(expenses, now, 12);
+        final anchor = isCurrent
+            ? now
+            : DateTime(selectedMonth.year, selectedMonth.month + 1, 0);
+        return _threeMonthPoints(expenses, anchor);
 
       case _TrendPeriod.year:
-        return _monthlyPoints(expenses, now, 12);
+        return _yearPoints(expenses, selectedMonth.year);
     }
   }
 
-  List<_ChartPoint> _dailyPoints(
-    List<Expense> expenses,
-    DateTime now,
-    int count,
-    DateFormat fmt,
-  ) {
+  List<_ChartPoint> _weekPoints(List<Expense> expenses, DateTime anchor) {
     final totals = <String, double>{};
     for (final e in expenses) {
-      totals[e.expenseDate] = (totals[e.expenseDate] ?? 0) + e.amount;
+      if (e.deletedAt != null) continue;
+      totals[e.expenseDate] = (totals[e.expenseDate] ?? 0.0) + e.amount;
     }
     final points = <_ChartPoint>[];
-    for (int i = count - 1; i >= 0; i--) {
-      final d = now.subtract(Duration(days: i));
+    for (int i = 6; i >= 0; i--) {
+      final d = anchor.subtract(Duration(days: i));
       final key = DateFormat('yyyy-MM-dd').format(d);
       points.add(_ChartPoint(
-        fmt.format(d),
-        DateFormat('d MMM').format(d),
+        DateFormat('E').format(d),
+        DateFormat('d MMM yyyy').format(d),
         totals[key] ?? 0.0,
       ));
     }
     return points;
   }
 
-  List<_ChartPoint> _weeklyPoints(
-      List<Expense> expenses, DateTime now, int weeks) {
+  List<_ChartPoint> _monthPoints(List<Expense> expenses, DateTime selectedMonth) {
+    final totals = <String, double>{};
+    for (final e in expenses) {
+      if (e.deletedAt != null) continue;
+      totals[e.expenseDate] = (totals[e.expenseDate] ?? 0.0) + e.amount;
+    }
+    final daysInMonth =
+        DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
     final points = <_ChartPoint>[];
-    for (int w = weeks - 1; w >= 0; w--) {
-      final weekEnd = now.subtract(Duration(days: w * 7));
+    for (int day = 1; day <= daysInMonth; day++) {
+      final d = DateTime(selectedMonth.year, selectedMonth.month, day);
+      final key = DateFormat('yyyy-MM-dd').format(d);
+      points.add(_ChartPoint(
+        '$day',
+        DateFormat('d MMM yyyy').format(d),
+        totals[key] ?? 0.0,
+      ));
+    }
+    return points;
+  }
+
+  List<_ChartPoint> _threeMonthPoints(List<Expense> expenses, DateTime anchor) {
+    final points = <_ChartPoint>[];
+    for (int w = 11; w >= 0; w--) {
+      final weekEnd = anchor.subtract(Duration(days: w * 7));
       final weekStart = weekEnd.subtract(const Duration(days: 6));
-      double total = 0;
+      double total = 0.0;
       for (final e in expenses) {
-        final d = DateTime.parse(e.expenseDate);
-        if (!d.isBefore(weekStart) && !d.isAfter(weekEnd)) {
+        if (e.deletedAt != null) continue;
+        final d = DateTime.tryParse(e.expenseDate);
+        if (d != null && !d.isBefore(weekStart) && !d.isAfter(weekEnd)) {
           total += e.amount;
         }
       }
       points.add(_ChartPoint(
         DateFormat('d/M').format(weekStart),
-        'Week of ${DateFormat('d MMM').format(weekStart)}',
+        '${DateFormat('d MMM').format(weekStart)} – ${DateFormat('d MMM').format(weekEnd)}',
         total,
       ));
     }
     return points;
   }
 
-  List<_ChartPoint> _monthlyPoints(
-      List<Expense> expenses, DateTime now, int months) {
+  List<_ChartPoint> _yearPoints(List<Expense> expenses, int year) {
     final points = <_ChartPoint>[];
-    for (int m = months - 1; m >= 0; m--) {
-      final month = DateTime(now.year, now.month - m, 1);
+    for (int m = 1; m <= 12; m++) {
+      final month = DateTime(year, m, 1);
       final prefix = DateFormat('yyyy-MM').format(month);
-      double total = 0;
+      double total = 0.0;
       for (final e in expenses) {
+        if (e.deletedAt != null) continue;
         if (e.expenseDate.startsWith(prefix)) total += e.amount;
       }
       points.add(_ChartPoint(
@@ -206,7 +231,8 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
     }
     _lastExpenseCount = expenses.length;
 
-    final points = _computePoints(expenses);
+    final selectedMonth = ref.watch(selectedMoneyMonthProvider);
+    final points = _computePoints(expenses, selectedMonth);
     final hasData = points.any((p) => p.amount > 0);
 
     return Column(
@@ -214,7 +240,7 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
       children: [
         _buildHeader(points, hasData),
         const SizedBox(height: 10),
-        _buildChartCard(points, hasData),
+        _buildChartCard(points, hasData, selectedMonth),
       ],
     );
   }
@@ -265,7 +291,11 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
     );
   }
 
-  Widget _buildChartCard(List<_ChartPoint> points, bool hasData) {
+  Widget _buildChartCard(
+    List<_ChartPoint> points,
+    bool hasData,
+    DateTime selectedMonth,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF060D1A),
@@ -291,12 +321,13 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
         borderRadius: BorderRadius.circular(20),
         child: hasData
             ? _buildChart(points)
-            : _buildEmptyState(),
+            : _buildEmptyState(selectedMonth),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(DateTime selectedMonth) {
+    final monthName = DateFormat('MMMM yyyy').format(selectedMonth);
     return Container(
       height: 230,
       padding: const EdgeInsets.all(24),
@@ -320,9 +351,9 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
-            'No spending data yet',
-            style: TextStyle(
+          Text(
+            'No spending in $monthName',
+            style: const TextStyle(
               color: AppColors.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w600,

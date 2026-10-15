@@ -1,16 +1,20 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../core/animation/tab_activation_scope.dart';
 import '../../core/theme/oled_theme.dart';
 import '../../core/widgets/animated_card.dart';
 import '../../core/widgets/custom_bottom_sheet.dart';
+import '../../core/widgets/micro_interactions/animated_consistency_bar.dart';
 import '../../core/widgets/micro_interactions/branded_refresh_indicator.dart';
 import '../../core/widgets/pressable_scale.dart';
 import '../../core/widgets/traffic_loader.dart';
 import '../../models/skill.dart';
 import '../../providers/skills_provider.dart';
+import '../../routes/scaffold_with_nav_bar.dart';
 import 'add_skill_sheet.dart';
 
 class SkillsScreen extends ConsumerWidget {
@@ -45,14 +49,18 @@ class SkillsScreen extends ConsumerWidget {
         ? (skills.fold<int>(0, (sum, s) => sum + s.consistencyPct) / skills.length).round()
         : 0;
 
-    return Container(
-      decoration: OledTheme.backgroundDecoration,
+    final bottomClearance = math.max(110.0, getNavBarClearance(context));
+
+    return TabCardScope(
+      tabIndex: 1,
+      child: Container(
+        decoration: OledTheme.backgroundDecoration,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
           child: BrandedRefreshIndicator(
             onRefresh: () async {
-              await ref.read(skillsProvider.notifier).fetchSkills();
+              await ref.read(skillsProvider.notifier).fetchSkills(forceRefresh: true);
             },
             color: OledTheme.cyan,
             backgroundColor: OledTheme.card,
@@ -139,42 +147,49 @@ class SkillsScreen extends ConsumerWidget {
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
                     sliver: SliverToBoxAdapter(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        decoration: BoxDecoration(
-                          color: OledTheme.card,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: OledTheme.border, width: 1),
-                        ),
-                        child: Row(
-                          children: [
-                            // 1. Total Skills
-                            Expanded(
-                              child: _SkillMetricItem(
-                                label: 'SKILLS',
-                                value: '${skills.length}',
-                                color: OledTheme.cyan,
+                      child: AnimatedCard(
+                        index: 0,
+                        margin: EdgeInsets.zero,
+                        padding: EdgeInsets.zero,
+                        backgroundColor: Colors.transparent,
+                        border: Border.all(color: Colors.transparent, width: 0),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: OledTheme.card,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: OledTheme.border, width: 1),
+                          ),
+                          child: Row(
+                            children: [
+                              // 1. Total Skills
+                              Expanded(
+                                child: _SkillMetricItem(
+                                  label: 'SKILLS',
+                                  value: '${skills.length}',
+                                  color: OledTheme.cyan,
+                                ),
                               ),
-                            ),
-                            Container(width: 1, height: 32, color: OledTheme.border),
-                            // 2. Practiced Hours
-                            Expanded(
-                              child: _SkillMetricItem(
-                                label: 'HOURS',
-                                value: '${totalHours.toStringAsFixed(1)}h',
-                                color: OledTheme.violet,
+                              Container(width: 1, height: 32, color: OledTheme.border),
+                              // 2. Practiced Hours
+                              Expanded(
+                                child: _SkillMetricItem(
+                                  label: 'HOURS',
+                                  value: '${totalHours.toStringAsFixed(1)}h',
+                                  color: OledTheme.violet,
+                                ),
                               ),
-                            ),
-                            Container(width: 1, height: 32, color: OledTheme.border),
-                            // 3. Avg Consistency
-                            Expanded(
-                              child: _SkillMetricItem(
-                                label: 'CONSISTENCY',
-                                value: '$avgConsistency%',
-                                color: OledTheme.emerald,
+                              Container(width: 1, height: 32, color: OledTheme.border),
+                              // 3. Avg Consistency
+                              Expanded(
+                                child: _SkillMetricItem(
+                                  label: 'CONSISTENCY',
+                                  value: '$avgConsistency%',
+                                  color: OledTheme.emerald,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -265,14 +280,14 @@ class SkillsScreen extends ConsumerWidget {
                   )
                 else
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 110),
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, bottomClearance),
                     sliver: SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
                           final skill = skills[index];
                           return _SkillCard(
                             skill: skill,
-                            index: index,
+                            index: index + 1,
                             onTap: () => context.push('/skills/${skill.id}'),
                           );
                         },
@@ -285,8 +300,9 @@ class SkillsScreen extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _SkillMetricItem extends StatelessWidget {
@@ -490,60 +506,12 @@ class _SkillCardState extends State<_SkillCard> {
           ),
           const SizedBox(height: 12),
 
-          // Consistency & Streak Progress Bar
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Text(
-                        'Consistency',
-                        style: TextStyle(
-                          color: OledTheme.textMuted,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${widget.skill.consistencyPct}%',
-                        style: const TextStyle(
-                          color: OledTheme.textPrimary,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      const Text('🔥 ', style: TextStyle(fontSize: 12)),
-                      Text(
-                        '${widget.skill.streak} day streak',
-                        style: const TextStyle(
-                          color: OledTheme.amber,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: (widget.skill.consistencyPct / 100).clamp(0.0, 1.0),
-                  minHeight: 5,
-                  backgroundColor: OledTheme.cardElevated,
-                  valueColor: AlwaysStoppedAnimation<Color>(accent),
-                ),
-              ),
-            ],
+          // Animated Consistency & Streak Progress Bar
+          AnimatedConsistencyBar(
+            percentage: widget.skill.consistencyPct,
+            accentColor: accent,
+            index: widget.index,
+            streakDays: widget.skill.streak,
           ),
         ],
       ),

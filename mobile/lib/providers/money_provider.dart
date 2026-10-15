@@ -457,7 +457,182 @@ class BudgetsNotifier extends StateNotifier<AsyncValue<List<Budget>>> {
   }
 }
 
-// Derived Money Metrics
+final selectedMoneyMonthProvider = StateProvider<DateTime>((ref) {
+  final now = DateTime.now();
+  return DateTime(now.year, now.month, 1);
+});
+
+class CategorySpending {
+  final String category;
+  final double amount;
+  final double percentage;
+  final int transactionCount;
+
+  const CategorySpending({
+    required this.category,
+    required this.amount,
+    required this.percentage,
+    required this.transactionCount,
+  });
+}
+
+class MonthlyAnalytics {
+  final DateTime selectedMonth;
+  final bool isCurrentMonth;
+  final bool isFutureMonth;
+  final double totalExpense;
+  final int transactionCount;
+  final double avgDailySpending;
+  final int daysInMonth;
+  final int elapsedDays;
+  final String highestCategory;
+  final double highestCategoryAmount;
+  final double previousMonthTotal;
+  final double differenceFromPreviousMonth;
+  final double percentageChangeFromPreviousMonth;
+  final bool hasPreviousMonthData;
+  final List<CategorySpending> categoryBreakdowns;
+  final Map<String, double> dailyTotals;
+  final double todayTotal;
+
+  const MonthlyAnalytics({
+    required this.selectedMonth,
+    required this.isCurrentMonth,
+    required this.isFutureMonth,
+    required this.totalExpense,
+    required this.transactionCount,
+    required this.avgDailySpending,
+    required this.daysInMonth,
+    required this.elapsedDays,
+    required this.highestCategory,
+    required this.highestCategoryAmount,
+    required this.previousMonthTotal,
+    required this.differenceFromPreviousMonth,
+    required this.percentageChangeFromPreviousMonth,
+    required this.hasPreviousMonthData,
+    required this.categoryBreakdowns,
+    required this.dailyTotals,
+    required this.todayTotal,
+  });
+}
+
+final monthlyAnalyticsProvider = Provider<MonthlyAnalytics>((ref) {
+  final selectedMonth = ref.watch(selectedMoneyMonthProvider);
+  final expenses = ref.watch(expensesProvider).value ?? [];
+
+  final now = DateTime.now();
+  final isCurrentMonth =
+      selectedMonth.year == now.year && selectedMonth.month == now.month;
+  final isFutureMonth = selectedMonth.year > now.year ||
+      (selectedMonth.year == now.year && selectedMonth.month > now.month);
+
+  final monthPrefix = DateFormat('yyyy-MM').format(selectedMonth);
+  final prevMonth = DateTime(selectedMonth.year, selectedMonth.month - 1, 1);
+  final prevMonthPrefix = DateFormat('yyyy-MM').format(prevMonth);
+  final todayStr = DateFormat('yyyy-MM-dd').format(now);
+
+  final targetExpenses = <Expense>[];
+  final prevExpenses = <Expense>[];
+
+  for (final e in expenses) {
+    if (e.deletedAt != null) continue;
+    if (e.expenseDate.startsWith(monthPrefix)) {
+      targetExpenses.add(e);
+    } else if (e.expenseDate.startsWith(prevMonthPrefix)) {
+      prevExpenses.add(e);
+    }
+  }
+
+  final totalExpense =
+      targetExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+  final prevTotal =
+      prevExpenses.fold<double>(0.0, (sum, e) => sum + e.amount);
+  final transactionCount = targetExpenses.length;
+
+  final daysInMonth =
+      DateTime(selectedMonth.year, selectedMonth.month + 1, 0).day;
+  final int elapsedDays;
+  final double avgDaily;
+
+  if (isCurrentMonth) {
+    elapsedDays = now.day.clamp(1, daysInMonth);
+    avgDaily = totalExpense / elapsedDays;
+  } else if (isFutureMonth) {
+    elapsedDays = 0;
+    avgDaily = 0.0;
+  } else {
+    elapsedDays = daysInMonth;
+    avgDaily = totalExpense / daysInMonth;
+  }
+
+  final catTotals = <String, double>{};
+  final catCounts = <String, int>{};
+  final dailyTotals = <String, double>{};
+  double todaySum = 0.0;
+
+  for (final e in targetExpenses) {
+    catTotals[e.category] = (catTotals[e.category] ?? 0.0) + e.amount;
+    catCounts[e.category] = (catCounts[e.category] ?? 0) + 1;
+    dailyTotals[e.expenseDate] = (dailyTotals[e.expenseDate] ?? 0.0) + e.amount;
+    if (isCurrentMonth && e.expenseDate == todayStr) {
+      todaySum += e.amount;
+    }
+  }
+
+  String highestCat = 'None';
+  double highestAmt = 0.0;
+  catTotals.forEach((cat, amt) {
+    if (amt > highestAmt) {
+      highestAmt = amt;
+      highestCat =
+          cat.isNotEmpty ? cat[0].toUpperCase() + cat.substring(1) : 'None';
+    }
+  });
+
+  final categoryBreakdowns = catTotals.entries.map((entry) {
+    final pct = totalExpense > 0 ? (entry.value / totalExpense * 100) : 0.0;
+    return CategorySpending(
+      category: entry.key,
+      amount: entry.value,
+      percentage: pct,
+      transactionCount: catCounts[entry.key] ?? 0,
+    );
+  }).toList()
+    ..sort((a, b) => b.amount.compareTo(a.amount));
+
+  final diff = totalExpense - prevTotal;
+  final bool hasPrev = prevExpenses.isNotEmpty;
+  final double pctChange;
+  if (prevTotal > 0) {
+    pctChange = (diff / prevTotal) * 100;
+  } else if (totalExpense > 0) {
+    pctChange = 100.0;
+  } else {
+    pctChange = 0.0;
+  }
+
+  return MonthlyAnalytics(
+    selectedMonth: selectedMonth,
+    isCurrentMonth: isCurrentMonth,
+    isFutureMonth: isFutureMonth,
+    totalExpense: totalExpense,
+    transactionCount: transactionCount,
+    avgDailySpending: avgDaily,
+    daysInMonth: daysInMonth,
+    elapsedDays: elapsedDays,
+    highestCategory: highestCat,
+    highestCategoryAmount: highestAmt,
+    previousMonthTotal: prevTotal,
+    differenceFromPreviousMonth: diff,
+    percentageChangeFromPreviousMonth: pctChange,
+    hasPreviousMonthData: hasPrev,
+    categoryBreakdowns: categoryBreakdowns,
+    dailyTotals: dailyTotals,
+    todayTotal: todaySum,
+  );
+});
+
+// Derived Money Metrics (Backwards compatible for any existing consumers)
 class MoneySummary {
   final double todayTotal;
   final double monthTotal;
@@ -492,6 +667,7 @@ final moneySummaryProvider = Provider<MoneySummary>((ref) {
   final Map<String, double> dailyTotals = {};
 
   for (final e in expenses) {
+    if (e.deletedAt != null) continue;
     if (e.expenseDate == todayStr) {
       todaySum += e.amount;
     }

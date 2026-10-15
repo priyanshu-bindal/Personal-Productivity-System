@@ -74,6 +74,10 @@ class _BrandedRefreshIndicatorState extends State<BrandedRefreshIndicator>
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical || notification.depth != 0) {
+      return false;
+    }
+
     if (_state == _RefreshState.refreshing ||
         _state == _RefreshState.completed ||
         _state == _RefreshState.error) {

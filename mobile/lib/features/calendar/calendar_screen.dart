@@ -1,13 +1,17 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../core/animation/tab_activation_scope.dart';
 import '../../core/theme/oled_theme.dart';
 import '../../core/widgets/animated_card.dart';
+import '../../core/widgets/micro_interactions/branded_refresh_indicator.dart';
 import '../../core/widgets/pressable_scale.dart';
 import '../../models/learning_session.dart';
 import '../../providers/sessions_provider.dart';
+import '../../routes/scaffold_with_nav_bar.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
   const CalendarScreen({super.key});
@@ -72,16 +76,25 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final weekDays = List.generate(7, (i) => _selectedWeekMonday.add(Duration(days: i)));
     final todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final selectedDateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final bottomClearance = math.max(110.0, getNavBarClearance(context));
 
-    return Container(
-      decoration: OledTheme.backgroundDecoration,
+    return TabCardScope(
+      tabIndex: 2,
+      child: Container(
+        decoration: OledTheme.backgroundDecoration,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
-          child: SingleChildScrollView(
-            // Bottom padding 110 prevents content from hiding behind floating nav
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
-            child: Column(
+          child: BrandedRefreshIndicator(
+            onRefresh: () async {
+              await ref.read(sessionsProvider.notifier).fetchSessions(forceRefresh: true);
+            },
+            color: OledTheme.violet,
+            backgroundColor: OledTheme.card,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(20, 16, 20, bottomClearance),
+              child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // ── Header & View Toggle ──────────────────────────────────────
@@ -169,70 +182,76 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 const SizedBox(height: 18),
 
                 // ── Period Navigation Bar ─────────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: OledTheme.card,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: OledTheme.border),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        icon: const Icon(LucideIcons.chevronLeft, color: OledTheme.textPrimary, size: 20),
-                        onPressed: _previousPeriod,
-                      ),
-                      PressableScale(
-                        onTap: _goToToday,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: OledTheme.cardElevated,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: OledTheme.borderSubtle),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                _isMonthlyView
-                                    ? DateFormat('MMMM yyyy').format(_currentMonth)
-                                    : '${DateFormat('MMM d').format(weekDays.first)} – ${DateFormat('MMM d, yyyy').format(weekDays.last)}',
-                                style: const TextStyle(
-                                  color: OledTheme.textPrimary,
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: OledTheme.cyan.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'Today',
-                                  style: TextStyle(
-                                    color: OledTheme.cyan,
-                                    fontSize: 10.5,
+                AnimatedCard(
+                  index: 0,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: EdgeInsets.zero,
+                  backgroundColor: Colors.transparent,
+                  border: Border.all(color: Colors.transparent, width: 0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: OledTheme.card,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: OledTheme.border),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        IconButton(
+                          icon: const Icon(LucideIcons.chevronLeft, color: OledTheme.textPrimary, size: 20),
+                          onPressed: _previousPeriod,
+                        ),
+                        PressableScale(
+                          onTap: _goToToday,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: OledTheme.cardElevated,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: OledTheme.borderSubtle),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _isMonthlyView
+                                      ? DateFormat('MMMM yyyy').format(_currentMonth)
+                                      : '${DateFormat('MMM d').format(weekDays.first)} – ${DateFormat('MMM d, yyyy').format(weekDays.last)}',
+                                  style: const TextStyle(
+                                    color: OledTheme.textPrimary,
+                                    fontSize: 13.5,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: OledTheme.cyan.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'Today',
+                                    style: TextStyle(
+                                      color: OledTheme.cyan,
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(LucideIcons.chevronRight, color: OledTheme.textPrimary, size: 20),
-                        onPressed: _nextPeriod,
-                      ),
-                    ],
+                        IconButton(
+                          icon: const Icon(LucideIcons.chevronRight, color: OledTheme.textPrimary, size: 20),
+                          onPressed: _nextPeriod,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
 
                 // ── VIEW MODES ────────────────────────────────────────────────
                 if (!_isMonthlyView) ...[
@@ -250,7 +269,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                       final completedCount = daySessions.where((s) => s.status == 'completed').length;
 
                       return AnimatedCard(
-                        index: index,
+                        index: index + 1,
                         margin: const EdgeInsets.only(bottom: 12),
                         padding: const EdgeInsets.all(16),
                         backgroundColor: isToday
@@ -355,29 +374,44 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   ),
                 ] else ...[
                   // ── MONTH VIEW ──────────────────────────────────────────────
-                  _MonthCalendarView(
-                    currentMonth: _currentMonth,
-                    selectedDate: _selectedDate,
-                    todayStr: todayStr,
-                    allSessions: allSessions,
-                    onSelectDate: (d) => setState(() => _selectedDate = d),
+                  AnimatedCard(
+                    index: 1,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: EdgeInsets.zero,
+                    backgroundColor: Colors.transparent,
+                    border: Border.all(color: Colors.transparent, width: 0),
+                    child: _MonthCalendarView(
+                      currentMonth: _currentMonth,
+                      selectedDate: _selectedDate,
+                      todayStr: todayStr,
+                      allSessions: allSessions,
+                      onSelectDate: (d) => setState(() => _selectedDate = d),
+                    ),
                   ),
-                  const SizedBox(height: 16),
 
                   // ── SELECTED DAY SESSIONS DETAIL CARD ───────────────────────
-                  _SelectedDayDetailCard(
-                    date: _selectedDate,
-                    sessions: allSessions.where((s) => s.scheduledDate == selectedDateStr).toList(),
-                    todayStr: todayStr,
+                  AnimatedCard(
+                    index: 2,
+                    margin: EdgeInsets.zero,
+                    padding: EdgeInsets.zero,
+                    backgroundColor: Colors.transparent,
+                    border: Border.all(color: Colors.transparent, width: 0),
+                    child: _SelectedDayDetailCard(
+                      date: _selectedDate,
+                      sessions: allSessions.where((s) => s.scheduledDate == selectedDateStr).toList(),
+                      todayStr: todayStr,
+                    ),
                   ),
                 ],
               ],
             ),
           ),
         ),
+        ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ─── Week View Calendar Session Row ──────────────────────────────────────────

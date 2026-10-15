@@ -352,7 +352,7 @@ void main() {
   });
 
   group('Responsive TabBar - No Text Clipping', () {
-    testWidgets('Renders all 4 tab labels fully without ellipsis on small screen (360x640)', (tester) async {
+    testWidgets('Renders all 3 finance tab labels fully without clipping on small screen (360x640)', (tester) async {
       tester.view.physicalSize = const Size(360, 640);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -360,7 +360,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: DefaultTabController(
-            length: 4,
+            length: 3,
             child: Scaffold(
               appBar: AppBar(
                 bottom: PreferredSize(
@@ -369,14 +369,11 @@ void main() {
                     margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
                     padding: const EdgeInsets.all(3),
                     child: TabBar(
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.center,
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+                      isScrollable: false,
                       tabs: const [
                         Tab(child: Text('Overview', maxLines: 1, softWrap: false)),
                         Tab(child: Text('Expenses', maxLines: 1, softWrap: false)),
                         Tab(child: Text('Categories', maxLines: 1, softWrap: false)),
-                        Tab(child: Text('Budgets', maxLines: 1, softWrap: false)),
                       ],
                     ),
                   ),
@@ -387,7 +384,6 @@ void main() {
                   Text('Overview Tab Content'),
                   Text('Expenses Tab Content'),
                   Text('Categories Tab Content'),
-                  Text('Budgets Tab Content'),
                 ],
               ),
             ),
@@ -397,11 +393,10 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      // All 4 tabs must be fully visible and rendered
+      // All 3 tabs must be fully visible and rendered
       expect(find.text('Overview'), findsOneWidget);
       expect(find.text('Expenses'), findsOneWidget);
       expect(find.text('Categories'), findsOneWidget);
-      expect(find.text('Budgets'), findsOneWidget);
     });
   });
 

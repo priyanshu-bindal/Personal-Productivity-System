@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/widgets/micro_interactions/premium_success_overlay.dart';
 import '../../core/widgets/pressable_scale.dart';
 import '../../core/widgets/trash_confirmation_overlay.dart';
 import '../../models/user_profile.dart';
@@ -14,6 +16,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../providers/sessions_provider.dart';
+import '../../routes/scaffold_with_nav_bar.dart';
 import '../../services/cache_service.dart';
 import '../../services/supabase_service.dart';
 import '../../services/notification_service.dart';
@@ -21,21 +24,34 @@ import '../../services/fcm_notification_service.dart';
 import 'services/pdf_export_service.dart';
 
 // ─── COLOR SYSTEM TOKENS ───────────────────────────────────────────────────────
-// True OLED dark productivity palette (~90% black/navy, ~10% blue/cyan accents)
+// OLED-first premium palette (#000000 true black, #111316 card surface,
+// #171A20 elevated surface, #292D35 border, with restrained semantic icon accents)
 class _SettingsColors {
-  static const Color background = Color(0xFF000000);   // true OLED black
-  static const Color card = Color(0xFF080D17);          // deep navy card
-  static const Color surface = Color(0xFF0B1220);       // secondary surface
-  static const Color pressed = Color(0xFF101A2D);       // pressed/selected state
-  static const Color border = Color(0xFF162640);        // subtle border
-  static const Color primaryBlue = Color(0xFF2F6BFF);   // primary accent
-  static const Color cyanAccent = Color(0xFF19BDB3);    // restrained cyan (NOT neon)
-  static const Color textPrimary = Color(0xFFF1F5F9);   // primary text
-  static const Color textSecondary = Color(0xFF8291A7); // secondary text
-  static const Color textMuted = Color(0xFF64748B);     // muted/placeholder text
-  static const Color destructive = Color(0xFFFF5C68);   // error/danger
-  static const Color destructiveBg = Color(0x12FF5C68); // subtle red bg
-  static const Color destructiveBorder = Color(0x30FF5C68); // subtle red border
+  static const Color background = Color(0xFF000000);       // true OLED black (#000000)
+  static const Color card = Color(0xFF111316);             // card surface (#111316)
+  static const Color surface = Color(0xFF171A20);          // elevated surface (#171A20)
+  static const Color pressed = Color(0xFF1C2028);          // subtle pressed surface
+  static const Color border = Color(0xFF292D35);           // restrained border (#292D35)
+  static const Color textPrimary = Color(0xFFF4F7FB);      // primary text (#F4F7FB)
+  static const Color textSecondary = Color(0xFF98A2B3);    // secondary text (#98A2B3)
+  static const Color textMuted = Color(0xFF64748B);        // muted placeholder
+
+  // Semantic icon accents
+  static const Color emerald = Color(0xFF20D6A1);          // #20D6A1
+  static const Color cyan = Color(0xFF35D9F8);             // #35D9F8
+  static const Color violet = Color(0xFFA78BFA);           // #A78BFA
+  static const Color amber = Color(0xFFFFC66D);            // #FFC66D
+  static const Color coral = Color(0xFFFF7D87);            // #FF7D87
+  static const Color blue = Color(0xFF5B8CFF);             // #5B8CFF
+
+  // Destructive / danger alias
+  static const Color destructive = coral;                  // #FF7D87
+  static const Color destructiveBg = Color(0x18FF7D87);    // subtle coral red bg
+  static const Color destructiveBorder = Color(0x38FF7D87);// subtle coral red border
+
+  // Compatibility aliases
+  static const Color primaryBlue = blue;
+  static const Color cyanAccent = cyan;
 }
 
 class SettingsScreen extends ConsumerWidget {
@@ -45,6 +61,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(profileProvider);
     final profile = profileAsync.value;
+    final bottomClearance = math.max(100.0, getNavBarClearance(context));
 
     return Scaffold(
       backgroundColor: _SettingsColors.background,
@@ -92,8 +109,10 @@ class SettingsScreen extends ConsumerWidget {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          padding: EdgeInsets.fromLTRB(16, 12, 16, bottomClearance),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -105,41 +124,39 @@ class SettingsScreen extends ConsumerWidget {
 
               // 1. ACCOUNT SECTION
               const _SectionLabel(label: 'ACCOUNT'),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               _AccountCard(profile: profile),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               // 2. NOTIFICATIONS SECTION
               const _SectionLabel(label: 'NOTIFICATIONS'),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               _NotificationsCard(profile: profile),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               // 3. DATA & PRIVACY SECTION
               const _SectionLabel(label: 'DATA & PRIVACY'),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               const _DataAndPrivacyCard(),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
-              // 4. DANGER ZONE SECTION
+              // 4. ABOUT SECTION
+              const _SectionLabel(label: 'ABOUT'),
+              const SizedBox(height: 8),
+              const _AboutCard(),
+
+              const SizedBox(height: 18),
+
+              // 5. DANGER ZONE SECTION
               const _SectionLabel(
                 label: 'DANGER ZONE',
                 color: _SettingsColors.destructive,
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               _DangerZoneCard(profile: profile),
-
-              const SizedBox(height: 20),
-
-              // 5. ABOUT SECTION
-              const _SectionLabel(label: 'ABOUT'),
-              const SizedBox(height: 10),
-              const _AboutCard(),
-
-              const SizedBox(height: 36),
             ],
           ),
         ),
@@ -314,6 +331,174 @@ class _PendingDeletionBannerState
   }
 }
 
+// ─── REUSABLE SETTINGS CARD CONTAINER (MATCHING REFERENCE) ───────────────────
+
+class _SettingsCard extends StatelessWidget {
+  final List<Widget> children;
+  final Color? backgroundColor;
+  final Color? borderColor;
+
+  const _SettingsCard({
+    required this.children,
+    this.backgroundColor,
+    this.borderColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: backgroundColor ?? _SettingsColors.card,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: borderColor ?? _SettingsColors.border.withValues(alpha: 0.7),
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: children,
+      ),
+    );
+  }
+}
+
+// ─── REUSABLE SETTINGS ROW TILE (MATCHING REFERENCE) ─────────────────────────
+
+class _SettingsRowTile extends StatefulWidget {
+  final IconData? icon;
+  final Color iconColor;
+  final String title;
+  final Color? titleColor;
+  final String? subtitle;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  const _SettingsRowTile({
+    this.icon,
+    this.iconColor = _SettingsColors.primaryBlue,
+    required this.title,
+    this.titleColor,
+    this.subtitle,
+    this.trailing,
+    this.onTap,
+  });
+
+  @override
+  State<_SettingsRowTile> createState() => _SettingsRowTileState();
+}
+
+class _SettingsRowTileState extends State<_SettingsRowTile> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveIconColor = widget.iconColor;
+    final badgeBg = Color.alphaBlend(
+      effectiveIconColor.withValues(alpha: 0.16),
+      const Color(0xFF1B1E26),
+    );
+
+    final leadingWidget = widget.icon != null
+        ? Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: badgeBg,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              widget.icon,
+              color: effectiveIconColor,
+              size: 20,
+            ),
+          )
+        : null;
+
+    final content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+      child: Row(
+        children: [
+          if (leadingWidget != null) ...[
+            leadingWidget,
+            const SizedBox(width: 14),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  widget.title,
+                  style: GoogleFonts.inter(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w500,
+                    color: widget.titleColor ?? _SettingsColors.textPrimary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                if (widget.subtitle != null && widget.subtitle!.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    widget.subtitle!,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      color: _SettingsColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (widget.trailing != null)
+            widget.trailing!
+          else if (widget.onTap != null)
+            Icon(
+              LucideIcons.chevronRight,
+              color: (widget.titleColor == _SettingsColors.destructive ||
+                      widget.titleColor == _SettingsColors.coral)
+                  ? _SettingsColors.coral.withValues(alpha: 0.8)
+                  : _SettingsColors.textSecondary.withValues(alpha: 0.65),
+              size: 18,
+            ),
+        ],
+      ),
+    );
+
+    if (widget.onTap != null) {
+      return PressableScale(
+        scaleFactor: 0.99,
+        duration: const Duration(milliseconds: 100),
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          decoration: BoxDecoration(
+            color: _isPressed ? _SettingsColors.pressed : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onHighlightChanged: (val) => setState(() => _isPressed = val),
+              onTap: widget.onTap,
+              hoverColor: _SettingsColors.surface,
+              splashColor: effectiveIconColor.withValues(alpha: 0.08),
+              highlightColor: _SettingsColors.pressed,
+              child: content,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return content;
+  }
+}
+
 // ─── ACCOUNT CARD ─────────────────────────────────────────────────────────────
 
 class _AccountCard extends ConsumerWidget {
@@ -350,162 +535,135 @@ class _AccountCard extends ConsumerWidget {
     final initial = fullName.isNotEmpty ? fullName[0].toUpperCase() : 'U';
     final email = profile?.email ?? 'No email available';
 
-    return Container(
-      decoration: BoxDecoration(
-        color: _SettingsColors.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _SettingsColors.border, width: 1),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x33000000),
-            blurRadius: 10,
-            offset: Offset(0, 3),
+    return _SettingsCard(
+      children: [
+        // Top: Avatar + Name + Email + Edit Profile Button
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              // Circular Avatar
+              PressableScale(
+                scaleFactor: 0.96,
+                onTap: () => _openEditProfileSheet(context),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Color.alphaBlend(
+                      _SettingsColors.primaryBlue.withValues(alpha: 0.16),
+                      const Color(0xFF1B1E26),
+                    ),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _SettingsColors.primaryBlue.withValues(alpha: 0.4),
+                      width: 1.5,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    initial,
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: _SettingsColors.primaryBlue,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              // Name & Email
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fullName,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: _SettingsColors.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      email,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        color: _SettingsColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Edit Profile Button
+              PressableScale(
+                scaleFactor: 0.95,
+                onTap: () => _openEditProfileSheet(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _SettingsColors.surface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: _SettingsColors.primaryBlue.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        LucideIcons.edit2,
+                        size: 11,
+                        color: _SettingsColors.textSecondary,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Edit Profile',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _SettingsColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(17),
-        child: Column(
-          children: [
-            // Top: Avatar + Name + Email + Edit Profile Button
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  // Circular Avatar with subtle blue/cyan outline (no neon)
-                  PressableScale(
-                    scaleFactor: 0.97,
-                    onTap: () => _openEditProfileSheet(context),
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: _SettingsColors.surface,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _SettingsColors.primaryBlue.withValues(alpha: 0.4),
-                          width: 1.5,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        initial,
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: _SettingsColors.primaryBlue,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  // Name & Email
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          fullName,
-                          style: GoogleFonts.spaceGrotesk(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: _SettingsColors.textPrimary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          email,
-                          style: GoogleFonts.inter(
-                            fontSize: 12.5,
-                            color: _SettingsColors.textSecondary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Edit Profile Button (clean dark navy with subtle blue border)
-                  PressableScale(
-                    scaleFactor: 0.95,
-                    onTap: () => _openEditProfileSheet(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _SettingsColors.surface,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: _SettingsColors.primaryBlue.withValues(alpha: 0.35),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            LucideIcons.edit2,
-                            size: 11,
-                            color: _SettingsColors.textSecondary,
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            'Edit Profile',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: _SettingsColors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const Divider(height: 1, color: _SettingsColors.border),
-
-            // Focus ID Section
-            const Padding(
-              padding: EdgeInsets.all(14),
-              child: _FocusIdRow(),
-            ),
-
-            const Divider(height: 1, color: _SettingsColors.border),
-
-            // Change Password Action Row
-            _SettingsActionTile(
-              icon: LucideIcons.keyRound,
-              iconColor: _SettingsColors.primaryBlue,
-              title: 'Change Password',
-              titleColor: _SettingsColors.textPrimary,
-              trailing: const Icon(
-                LucideIcons.chevronRight,
-                color: _SettingsColors.textSecondary,
-                size: 16,
-              ),
-              onTap: () => _openChangePasswordSheet(context),
-            ),
-
-            const Divider(height: 1, color: _SettingsColors.border),
-
-            // Sign Out Action Row
-            _SettingsActionTile(
-              icon: LucideIcons.logOut,
-              iconColor: _SettingsColors.destructive,
-              title: 'Sign Out',
-              titleColor: _SettingsColors.destructive,
-              onTap: () => _openSignOutDialog(context, ref),
-            ),
-          ],
         ),
-      ),
+
+        // Focus ID Row
+        const _FocusIdRow(),
+
+        // Change Password Action Row
+        _SettingsRowTile(
+          icon: LucideIcons.keyRound,
+          iconColor: _SettingsColors.violet,
+          title: 'Change Password',
+          subtitle: 'Update your account password',
+          onTap: () => _openChangePasswordSheet(context),
+        ),
+
+        // Sign Out Action Row
+        _SettingsRowTile(
+          icon: LucideIcons.logOut,
+          iconColor: _SettingsColors.destructive,
+          title: 'Sign Out',
+          titleColor: _SettingsColors.destructive,
+          subtitle: 'Log out of your session',
+          onTap: () => _openSignOutDialog(context, ref),
+        ),
+      ],
     );
   }
 }
@@ -536,108 +694,57 @@ class _FocusIdRowState extends ConsumerState<_FocusIdRow> {
     final chatId = chatIdAsync.value ?? '···';
     final canCopy = chatId != '···';
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: _SettingsColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _SettingsColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: _SettingsColors.primaryBlue.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: _SettingsColors.primaryBlue.withValues(alpha: 0.35),
-              ),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              LucideIcons.hash,
-              color: _SettingsColors.primaryBlue,
-              size: 14,
+    return _SettingsRowTile(
+      icon: LucideIcons.hash,
+      iconColor: _SettingsColors.primaryBlue,
+      title: 'Focus ID',
+      subtitle: '#$chatId',
+      onTap: canCopy ? () => _copy(chatId) : null,
+      trailing: PressableScale(
+        scaleFactor: 0.94,
+        onTap: canCopy ? () => _copy(chatId) : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: _copied
+                ? _SettingsColors.primaryBlue.withValues(alpha: 0.15)
+                : _SettingsColors.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _copied
+                  ? _SettingsColors.primaryBlue.withValues(alpha: 0.5)
+                  : _SettingsColors.border,
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'YOUR FOCUS ID',
-                  style: GoogleFonts.spaceGrotesk(
-                    color: _SettingsColors.textSecondary,
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  '#$chatId',
-                  style: const TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFFBFDBFE),
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          PressableScale(
-            scaleFactor: 0.94,
-            onTap: canCopy ? () => _copy(chatId) : null,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _copied
-                    ? _SettingsColors.primaryBlue.withValues(alpha: 0.15)
-                    : _SettingsColors.card,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Icon(
+                  _copied ? LucideIcons.check : LucideIcons.copy,
+                  key: ValueKey<bool>(_copied),
+                  size: 13,
                   color: _copied
-                      ? _SettingsColors.primaryBlue.withValues(alpha: 0.5)
-                      : _SettingsColors.border,
+                      ? _SettingsColors.primaryBlue
+                      : _SettingsColors.textSecondary,
                 ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
-                    child: Icon(
-                      _copied ? LucideIcons.check : LucideIcons.copy,
-                      key: ValueKey<bool>(_copied),
-                      size: 13,
-                      color: _copied
-                          ? _SettingsColors.primaryBlue
-                          : _SettingsColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    _copied ? 'Copied' : 'Copy',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: _copied
-                          ? _SettingsColors.primaryBlue
-                          : _SettingsColors.textSecondary,
-                    ),
-                  ),
-                ],
+              const SizedBox(width: 5),
+              Text(
+                _copied ? 'Copied' : 'Copy',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _copied
+                      ? _SettingsColors.primaryBlue
+                      : _SettingsColors.textSecondary,
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -942,69 +1049,29 @@ class _NotificationsCardState extends ConsumerState<_NotificationsCard>
     required String subtitle,
     required bool value,
     required ValueChanged<bool> onChanged,
+    Color iconColor = _SettingsColors.primaryBlue,
     bool isWarning = false,
   }) {
-    return Row(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: _SettingsColors.surface,
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: _SettingsColors.border),
-          ),
-          alignment: Alignment.center,
-          child: Icon(
-            icon,
-            color: isWarning
-                ? _SettingsColors.textMuted
-                : _SettingsColors.primaryBlue,
-            size: 16,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: GoogleFonts.inter(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w600,
-                  color: _SettingsColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: isWarning
-                      ? _SettingsColors.destructive.withValues(alpha: 0.75)
-                      : _SettingsColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 10),
-        Switch(
-          value: value,
-          activeTrackColor: _SettingsColors.primaryBlue,
-          activeThumbColor: Colors.white,
-          inactiveTrackColor: _SettingsColors.surface,
-          inactiveThumbColor: _SettingsColors.textMuted,
-          trackOutlineColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) {
-              return _SettingsColors.primaryBlue;
-            }
-            return _SettingsColors.border;
-          }),
-          onChanged: onChanged,
-        ),
-      ],
+    final effectiveColor = isWarning ? _SettingsColors.textMuted : iconColor;
+    return _SettingsRowTile(
+      icon: icon,
+      iconColor: effectiveColor,
+      title: title,
+      subtitle: subtitle,
+      trailing: Switch(
+        value: value,
+        activeTrackColor: effectiveColor,
+        activeThumbColor: Colors.white,
+        inactiveTrackColor: _SettingsColors.surface,
+        inactiveThumbColor: _SettingsColors.textMuted,
+        trackOutlineColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return effectiveColor;
+          }
+          return _SettingsColors.border;
+        }),
+        onChanged: onChanged,
+      ),
     );
   }
 
@@ -1013,65 +1080,50 @@ class _NotificationsCardState extends ConsumerState<_NotificationsCard>
     final permissionDeniedHint =
         _isInitialized && _permissionGranted == false;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: _SettingsColors.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _SettingsColors.border, width: 1),
-      ),
-      child: Column(
-        children: [
-          // 1. Daily Practice Reminders (Local Smart Reminders)
-          _buildToggleRow(
-            icon: LucideIcons.bell,
-            title: 'Daily Practice Reminders',
-            subtitle: permissionDeniedHint && !_isEnabled
-                ? 'Allow in device Settings to activate'
-                : _isEnabled
-                    ? 'Smart reminders are active'
-                    : 'Receive a prompt to stay on streak',
-            value: _isEnabled,
-            onChanged: _handleToggle,
-            isWarning: permissionDeniedHint && !_isEnabled,
-          ),
+    return _SettingsCard(
+      children: [
+        // 1. Daily Practice Reminders (Amber circular badge)
+        _buildToggleRow(
+          icon: LucideIcons.bell,
+          title: 'Daily Practice Reminders',
+          iconColor: _SettingsColors.amber,
+          subtitle: permissionDeniedHint && !_isEnabled
+              ? 'Allow in device Settings to activate'
+              : _isEnabled
+                  ? 'Smart reminders are active'
+                  : 'Receive a prompt to stay on streak',
+          value: _isEnabled,
+          onChanged: _handleToggle,
+          isWarning: permissionDeniedHint && !_isEnabled,
+        ),
 
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Divider(color: _SettingsColors.border, height: 1, thickness: 0.8),
-          ),
+        // 2. Direct Messages (Blue circular badge)
+        _buildToggleRow(
+          icon: LucideIcons.messageSquare,
+          title: 'Direct Messages',
+          iconColor: _SettingsColors.blue,
+          subtitle: permissionDeniedHint && !_isMessagesEnabled
+              ? 'Allow in device Settings to activate'
+              : _isMessagesEnabled
+                  ? 'Instant alerts for 1-to-1 chats'
+                  : 'Chat notifications muted',
+          value: _isMessagesEnabled,
+          onChanged: _handleMessagesToggle,
+          isWarning: permissionDeniedHint && !_isMessagesEnabled,
+        ),
 
-          // 2. Direct Messages (FCM Remote Chat Alerts)
-          _buildToggleRow(
-            icon: LucideIcons.messageSquare,
-            title: 'Direct Messages',
-            subtitle: permissionDeniedHint && !_isMessagesEnabled
-                ? 'Allow in device Settings to activate'
-                : _isMessagesEnabled
-                    ? 'Instant alerts for 1-to-1 chats'
-                    : 'Chat notifications muted',
-            value: _isMessagesEnabled,
-            onChanged: _handleMessagesToggle,
-            isWarning: permissionDeniedHint && !_isMessagesEnabled,
-          ),
-
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Divider(color: _SettingsColors.border, height: 1, thickness: 0.8),
-          ),
-
-          // 3. Announcements & Updates (FCM Broadcast Alerts)
-          _buildToggleRow(
-            icon: LucideIcons.megaphone,
-            title: 'Announcements & Updates',
-            subtitle: _isAnnouncementsEnabled
-                ? 'Important FocusFlow news & feature updates'
-                : 'Announcements muted',
-            value: _isAnnouncementsEnabled,
-            onChanged: _handleAnnouncementsToggle,
-          ),
-        ],
-      ),
+        // 3. Announcements & Updates (Cyan circular badge)
+        _buildToggleRow(
+          icon: LucideIcons.megaphone,
+          title: 'Announcements & Updates',
+          iconColor: _SettingsColors.cyan,
+          subtitle: _isAnnouncementsEnabled
+              ? 'Important FocusFlow news & feature updates'
+              : 'Announcements muted',
+          value: _isAnnouncementsEnabled,
+          onChanged: _handleAnnouncementsToggle,
+        ),
+      ],
     );
   }
 }
@@ -1290,20 +1342,21 @@ class _DataAndPrivacyCardState extends ConsumerState<_DataAndPrivacyCard> {
       ref.invalidate(sessionsProvider);
       ref.invalidate(profileProvider);
 
+      if (!mounted) return;
+      await _loadCacheMetrics(); // Update the size display
+
+      if (!mounted) return;
+      await PremiumSuccessOverlay.show(
+        context: context,
+        title: 'Cache Cleared Successfully',
+        subtitle: 'Your app is refreshed and ready.',
+      );
+    } catch (e) {
+      debugPrint('Error clearing cache: $e');
       if (mounted) {
-        final messenger = ScaffoldMessenger.of(context);
-        await _loadCacheMetrics(); // Update the size display
-        messenger.showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Cache cleared. Data refreshed.',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-            ),
-            backgroundColor: const Color(0xFF2F6BFF),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: const Duration(seconds: 3),
-          ),
+        TrashConfirmationOverlay.showError(
+          context: context,
+          message: "Couldn't clear cache. Please try again.",
         );
       }
     } finally {
@@ -1313,73 +1366,55 @@ class _DataAndPrivacyCardState extends ConsumerState<_DataAndPrivacyCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _SettingsColors.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _SettingsColors.border, width: 1),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(17),
-        child: Column(
-          children: [
-            // Export Personal Data as PDF (fills full width properly)
-            _SettingsNavigationTile(
-              icon: LucideIcons.fileDown,
-              iconColor: _SettingsColors.cyanAccent,
-              title: 'Export Personal Data',
-              subtitle: 'Download your FocusFlow data as a PDF',
-              trailing: _isExporting
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: _SettingsColors.cyanAccent,
-                      ),
-                    )
-                  : const Icon(
-                      LucideIcons.chevronRight,
-                      color: _SettingsColors.textSecondary,
-                      size: 16,
-                    ),
-              onTap: _handlePdfExport,
-            ),
-            const Divider(height: 1, color: _SettingsColors.border),
-            // Clear Cache
-            _SettingsNavigationTile(
-              icon: LucideIcons.refreshCw,
-              iconColor: _SettingsColors.primaryBlue,
-              title: 'Clear Cache',
-              subtitle: 'Cached: $_cacheSize · Last updated: $_lastRefreshedLabel',
-              trailing: _isClearingCache
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: _SettingsColors.primaryBlue,
-                      ),
-                    )
-                  : const Icon(
-                      LucideIcons.chevronRight,
-                      color: _SettingsColors.textSecondary,
-                      size: 16,
-                    ),
-              onTap: _handleClearCache,
-            ),
-            const Divider(height: 1, color: _SettingsColors.border),
-            // Trash (fills full width properly)
-            _SettingsNavigationTile(
-              icon: LucideIcons.trash2,
-              iconColor: _SettingsColors.primaryBlue,
-              title: 'Trash',
-              subtitle: 'Restore deleted expenses',
-              onTap: () => context.push('/money/trash'),
-            ),
-          ],
+    return _SettingsCard(
+      children: [
+        // Export Personal Data as PDF (fills full width properly)
+        _SettingsRowTile(
+          icon: LucideIcons.fileDown,
+          iconColor: _SettingsColors.cyan,
+          title: 'Export Personal Data',
+          subtitle: 'Download your FocusFlow data as a PDF',
+          trailing: _isExporting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: _SettingsColors.cyan,
+                  ),
+                )
+              : null,
+          onTap: _handlePdfExport,
         ),
-      ),
+
+        // Clear Cache
+        _SettingsRowTile(
+          icon: LucideIcons.trash2,
+          iconColor: _SettingsColors.amber,
+          title: 'Clear Cache',
+          subtitle: 'Cached: $_cacheSize · Last updated: $_lastRefreshedLabel',
+          trailing: _isClearingCache
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: _SettingsColors.amber,
+                  ),
+                )
+              : null,
+          onTap: _handleClearCache,
+        ),
+
+        // Trash (fills full width properly)
+        _SettingsRowTile(
+          icon: LucideIcons.archive,
+          iconColor: _SettingsColors.emerald,
+          title: 'Trash',
+          subtitle: 'Restore deleted expenses',
+          onTap: () => context.push('/money/trash'),
+        ),
+      ],
     );
   }
 }
@@ -1400,83 +1435,19 @@ class _DangerZoneCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _SettingsColors.destructiveBg,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _SettingsColors.destructiveBorder, width: 1),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(17),
-        child: PressableScale(
-          scaleFactor: 0.99,
-          duration: const Duration(milliseconds: 120),
+    return _SettingsCard(
+      backgroundColor: _SettingsColors.destructiveBg,
+      borderColor: _SettingsColors.destructiveBorder,
+      children: [
+        _SettingsRowTile(
+          icon: LucideIcons.userX,
+          iconColor: _SettingsColors.coral,
+          title: 'Delete Account',
+          titleColor: _SettingsColors.coral,
+          subtitle: 'Permanently delete your FocusFlow account',
           onTap: () => _openDeleteAccountSafetyFlow(context, ref),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _openDeleteAccountSafetyFlow(context, ref),
-              hoverColor: _SettingsColors.destructive.withValues(alpha: 0.1),
-              splashColor: _SettingsColors.destructive.withValues(alpha: 0.16),
-              highlightColor: _SettingsColors.destructive.withValues(alpha: 0.08),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: _SettingsColors.destructive.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(9),
-                        border: Border.all(
-                          color: _SettingsColors.destructive.withValues(alpha: 0.35),
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        LucideIcons.userX,
-                        color: _SettingsColors.destructive,
-                        size: 17,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Delete Account',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
-                              color: _SettingsColors.destructive,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Permanently delete your FocusFlow account',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: _SettingsColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(
-                      LucideIcons.chevronRight,
-                      color: _SettingsColors.destructive,
-                      size: 17,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -1547,99 +1518,49 @@ class _AboutCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _SettingsColors.card,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _SettingsColors.border, width: 1),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(17),
-        child: Column(
-          children: [
-            // App Name & Version
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: _SettingsColors.surface,
-                      borderRadius: BorderRadius.circular(9),
-                      border: Border.all(color: _SettingsColors.border),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      LucideIcons.info,
-                      color: _SettingsColors.primaryBlue,
-                      size: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'FocusFlow',
-                          style: GoogleFonts.inter(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w600,
-                            color: _SettingsColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Version 1.0.0',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: _SettingsColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: _SettingsColors.border),
-            // Privacy Policy
-            _SettingsNavigationTile(
-              icon: LucideIcons.shieldCheck,
-              iconColor: _SettingsColors.cyanAccent,
-              title: 'Privacy Policy',
-              subtitle: 'Learn how your data is protected',
-              onTap: () => _showPolicyDialog(
-                context,
-                'Privacy Policy',
-                'FocusFlow is engineered with strict data ownership principles.\n\n'
-                '1. Data Ownership: All skills, sessions, notes, and financial logs belong strictly to you.\n\n'
-                '2. Security: Cloud synchronization is handled through encrypted connections with Supabase row-level security.\n\n'
-                '3. No Profiling: FocusFlow never sells, shares, or monetizes personal activity or practice patterns.',
-              ),
-            ),
-            const Divider(height: 1, color: _SettingsColors.border),
-            // Terms of Service
-            _SettingsNavigationTile(
-              icon: LucideIcons.fileText,
-              iconColor: _SettingsColors.primaryBlue,
-              title: 'Terms of Service',
-              subtitle: 'User agreement and service conditions',
-              onTap: () => _showPolicyDialog(
-                context,
-                'Terms of Service',
-                'Welcome to FocusFlow.\n\n'
-                'By accessing or using FocusFlow, you agree to utilize the application for legitimate personal productivity and learning tracking.\n\n'
-                '1. Account Responsibility: You are responsible for safeguarding your login credentials.\n\n'
-                '2. Continuity: You may export or delete your personal data at any time via Settings.\n\n'
-                '3. Availability: FocusFlow strives for reliable synchronization across devices.',
-              ),
-            ),
-          ],
+    return _SettingsCard(
+      children: [
+        // App Name & Version (Amber circular badge with 'i' icon, matching reference screenshot)
+        const _SettingsRowTile(
+          icon: LucideIcons.info,
+          iconColor: _SettingsColors.amber,
+          title: 'FocusFlow',
+          subtitle: 'Version 1.0.0',
         ),
-      ),
+
+        // Privacy Policy
+        _SettingsRowTile(
+          icon: LucideIcons.shieldCheck,
+          iconColor: _SettingsColors.blue,
+          title: 'Privacy Policy',
+          subtitle: 'Learn how your data is protected',
+          onTap: () => _showPolicyDialog(
+            context,
+            'Privacy Policy',
+            'FocusFlow is engineered with strict data ownership principles.\n\n'
+            '1. Data Ownership: All skills, sessions, notes, and financial logs belong strictly to you.\n\n'
+            '2. Security: Cloud synchronization is handled through encrypted connections with Supabase row-level security.\n\n'
+            '3. No Profiling: FocusFlow never sells, shares, or monetizes personal activity or practice patterns.',
+          ),
+        ),
+
+        // Terms of Service
+        _SettingsRowTile(
+          icon: LucideIcons.fileText,
+          iconColor: _SettingsColors.emerald,
+          title: 'Terms of Service',
+          subtitle: 'User agreement and service conditions',
+          onTap: () => _showPolicyDialog(
+            context,
+            'Terms of Service',
+            'Welcome to FocusFlow.\n\n'
+            'By accessing or using FocusFlow, you agree to utilize the application for legitimate personal productivity and learning tracking.\n\n'
+            '1. Account Responsibility: You are responsible for safeguarding your login credentials.\n\n'
+            '2. Continuity: You may export or delete your personal data at any time via Settings.\n\n'
+            '3. Availability: FocusFlow strives for reliable synchronization across devices.',
+          ),
+        ),
+      ],
     );
   }
 }
@@ -2969,173 +2890,7 @@ class _UnifiedDeleteFieldState extends State<_UnifiedDeleteField> {
   }
 }
 
-// ─── REUSABLE TILES & INTERACTIVE COMPONENTS ─────────────────────────────────
 
-class _SettingsActionTile extends StatefulWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final Color titleColor;
-  final Widget? trailing;
-  final VoidCallback onTap;
-
-  const _SettingsActionTile({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.titleColor,
-    this.trailing,
-    required this.onTap,
-  });
-
-  @override
-  State<_SettingsActionTile> createState() => _SettingsActionTileState();
-}
-
-class _SettingsActionTileState extends State<_SettingsActionTile> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return PressableScale(
-      scaleFactor: 0.99,
-      duration: const Duration(milliseconds: 120),
-      onTap: widget.onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        color: _isPressed ? _SettingsColors.pressed : Colors.transparent,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onHighlightChanged: (val) => setState(() => _isPressed = val),
-            onTap: widget.onTap,
-            hoverColor: _SettingsColors.surface,
-            splashColor: widget.iconColor.withValues(alpha: 0.12),
-            highlightColor: _SettingsColors.pressed,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  Icon(widget.icon, color: widget.iconColor, size: 18),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: GoogleFonts.inter(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w600,
-                        color: widget.titleColor,
-                      ),
-                    ),
-                  ),
-                  if (widget.trailing != null) widget.trailing!,
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsNavigationTile extends StatefulWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String subtitle;
-  final Widget? trailing;
-  final VoidCallback onTap;
-
-  const _SettingsNavigationTile({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.subtitle,
-    this.trailing,
-    required this.onTap,
-  });
-
-  @override
-  State<_SettingsNavigationTile> createState() =>
-      _SettingsNavigationTileState();
-}
-
-class _SettingsNavigationTileState extends State<_SettingsNavigationTile> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return PressableScale(
-      scaleFactor: 0.99,
-      duration: const Duration(milliseconds: 120),
-      onTap: widget.onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
-        color: _isPressed ? _SettingsColors.pressed : Colors.transparent,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onHighlightChanged: (val) => setState(() => _isPressed = val),
-            onTap: widget.onTap,
-            hoverColor: _SettingsColors.surface,
-            splashColor: _SettingsColors.primaryBlue.withValues(alpha: 0.1),
-            highlightColor: _SettingsColors.pressed,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-              child: Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: _SettingsColors.surface,
-                      borderRadius: BorderRadius.circular(9),
-                      border: Border.all(color: _SettingsColors.border),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(widget.icon, color: widget.iconColor, size: 16),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.title,
-                          style: GoogleFonts.inter(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w600,
-                            color: _SettingsColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          widget.subtitle,
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: _SettingsColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  widget.trailing ??
-                      const Icon(
-                        LucideIcons.chevronRight,
-                        color: _SettingsColors.textSecondary,
-                        size: 16,
-                      ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 // ─── SMOOTH ANIMATED MODAL DIALOG ─────────────────────────────────────────────
 

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
@@ -22,6 +22,7 @@ import 'set_budget_sheet.dart';
 import 'widgets/expense_filter_bar.dart';
 import 'widgets/financial_balance_card.dart';
 import 'widgets/money_pdf_export_dialog.dart';
+import 'widgets/month_selector_bar.dart';
 import 'widgets/spending_trend_chart.dart';
 import 'widgets/transaction_list_item.dart';
 
@@ -45,9 +46,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen>
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 4,
+      length: 3,
       vsync: this,
-      animationDuration: const Duration(milliseconds: 250),
+      animationDuration: const Duration(milliseconds: 240),
     );
     _entranceController = AnimationController(
       vsync: this,
@@ -243,11 +244,6 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen>
                 const _KeepAliveTab(
                   child: _CategoriesTab(),
                 ),
-                _KeepAliveTab(
-                  child: _BudgetsTab(
-                    onSetBudgetTap: _openSetBudgetModal,
-                  ),
-                ),
               ],
             ),
           ),
@@ -295,10 +291,19 @@ class _OverviewTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final summary = ref.watch(moneySummaryProvider);
+    final selectedMonth = ref.watch(selectedMoneyMonthProvider);
+    final analytics = ref.watch(monthlyAnalyticsProvider);
     final expensesAsync = ref.watch(expensesProvider);
     final expenses = expensesAsync.value ?? [];
-    final recentExpenses = expenses.take(3).toList();
+
+    // Filter transactions for the selected month (or top 3 if current month)
+    final selectedMonthStr = DateFormat('yyyy-MM').format(selectedMonth);
+    final monthExpenses = expenses
+        .where((e) => e.deletedAt == null && e.expenseDate.startsWith(selectedMonthStr))
+        .toList();
+    final displayedExpenses = analytics.isCurrentMonth
+        ? expenses.take(3).toList()
+        : monthExpenses.take(3).toList();
     final currency = NumberFormat.currency(symbol: '₹', decimalDigits: 0, locale: 'en_IN');
 
     return SingleChildScrollView(
@@ -307,6 +312,10 @@ class _OverviewTab extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Interactive Month Selector Bar
+          const MonthSelectorBar(),
+          const SizedBox(height: 14),
+
           // Hero Financial Balance Card
           FinancialBalanceCard(
             floatingAmount: floatingAmount,
@@ -392,16 +401,18 @@ class _OverviewTab extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'RECENT TRANSACTIONS',
-                style: TextStyle(
+              Text(
+                analytics.isCurrentMonth
+                    ? 'RECENT TRANSACTIONS'
+                    : 'TRANSACTIONS IN ${DateFormat('MMMM yyyy').format(selectedMonth).toUpperCase()}',
+                style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
                   color: AppColors.textDim,
                   letterSpacing: 1.1,
                 ),
               ),
-              if (expenses.isNotEmpty)
+              if (displayedExpenses.isNotEmpty)
                 InkWell(
                   onTap: onViewAllExpensesTap,
                   child: Row(
@@ -422,17 +433,21 @@ class _OverviewTab extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 10),
-          if (recentExpenses.isEmpty)
-            const MoneyEmptyState(
+          if (displayedExpenses.isEmpty)
+            MoneyEmptyState(
               icon: LucideIcons.receipt,
-              title: 'No expenses logged yet',
-              description: 'Tap + Add to record your first personal expense.',
+              title: analytics.isCurrentMonth
+                  ? 'No expenses logged yet'
+                  : 'No transactions in ${DateFormat('MMMM yyyy').format(selectedMonth)}',
+              description: analytics.isFutureMonth
+                  ? 'No expenses planned or logged for this future month.'
+                  : 'Tap + Add Expense to record your spending.',
               accentColor: AppColors.primary,
               minHeight: 140,
             )
           else
             Column(
-              children: recentExpenses.map((expense) {
+              children: displayedExpenses.map((expense) {
                 return TransactionListItem(
                   key: ValueKey(expense.id),
                   expense: expense,
@@ -467,31 +482,52 @@ class _OverviewTab extends ConsumerWidget {
           const SizedBox(height: 16),
 
           // Category Distribution Preview
-          const Text(
-            'CATEGORY BREAKDOWN',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textDim,
-              letterSpacing: 1.1,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                analytics.isCurrentMonth
+                    ? 'CATEGORY BREAKDOWN'
+                    : 'CATEGORY BREAKDOWN • ${DateFormat('MMM yyyy').format(selectedMonth).toUpperCase()}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textDim,
+                  letterSpacing: 1.1,
+                ),
+              ),
+              if (analytics.categoryBreakdowns.isNotEmpty)
+                Text(
+                  '${analytics.categoryBreakdowns.length} ${analytics.categoryBreakdowns.length == 1 ? 'category' : 'categories'}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textDim,
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 10),
-          if (summary.categoryBreakdown.isEmpty)
-            const MoneyEmptyState(
+          if (analytics.categoryBreakdowns.isEmpty)
+            MoneyEmptyState(
               icon: LucideIcons.pieChart,
-              title: 'No category breakdown',
-              description: 'Expenses will automatically organize by category.',
+              title: 'No category breakdown for ${DateFormat('MMMM yyyy').format(selectedMonth)}',
+              description: analytics.isFutureMonth
+                  ? 'No spending planned yet for this future month.'
+                  : 'Expenses in ${DateFormat('MMMM yyyy').format(selectedMonth)} will automatically organize by category.',
               accentColor: AppColors.secondary,
               minHeight: 140,
             )
           else
             Column(
-              children: summary.categoryBreakdown.take(4).map((item) {
-                final cat = item['category'] as String;
-                final amt = (item['amount'] as num).toDouble();
-                final pct = (item['percentage'] as num).toInt();
-                final catName = cat[0].toUpperCase() + cat.substring(1);
+              children: analytics.categoryBreakdowns.take(5).map((item) {
+                final cat = item.category;
+                final amt = item.amount;
+                final pct = item.percentage;
+                final txnCount = item.transactionCount;
+                final catName = cat.isNotEmpty
+                    ? (cat[0].toUpperCase() + cat.substring(1))
+                    : 'Other';
                 final catColor = TransactionListItem.getCategoryColor(cat);
                 final catIcon = TransactionListItem.getCategoryIcon(cat);
 
@@ -521,21 +557,53 @@ class _OverviewTab extends ConsumerWidget {
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  catName,
-                                  style: const TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
+                                Expanded(
+                                  child: Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          catName,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: AppColors.textPrimary,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '• $txnCount',
+                                        style: const TextStyle(
+                                          color: AppColors.textDim,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                Text(
-                                  currency.format(amt),
-                                  style: const TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
+                                const SizedBox(width: 8),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      currency.format(amt),
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13.5,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      '(${pct.toStringAsFixed(0)}%)',
+                                      style: const TextStyle(
+                                        color: AppColors.textDim,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -759,6 +827,9 @@ class _ExpensesTab extends ConsumerWidget {
           const ExpenseFilterBar(),
           const SizedBox(height: 8),
 
+          // 2b. Filtered Summary Banner
+          _buildFilteredSummaryBanner(filtered, filterState),
+
           // 3. Transactions List or Contextual Empty State
           Expanded(
             child: expensesAsync.isLoading && filtered.isEmpty
@@ -824,6 +895,74 @@ class _ExpensesTab extends ConsumerWidget {
                       ),
           ),
         ],
+      ),
+    );
+  }
+
+  static Widget _buildFilteredSummaryBanner(
+    List<Expense> filtered,
+    ExpenseFilterState filterState,
+  ) {
+    final count = filtered.length;
+    final totalAmount = filtered.fold<double>(0.0, (sum, e) => sum + e.amount);
+    final currency =
+        NumberFormat.currency(symbol: '₹', decimalDigits: 0, locale: 'en_IN');
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0E1526).withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(
+            color: filterState.hasActiveFilters
+                ? const Color(0xFF2F6BFF).withValues(alpha: 0.35)
+                : const Color(0xFF1B2B48),
+            width: 0.9,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(4.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2F6BFF).withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                LucideIcons.listFilter,
+                size: 12,
+                color: Color(0xFF2F6BFF),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '$count ${count == 1 ? 'transaction' : 'transactions'}',
+              style: const TextStyle(
+                color: Color(0xFF93C5FD),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            const Text(
+              'Total: ',
+              style: TextStyle(
+                color: Color(0xFF7E93A8),
+                fontSize: 12,
+              ),
+            ),
+            Text(
+              currency.format(totalAmount),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1112,171 +1251,9 @@ class _CategoriesTab extends ConsumerWidget {
   }
 }
 
-// 4. BUDGETS TAB
-class _BudgetsTab extends ConsumerWidget {
-  final VoidCallback onSetBudgetTap;
-
-  const _BudgetsTab({required this.onSetBudgetTap});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final budgetsAsync = ref.watch(budgetsProvider);
-    final budgets = budgetsAsync.value ?? [];
-    final summary = ref.watch(moneySummaryProvider);
-    final currency = NumberFormat.currency(symbol: '₹', decimalDigits: 0, locale: 'en_IN');
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'MONTHLY BUDGET LIMITS',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textDim,
-                  letterSpacing: 1.1,
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: onSetBudgetTap,
-                icon: const Icon(LucideIcons.plus, size: 14),
-                label: const Text('Set Budget'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: OceanTheme.bg,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: budgets.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
-                  child: MoneyEmptyState(
-                    icon: LucideIcons.target,
-                    title: 'No category budgets set',
-                    description: 'Set monthly limits for categories to manage your personal budget.',
-                    accentColor: AppColors.secondary,
-                    minHeight: 200,
-                    showGrid: false,
-                  ),
-                )
-              : ListView.builder(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                  itemCount: budgets.length,
-                  itemBuilder: (context, index) {
-                    final b = budgets[index];
-                    final catName = b.category[0].toUpperCase() + b.category.substring(1);
-                    final catColor = TransactionListItem.getCategoryColor(b.category);
-
-                    final catItem = summary.categoryBreakdown
-                        .where((item) =>
-                            (item['category'] as String).toLowerCase() == b.category.toLowerCase())
-                        .firstOrNull;
-                    final spent = (catItem?['amount'] as num?)?.toDouble() ?? 0.0;
-                    final pct = (spent / b.monthlyLimit * 100).clamp(0, 100).round();
-                    final progressVal = (spent / b.monthlyLimit).clamp(0.0, 1.0);
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: OceanTheme.card,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                catName,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(LucideIcons.trash2, color: AppColors.textDim, size: 15),
-                                onPressed: () {
-                                  ref.read(budgetsProvider.notifier).deleteBudget(b.id);
-                                },
-                                visualDensity: VisualDensity.compact,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                '${currency.format(spent)} spent',
-                                style: const TextStyle(fontSize: 13, color: AppColors.textDim),
-                              ),
-                              Text(
-                                '${currency.format(b.monthlyLimit)} budget',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: LinearProgressIndicator(
-                              value: progressVal,
-                              minHeight: 6,
-                              backgroundColor: OceanTheme.bg,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                pct > 90
-                                    ? AppColors.accentRose
-                                    : (pct > 70 ? AppColors.accentAmber : catColor),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              '$pct% used',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: pct > 90 ? AppColors.accentRose : AppColors.textDim,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-}
-
 // ─── Premium Money Tab Bar ──────────────────────────────────────────────────
-// Uses a Stack + AnimatedPositioned sliding pill so there are ZERO rectangular
-// artifacts and the indicator is always fully clipped by the outer capsule.
+// Compact, responsive 3-tab bar matching FocusFlow's OLED dark glass theme.
+// Uses a Stack + AnimatedBuilder sliding pill with equal-width segments.
 class _MoneyTabBar extends StatefulWidget {
   final TabController controller;
 
@@ -1287,11 +1264,11 @@ class _MoneyTabBar extends StatefulWidget {
 }
 
 class _MoneyTabBarState extends State<_MoneyTabBar> {
-  static const _tabs = ['Overview', 'Expenses', 'Categories', 'Budgets'];
-  static const double _height = 40;
-  static const double _pillVPad = 4;
-  static const double _outerRadius = 24.0;
-  static const double _pillRadius = 20.0;
+  static const _tabs = ['Overview', 'Expenses', 'Categories'];
+  static const double _height = 40.0;
+  static const double _pillPad = 3.5;
+  static const double _outerRadius = 22.0;
+  static const double _pillRadius = 18.0;
 
   @override
   void initState() {
@@ -1315,20 +1292,24 @@ class _MoneyTabBarState extends State<_MoneyTabBar> {
       builder: (context, constraints) {
         final totalWidth = constraints.maxWidth;
         final tabWidth = totalWidth / _tabs.length;
-                return SizedBox(
+
+        return SizedBox(
           height: _height,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(_outerRadius),
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xE0080E1A),
+                color: const Color(0xF2080D1A),
                 borderRadius: BorderRadius.circular(_outerRadius),
-                border: Border.all(color: const Color(0xFF1A2E4A), width: 1),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  width: 1.0,
+                ),
                 boxShadow: const [
                   BoxShadow(
-                    color: Color(0x30000000),
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
+                    color: Color(0x40000000),
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
                   ),
                 ],
               ),
@@ -1336,43 +1317,43 @@ class _MoneyTabBarState extends State<_MoneyTabBar> {
                 animation: widget.controller.animation!,
                 builder: (context, _) {
                   final anim = widget.controller.animation!.value;
-                  final pillLeft = anim * tabWidth + _pillVPad;
-                  final pillWidth = tabWidth - _pillVPad * 2;
+                  final pillLeft = anim * tabWidth + _pillPad;
+                  final pillWidth = (tabWidth - (_pillPad * 2)).clamp(0.0, totalWidth);
+
                   return Stack(
                     children: [
-                      // Sliding pill — lives inside the ClipRRect so always clipped
+                      // Smooth sliding indicator pill
                       Positioned(
-                        top: _pillVPad,
-                        bottom: _pillVPad,
+                        top: _pillPad,
+                        bottom: _pillPad,
                         left: pillLeft,
                         width: pillWidth,
                         child: Container(
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0F1C36),
+                            color: const Color(0xFF132238),
                             borderRadius: BorderRadius.circular(_pillRadius),
                             border: Border.all(
-                              color: const Color(0xFF2F6BFF),
-                              width: 1,
+                              color: const Color(0xFF2F6BFF).withValues(alpha: 0.8),
+                              width: 1.0,
                             ),
                             boxShadow: const [
                               BoxShadow(
-                                color: Color(0x1F2F6BFF),
-                                blurRadius: 10,
-                                spreadRadius: 1,
+                                color: Color(0x332F6BFF),
+                                blurRadius: 8,
+                                spreadRadius: 0.5,
                               ),
                             ],
                           ),
                         ),
                       ),
-                      // Tab labels
+                      // Equal-width tab interactive targets
                       Row(
                         children: List.generate(_tabs.length, (i) {
-                          // Compute interpolated selection weight for smooth colour transition
                           final distance = (anim - i).abs();
                           final weight = (1.0 - distance.clamp(0.0, 1.0));
 
                           final labelColor = Color.lerp(
-                            const Color(0xFF7F91AA),
+                            const Color(0xFF718299),
                             const Color(0xFFF1F5F9),
                             weight,
                           )!;
@@ -1381,14 +1362,17 @@ class _MoneyTabBarState extends State<_MoneyTabBar> {
                           return Expanded(
                             child: GestureDetector(
                               behavior: HitTestBehavior.opaque,
-                              onTap: () => widget.controller.animateTo(i),
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                widget.controller.animateTo(i);
+                              },
                               child: Center(
                                 child: AnimatedDefaultTextStyle(
-                                  duration: const Duration(milliseconds: 220),
+                                  duration: const Duration(milliseconds: 200),
                                   curve: Curves.easeOutCubic,
                                   style: TextStyle(
                                     color: labelColor,
-                                    fontSize: 12.5,
+                                    fontSize: 13.0,
                                     fontWeight: fontWeight,
                                     letterSpacing: -0.1,
                                   ),

@@ -7,9 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../core/animation/tab_activation_scope.dart';
 import '../core/theme/app_colors.dart';
 import '../core/theme/oled_theme.dart';
 import '../providers/chat_provider.dart';
+import 'app_router.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Per-destination accent colors for the glass navbar
@@ -63,7 +65,11 @@ class ScaffoldWithNavBar extends ConsumerStatefulWidget {
 }
 
 class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, RouteAware {
+  // ── Tab activation tick counter for card animation replay ─────────────
+  int _activationTick = 0;
+  int _lastIndex = -1;
+
   // ── More-menu animations ────────────────────────────────────────────────
   late final AnimationController _menuController;
   late final Animation<double> _curvedAnimation;
@@ -80,6 +86,25 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
 
   final ValueNotifier<bool> _isMenuOpenNotifier = ValueNotifier<bool>(false);
   bool _isNavigating = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final modalRoute = ModalRoute.of(context);
+    if (modalRoute != null) {
+      appRouteObserver.subscribe(this, modalRoute);
+    }
+  }
+
+  @override
+  void didPopNext() {
+    super.didPopNext();
+    // Returning from a pushed route (e.g. /skills/:id, /notes, /money, /settings)
+    // Increment activation tick so cards on the active tab replay their entrance animation!
+    setState(() {
+      _activationTick++;
+    });
+  }
 
   @override
   void initState() {
@@ -152,6 +177,7 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
 
   @override
   void dispose() {
+    appRouteObserver.unsubscribe(this);
     _isMenuOpenNotifier.dispose();
     _entranceController.dispose();
     _menuController.dispose();
@@ -205,6 +231,10 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
   @override
   Widget build(BuildContext context) {
     final currentIndex = widget.navigationShell.currentIndex;
+    if (currentIndex != _lastIndex) {
+      _lastIndex = currentIndex;
+      _activationTick++;
+    }
     final totalUnread = ref.watch(totalUnreadChatCountProvider).value ?? 0;
     final navBarBottom = getFloatingNavBarBottom(context);
     final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 80;
@@ -282,7 +312,11 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
                     ),
                   ),
                 ),
-                child: widget.navigationShell,
+                child: TabActivationScope(
+                  activeTabIndex: currentIndex,
+                  activationTick: _activationTick,
+                  child: widget.navigationShell,
+                ),
               ),
             ),
 
@@ -789,6 +823,11 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final navBarBottom = getFloatingNavBarBottom(context);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final double blurSigma = reduceMotion ? 0.0 : 14.0;
+    final glassColor = blurSigma > 0
+        ? const Color(0xFF0C1322).withValues(alpha: 0.88)
+        : const Color(0xF6090E18);
 
     return ValueListenableBuilder<bool>(
       valueListenable: isOpenNotifier,
@@ -799,6 +838,130 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
             final isVisible = isOpen || menuController.value > 0.0;
             if (!isVisible) {
               return const SizedBox.shrink();
+            }
+
+            Widget menuBody = Container(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+              decoration: BoxDecoration(
+                color: glassColor,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.09),
+                  width: 0.9,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.65),
+                    blurRadius: 32,
+                    offset: const Offset(0, 12),
+                  ),
+                  BoxShadow(
+                    color: OledTheme.electricBlue.withValues(alpha: 0.08),
+                    blurRadius: 24,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Mini OLED Header
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: OledTheme.cyan,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'MORE FEATURES',
+                        style: TextStyle(
+                          color: OledTheme.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: onClose,
+                        behavior: HitTestBehavior.opaque,
+                        child: Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.06),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08),
+                              width: 0.8,
+                            ),
+                          ),
+                          child: const Icon(
+                            LucideIcons.x,
+                            size: 13,
+                            color: OledTheme.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Staggered Menu items with internal scroll safety
+                  ...List.generate(menuItems.length, (index) {
+                    final item = menuItems[index];
+                    final start = (0.06 + index * 0.10).clamp(0.0, 1.0);
+                    final end = (start + 0.40).clamp(0.0, 1.0);
+                    final itemAnim = CurvedAnimation(
+                      parent: menuController,
+                      curve: Interval(start, end, curve: Curves.easeOutCubic),
+                    );
+
+                    return AnimatedBuilder(
+                      animation: itemAnim,
+                      builder: (context, child) {
+                        final itemDy = (1.0 - itemAnim.value) * 8.0;
+                        return Transform.translate(
+                          offset: Offset(0, itemDy),
+                          child: Opacity(
+                            opacity: itemAnim.value.clamp(0.0, 1.0),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          bottom: index < menuItems.length - 1 ? 8 : 0,
+                        ),
+                        child: _FloatingMoreMenuItem(
+                          icon: item.icon,
+                          color: item.color,
+                          title: item.title,
+                          subtitle: item.subtitle,
+                          badgeCount: item.badgeCount,
+                          isActive: item.isActive,
+                          onTap: () => onNavigate(item.route),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
+
+            if (blurSigma > 0) {
+              menuBody = ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+                  child: menuBody,
+                ),
+              );
             }
 
             return RepaintBoundary(
@@ -812,7 +975,7 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
                       child: FadeTransition(
                         opacity: fadeAnimation,
                         child: Container(
-                          color: const Color(0x73000000),
+                          color: const Color(0x78000000),
                         ),
                       ),
                     ),
@@ -826,140 +989,18 @@ class _DockedMoreMenuOverlay extends StatelessWidget {
                     child: Align(
                       alignment: Alignment.bottomRight,
                       child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 340),
+                        constraints: BoxConstraints(
+                          maxWidth: 336,
+                          maxHeight: MediaQuery.sizeOf(context).height * 0.65,
+                        ),
                         child: FadeTransition(
                           opacity: fadeAnimation,
                           child: ScaleTransition(
                             scale: scaleAnimation,
                             alignment: const Alignment(0.85, 1.0),
-                            child: AnimatedBuilder(
-                              animation: curvedAnimation,
-                              builder: (context, child) {
-                                final dy =
-                                    (1.0 - curvedAnimation.value) * 3.0;
-                                return Transform.translate(
-                                  offset: Offset(0, dy),
-                                  child: child,
-                                );
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.fromLTRB(
-                                    14, 12, 14, 14),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xF80E1526),
-                                  borderRadius: BorderRadius.circular(22),
-                                  border: Border.all(
-                                    color: AppColors.border
-                                        .withValues(alpha: 0.75),
-                                    width: 1,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black
-                                          .withValues(alpha: 0.5),
-                                      blurRadius: 28,
-                                      offset: const Offset(0, 10),
-                                    ),
-                                    BoxShadow(
-                                      color: AppColors.primary
-                                          .withValues(alpha: 0.08),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    // Header
-                                    Row(
-                                      children: [
-                                        const Text(
-                                          'MORE FEATURES',
-                                          style: TextStyle(
-                                            color: AppColors.textMuted,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                            letterSpacing: 1.1,
-                                          ),
-                                        ),
-                                        const Spacer(),
-                                        GestureDetector(
-                                          onTap: onClose,
-                                          behavior: HitTestBehavior.opaque,
-                                          child: Container(
-                                            padding:
-                                                const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white
-                                                  .withValues(alpha: 0.06),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                              LucideIcons.x,
-                                              size: 14,
-                                              color:
-                                                  AppColors.textSecondary,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-
-                                    // Menu Items with sequential fade + slide
-                                    ...List.generate(menuItems.length,
-                                        (index) {
-                                      final item = menuItems[index];
-                                      final start = (0.10 + index * 0.10)
-                                          .clamp(0.0, 1.0);
-                                      final end = (start + 0.45)
-                                          .clamp(0.0, 1.0);
-                                      final itemAnim = CurvedAnimation(
-                                        parent: menuController,
-                                        curve: Interval(start, end,
-                                            curve: Curves.easeOutCubic),
-                                      );
-
-                                      return AnimatedBuilder(
-                                        animation: itemAnim,
-                                        builder: (context, child) {
-                                          final itemDy =
-                                              (1.0 - itemAnim.value) * 6.0;
-                                          return Transform.translate(
-                                            offset: Offset(0, itemDy),
-                                            child: Opacity(
-                                              opacity: itemAnim.value
-                                                  .clamp(0.0, 1.0),
-                                              child: child,
-                                            ),
-                                          );
-                                        },
-                                        child: Padding(
-                                          padding: EdgeInsets.only(
-                                            bottom:
-                                                index < menuItems.length - 1
-                                                    ? 8
-                                                    : 0,
-                                          ),
-                                          child: _FloatingMoreMenuItem(
-                                            icon: item.icon,
-                                            color: item.color,
-                                            title: item.title,
-                                            subtitle: item.subtitle,
-                                            badgeCount: item.badgeCount,
-                                            isActive: item.isActive,
-                                            onTap: () =>
-                                                onNavigate(item.route),
-                                          ),
-                                        ),
-                                      );
-                                    }),
-                                  ],
-                                ),
-                              ),
+                            child: SingleChildScrollView(
+                              physics: const BouncingScrollPhysics(),
+                              child: menuBody,
                             ),
                           ),
                         ),
@@ -1009,17 +1050,17 @@ class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
   Widget build(BuildContext context) {
     final bgColor = widget.isActive
         ? (_isPressed
-            ? widget.color.withValues(alpha: 0.20)
-            : widget.color.withValues(alpha: 0.12))
+            ? widget.color.withValues(alpha: 0.18)
+            : widget.color.withValues(alpha: 0.11))
         : (_isPressed
-            ? const Color(0xFF1E293B).withValues(alpha: 0.6)
-            : const Color(0xFF0F172A).withValues(alpha: 0.55));
+            ? const Color(0xFF1A2333).withValues(alpha: 0.65)
+            : const Color(0xFF0F1728).withValues(alpha: 0.50));
 
     final borderColor = widget.isActive
-        ? widget.color.withValues(alpha: 0.55)
+        ? widget.color.withValues(alpha: 0.50)
         : (_isPressed
-            ? widget.color.withValues(alpha: 0.4)
-            : const Color(0xFF1E2A42));
+            ? widget.color.withValues(alpha: 0.35)
+            : Colors.white.withValues(alpha: 0.07));
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
@@ -1028,23 +1069,24 @@ class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
       onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedScale(
-        duration: const Duration(milliseconds: 140),
+        duration: const Duration(milliseconds: 110),
         curve: Curves.easeOutCubic,
-        scale: _isPressed ? 0.975 : 1.0,
+        scale: _isPressed ? 0.965 : 1.0,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          duration: const Duration(milliseconds: 130),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: bgColor,
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(15),
             border: Border.all(
               color: borderColor,
-              width: widget.isActive ? 1.2 : 1.0,
+              width: widget.isActive ? 1.2 : 0.9,
             ),
             boxShadow: widget.isActive
                 ? [
                     BoxShadow(
-                      color: widget.color.withValues(alpha: 0.18),
+                      color: widget.color.withValues(alpha: 0.16),
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),
@@ -1057,8 +1099,12 @@ class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
-                  color: widget.color.withValues(alpha: 0.15),
+                  color: widget.color.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(11),
+                  border: Border.all(
+                    color: widget.color.withValues(alpha: 0.22),
+                    width: 0.8,
+                  ),
                 ),
                 child: Center(
                   child: Icon(
@@ -1081,9 +1127,10 @@ class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
                           style: TextStyle(
                             color: widget.isActive
                                 ? widget.color
-                                : AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
+                                : OledTheme.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13.5,
+                            letterSpacing: -0.1,
                           ),
                         ),
                         if (widget.isActive) ...[
@@ -1096,8 +1143,7 @@ class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
                               shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
-                                  color:
-                                      widget.color.withValues(alpha: 0.6),
+                                  color: widget.color.withValues(alpha: 0.7),
                                   blurRadius: 4,
                                 ),
                               ],
@@ -1106,12 +1152,13 @@ class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
                         ],
                       ],
                     ),
-                    const SizedBox(height: 1),
+                    const SizedBox(height: 1.5),
                     Text(
                       widget.subtitle,
                       style: const TextStyle(
-                        color: AppColors.textSecondary,
+                        color: OledTheme.textSecondary,
                         fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1122,18 +1169,21 @@ class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
               if (widget.badgeCount > 0) ...[
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
                   decoration: BoxDecoration(
-                    color: const Color(0x333B82F6),
+                    color: OledTheme.coral.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0x663B82F6)),
+                    border: Border.all(
+                      color: OledTheme.coral.withValues(alpha: 0.45),
+                      width: 0.8,
+                    ),
                   ),
                   child: Text(
                     widget.badgeCount > 99
                         ? '99+'
                         : widget.badgeCount.toString(),
                     style: const TextStyle(
-                      color: Color(0xFF93C5FD),
+                      color: OledTheme.coral,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                     ),
@@ -1143,8 +1193,9 @@ class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
               ],
               Icon(
                 LucideIcons.chevronRight,
-                color:
-                    widget.isActive ? widget.color : AppColors.textMuted,
+                color: widget.isActive
+                    ? widget.color
+                    : OledTheme.textMuted.withValues(alpha: 0.6),
                 size: 16,
               ),
             ],

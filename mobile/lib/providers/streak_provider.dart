@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../models/learning_session.dart';
+import '../models/user_profile.dart';
 import '../providers/profile_provider.dart';
 import '../services/supabase_service.dart';
 import 'auth_provider.dart';
@@ -44,7 +45,17 @@ class StreakState {
 final streakProvider =
     StateNotifierProvider<StreakNotifier, StreakState>((ref) {
   final userId = ref.watch(currentUserIdProvider);
-  return StreakNotifier(ref, userId);
+  final notifier = StreakNotifier(ref, userId);
+  ref.listen<AsyncValue<UserProfile?>>(
+    profileProvider,
+    (_, next) {
+      if (next.hasValue && next.value != null) {
+        notifier.syncFromProfile();
+      }
+    },
+    fireImmediately: true,
+  );
+  return notifier;
 });
 
 class StreakNotifier extends StateNotifier<StreakState> {

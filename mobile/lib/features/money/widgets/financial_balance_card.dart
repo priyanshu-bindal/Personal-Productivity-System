@@ -5,6 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/ocean_theme.dart';
+import '../../../core/theme/oled_theme.dart';
 import '../../../providers/money_provider.dart';
 import 'animated_balance_ticker.dart';
 import 'floating_amount_indicator.dart';
@@ -21,11 +22,26 @@ class FinancialBalanceCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final summary = ref.watch(moneySummaryProvider);
+    final analytics = ref.watch(monthlyAnalyticsProvider);
     final expensesAsync = ref.watch(expensesProvider);
     final expenses = expensesAsync.value ?? [];
     final hasOptimistic = expenses.any((e) => e.isOptimistic);
-    final currency = NumberFormat.currency(symbol: '₹', decimalDigits: 0, locale: 'en_IN');
+    final currency =
+        NumberFormat.currency(symbol: '₹', decimalDigits: 0, locale: 'en_IN');
+
+    // Title based on month context
+    final String cardTitle;
+    if (analytics.isCurrentMonth) {
+      cardTitle = "THIS MONTH'S SPENDING";
+    } else if (analytics.isFutureMonth) {
+      final monthName =
+          DateFormat('MMMM yyyy').format(analytics.selectedMonth).toUpperCase();
+      cardTitle = "$monthName • FUTURE BUDGET";
+    } else {
+      final monthName =
+          DateFormat('MMMM yyyy').format(analytics.selectedMonth).toUpperCase();
+      cardTitle = "$monthName SPENDING";
+    }
 
     return Container(
       width: double.infinity,
@@ -82,20 +98,26 @@ class FinancialBalanceCard extends ConsumerWidget {
                               shape: BoxShape.circle,
                               color: hasOptimistic
                                   ? AppColors.accentAmber
-                                  : AppColors.primary,
+                                  : (analytics.isCurrentMonth
+                                      ? OledTheme.electricBlue
+                                      : OledTheme.violet),
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Flexible(
-                            child: Text(
-                              'THIS MONTH\'S SPENDING',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1.1,
+                          Flexible(
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 200),
+                              child: Text(
+                                cardTitle,
+                                key: ValueKey(cardTitle),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.1,
+                                ),
                               ),
                             ),
                           ),
@@ -151,20 +173,30 @@ class FinancialBalanceCard extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
 
                 // Focal Animated Amount
-                AnimatedBalanceTicker(
-                  amount: summary.monthTotal,
-                  style: const TextStyle(
-                    fontSize: 34,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                    letterSpacing: -0.8,
-                    height: 1.1,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    AnimatedBalanceTicker(
+                      amount: analytics.totalExpense,
+                      style: const TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.8,
+                        height: 1.1,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 8),
+
+                // Month-over-Month Comparison Pill
+                _buildComparisonPill(analytics, currency),
+                const SizedBox(height: 18),
 
                 // Supporting Financial Metrics Strip
                 Container(
@@ -178,43 +210,55 @@ class FinancialBalanceCard extends ConsumerWidget {
                   ),
                   child: Row(
                     children: [
+                      // Metric 1: Daily Average
                       Expanded(
                         child: _MetricItem(
-                          icon: LucideIcons.calendar,
-                          iconColor: AppColors.primary,
-                          label: "Today's Outflow",
-                          value: currency.format(summary.todayTotal),
+                          icon: LucideIcons.trendingUp,
+                          iconColor: OledTheme.cyan,
+                          label: 'Daily Average',
+                          value: currency.format(analytics.avgDailySpending),
+                          sublabel: analytics.isFutureMonth
+                              ? '0 days'
+                              : (analytics.isCurrentMonth
+                                  ? 'Day ${analytics.elapsedDays} of ${analytics.daysInMonth}'
+                                  : 'Full ${analytics.daysInMonth} days'),
                         ),
                       ),
                       Container(
                         width: 1,
-                        height: 28,
+                        height: 32,
                         color: AppColors.border.withValues(alpha: 0.7),
                       ),
+                      // Metric 2: Transactions
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.only(left: 12),
+                          padding: const EdgeInsets.only(left: 10),
                           child: _MetricItem(
-                            icon: LucideIcons.trendingUp,
-                            iconColor: AppColors.secondary,
-                            label: 'Daily Average',
-                            value: currency.format(summary.avgDaily),
+                            icon: LucideIcons.receipt,
+                            iconColor: OledTheme.violet,
+                            label: 'Transactions',
+                            value: '${analytics.transactionCount}',
+                            sublabel: 'expenses logged',
                           ),
                         ),
                       ),
                       Container(
                         width: 1,
-                        height: 28,
+                        height: 32,
                         color: AppColors.border.withValues(alpha: 0.7),
                       ),
+                      // Metric 3: Top Category
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.only(left: 12),
+                          padding: const EdgeInsets.only(left: 10),
                           child: _MetricItem(
                             icon: LucideIcons.pieChart,
-                            iconColor: AppColors.accentAmber,
+                            iconColor: OledTheme.amber,
                             label: 'Top Category',
-                            value: summary.highestCategory,
+                            value: analytics.highestCategory,
+                            sublabel: analytics.highestCategoryAmount > 0
+                                ? currency.format(analytics.highestCategoryAmount)
+                                : 'No spending',
                           ),
                         ),
                       ),
@@ -240,6 +284,106 @@ class FinancialBalanceCard extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _buildComparisonPill(MonthlyAnalytics analytics, NumberFormat currency) {
+    if (analytics.isFutureMonth) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: OledTheme.amber.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: OledTheme.amber.withValues(alpha: 0.35),
+            width: 0.8,
+          ),
+        ),
+        child: const Text(
+          'Future Month • No actual spending recorded',
+          style: TextStyle(
+            color: OledTheme.amber,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+    }
+
+    if (!analytics.hasPreviousMonthData && analytics.previousMonthTotal == 0) {
+      if (analytics.totalExpense == 0) {
+        return const SizedBox.shrink();
+      }
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: AppColors.textDim.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          'First recorded spending period',
+          style: TextStyle(
+            color: AppColors.textDim,
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    final diff = analytics.differenceFromPreviousMonth;
+    final pct = analytics.percentageChangeFromPreviousMonth.abs().toStringAsFixed(1);
+    final isIncrease = diff > 0;
+    final isDecrease = diff < 0;
+
+    final Color badgeColor;
+    final IconData icon;
+    final String text;
+
+    if (isIncrease) {
+      badgeColor = OledTheme.coral;
+      icon = LucideIcons.trendingUp;
+      text = '+${currency.format(diff.abs())} (+$pct%) vs last month';
+    } else if (isDecrease) {
+      badgeColor = OledTheme.emerald;
+      icon = LucideIcons.trendingDown;
+      text = '-${currency.format(diff.abs())} (-$pct%) vs last month';
+    } else {
+      badgeColor = AppColors.textDim;
+      icon = LucideIcons.minus;
+      text = 'Same as previous month';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+      decoration: BoxDecoration(
+        color: badgeColor.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: badgeColor.withValues(alpha: 0.35),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: badgeColor),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: badgeColor,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _MetricItem extends StatelessWidget {
@@ -247,12 +391,14 @@ class _MetricItem extends StatelessWidget {
   final Color iconColor;
   final String label;
   final String value;
+  final String? sublabel;
 
   const _MetricItem({
     required this.icon,
     required this.iconColor,
     required this.label,
     required this.value,
+    this.sublabel,
   });
 
   @override
@@ -289,6 +435,19 @@ class _MetricItem extends StatelessWidget {
             fontWeight: FontWeight.bold,
           ),
         ),
+        if (sublabel != null) ...[
+          const SizedBox(height: 1),
+          Text(
+            sublabel!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textDim,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ],
     );
   }

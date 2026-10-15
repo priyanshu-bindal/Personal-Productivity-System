@@ -21,6 +21,15 @@ class ExpenseFilterBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final filterState = ref.watch(expenseFilterStateProvider);
+    final selectedMonth = ref.watch(selectedMoneyMonthProvider);
+    final now = DateTime.now();
+    final isCurrentMonth =
+        selectedMonth.year == now.year && selectedMonth.month == now.month;
+    final isLastMonth =
+        (now.year == selectedMonth.year && now.month - 1 == selectedMonth.month) ||
+            (now.month == 1 &&
+                selectedMonth.month == 12 &&
+                selectedMonth.year == now.year - 1);
 
     // Advanced filters active count (excluding default 'All' date filter, which has its own quick chips)
     final hasAdvancedFilters = (filterState.category != null &&
@@ -91,6 +100,7 @@ class ExpenseFilterBar extends ConsumerWidget {
                       filterState.copyWith(
                     dateFilter: QuickDateFilter.all,
                     clearCustomDateRange: true,
+                    clearSelectedMonthDate: true,
                   );
                 },
               ),
@@ -103,6 +113,7 @@ class ExpenseFilterBar extends ConsumerWidget {
                       filterState.copyWith(
                     dateFilter: QuickDateFilter.today,
                     clearCustomDateRange: true,
+                    clearSelectedMonthDate: true,
                   );
                 },
               ),
@@ -115,6 +126,7 @@ class ExpenseFilterBar extends ConsumerWidget {
                       filterState.copyWith(
                     dateFilter: QuickDateFilter.thisWeek,
                     clearCustomDateRange: true,
+                    clearSelectedMonthDate: true,
                   );
                 },
               ),
@@ -127,6 +139,7 @@ class ExpenseFilterBar extends ConsumerWidget {
                       filterState.copyWith(
                     dateFilter: QuickDateFilter.thisMonth,
                     clearCustomDateRange: true,
+                    clearSelectedMonthDate: true,
                   );
                 },
               ),
@@ -139,9 +152,28 @@ class ExpenseFilterBar extends ConsumerWidget {
                       filterState.copyWith(
                     dateFilter: QuickDateFilter.lastMonth,
                     clearCustomDateRange: true,
+                    clearSelectedMonthDate: true,
                   );
                 },
               ),
+              if (!isCurrentMonth && !isLastMonth) ...[
+                const SizedBox(width: 8),
+                _buildFilterChip(
+                  label: DateFormat('MMM yyyy').format(selectedMonth),
+                  icon: LucideIcons.calendarDays,
+                  isActive: filterState.dateFilter == QuickDateFilter.selectedMonth &&
+                      filterState.selectedMonthDate?.year == selectedMonth.year &&
+                      filterState.selectedMonthDate?.month == selectedMonth.month,
+                  onTap: () {
+                    ref.read(expenseFilterStateProvider.notifier).state =
+                        filterState.copyWith(
+                      dateFilter: QuickDateFilter.selectedMonth,
+                      selectedMonthDate: selectedMonth,
+                      clearCustomDateRange: true,
+                    );
+                  },
+                ),
+              ],
               if (filterState.dateFilter == QuickDateFilter.customRange &&
                   filterState.customDateRange != null) ...[
                 const SizedBox(width: 8),
@@ -390,6 +422,7 @@ class ExpenseFilterBar extends ConsumerWidget {
     WidgetRef ref,
     ExpenseFilterState currentState,
   ) {
+    final selectedMonth = ref.read(selectedMoneyMonthProvider);
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -397,6 +430,7 @@ class ExpenseFilterBar extends ConsumerWidget {
       builder: (sheetContext) {
         return _AdvancedFilterSheetContent(
           initialState: currentState,
+          selectedMonth: selectedMonth,
           onApply: (newState) {
             ref.read(expenseFilterStateProvider.notifier).state = newState;
             Navigator.of(sheetContext).pop();
@@ -414,11 +448,13 @@ class ExpenseFilterBar extends ConsumerWidget {
 
 class _AdvancedFilterSheetContent extends StatefulWidget {
   final ExpenseFilterState initialState;
+  final DateTime selectedMonth;
   final ValueChanged<ExpenseFilterState> onApply;
   final VoidCallback onReset;
 
   const _AdvancedFilterSheetContent({
     required this.initialState,
+    required this.selectedMonth,
     required this.onApply,
     required this.onReset,
   });
@@ -620,6 +656,26 @@ class _AdvancedFilterSheetContentState
                             _customRange = null;
                           }),
                         ),
+                        if ((widget.selectedMonth.year != DateTime.now().year ||
+                                widget.selectedMonth.month != DateTime.now().month) &&
+                            !(widget.selectedMonth.year == DateTime.now().year &&
+                                widget.selectedMonth.month ==
+                                    DateTime.now().month - 1) &&
+                            !(DateTime.now().month == 1 &&
+                                widget.selectedMonth.month == 12 &&
+                                widget.selectedMonth.year ==
+                                    DateTime.now().year - 1))
+                          _buildChoiceChip(
+                            label: DateFormat('MMMM yyyy')
+                                .format(widget.selectedMonth),
+                            icon: LucideIcons.calendarDays,
+                            isSelected:
+                                _dateFilter == QuickDateFilter.selectedMonth,
+                            onTap: () => setState(() {
+                              _dateFilter = QuickDateFilter.selectedMonth;
+                              _customRange = null;
+                            }),
+                          ),
                         _buildChoiceChip(
                           label: _dateFilter == QuickDateFilter.customRange &&
                                   _customRange != null
@@ -778,9 +834,14 @@ class _AdvancedFilterSheetContentState
                     child: PressableScale(
                       scaleFactor: 0.96,
                       onTap: () {
+                        final isSelMonth =
+                            _dateFilter == QuickDateFilter.selectedMonth;
                         final updated = widget.initialState.copyWith(
                           dateFilter: _dateFilter,
                           customDateRange: _customRange,
+                          selectedMonthDate:
+                              isSelMonth ? widget.selectedMonth : null,
+                          clearSelectedMonthDate: !isSelMonth,
                           category: _category,
                           paymentMethod: _paymentMethod,
                           amountRange: _amountRange,

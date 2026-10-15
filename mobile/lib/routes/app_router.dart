@@ -18,7 +18,6 @@ import '../features/money/money_screen.dart';
 import '../features/money/category_transactions_screen.dart';
 import '../features/money/trash_screen.dart';
 import '../features/settings/settings_screen.dart';
-import '../features/streak/streak_screen.dart';
 import '../features/messages/messages_screen.dart';
 import '../features/messages/new_message_screen.dart';
 import '../features/messages/chat_screen.dart';
@@ -44,9 +43,13 @@ final _authRefreshNotifier = _GoRouterRefreshStream(
   SupabaseService.client.auth.onAuthStateChange,
 );
 
+/// Global route observer enabling RouteAware subscription across tabs and pushed screens
+final appRouteObserver = RouteObserver<ModalRoute<void>>();
+
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/login',
+    observers: [appRouteObserver],
     // refreshListenable makes GoRouter re-run redirect on every auth state change
     refreshListenable: _authRefreshNotifier,
     redirect: (BuildContext context, GoRouterState state) {
@@ -324,32 +327,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             reverseTransitionDuration: const Duration(milliseconds: 250),
           );
         },
-      ),
-      GoRoute(
-        path: '/streak',
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const StreakScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(
-              opacity: CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOut,
-              ),
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.04, 0),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeOutCubic,
-                )),
-                child: child,
-              ),
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 320),
-        ),
       ),
     ],
   );
