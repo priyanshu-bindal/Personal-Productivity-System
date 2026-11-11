@@ -48,6 +48,12 @@ mobile/android/captures/
 mobile/android/local.properties
 mobile/android/key.properties
 mobile/android/app/upload-keystore.jks
+*.jks
+*.keystore
+key.properties
+keystore.properties
+**/key.properties
+**/keystore.properties
 
 # iOS Generated / Pods Files
 mobile/ios/Pods/

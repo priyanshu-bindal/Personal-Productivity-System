@@ -1,26 +1,31 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
-  Sparkles,
+  motion,
+  AnimatePresence,
+  useMotionValue,
+  useSpring,
+  useMotionTemplate,
+  useReducedMotion,
+  type Variants,
+} from 'framer-motion'
+import {
+  LayoutDashboard,
+  MessageSquare,
+  BookOpen,
   Calendar,
   TrendingUp,
+  StickyNote,
   IndianRupee,
-  Flame,
-  CheckCircle2,
-  Lock,
-  Mail,
-  User,
-  ArrowRight,
-  AlertCircle,
   Loader2,
-  Check,
-  Activity,
-  ShieldCheck,
-  Zap,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  Download,
 } from 'lucide-react'
-import TextType from '@/components/ui/TextType'
+import QRCode from 'qrcode'
 import { login, signup, resetPassword } from '@/app/auth/actions'
 
 interface AuthExperienceProps {
@@ -34,10 +39,40 @@ interface FieldErrors {
   password?: string
 }
 
+function AndroidIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M17.523 15.3414c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.551 0 .9993.4482.9993.9993.0001.5511-.4483.9997-.9993.9997m-11.046 0c-.5511 0-.9993-.4486-.9993-.9997s.4482-.9993.9993-.9993c.5511 0 .9993.4482.9993.9993 0 .5511-.4482.9997-.9993.9997m11.4045-6.02l1.9973-3.4592a.416.416 0 00-.1521-.5676.416.416 0 00-.5676.1521l-2.0223 3.503C15.5898 8.4116 13.8497 8.1 12 8.1s-3.5898.3116-5.1368.8507L4.8409 5.4477a.416.416 0 00-.5676-.1521.416.416 0 00-.1521.5676l1.9973 3.4592C2.6889 11.1867.3432 14.6589 0 18.761h24c-.3432-4.1021-2.6889-7.5743-6.1185-9.4396" />
+    </svg>
+  )
+}
+
+const DEFAULT_QR_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 31 31" shape-rendering="crispEdges"><path fill="#ffffff" d="M0 0h31v31H0z"/><path stroke="#000000" d="M1 1.5h7m2 0h3m3 0h2m1 0h3m1 0h7M1 2.5h1m5 0h1m2 0h3m5 0h1m2 0h1m1 0h1m5 0h1M1 3.5h1m1 0h3m1 0h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h3m1 0h1m1 0h3m1 0h1M1 4.5h1m1 0h3m1 0h1m1 0h2m1 0h2m4 0h1m1 0h1m2 0h1m1 0h3m1 0h1M1 5.5h1m1 0h3m1 0h1m1 0h8m1 0h3m2 0h1m1 0h3m1 0h1M1 6.5h1m5 0h1m1 0h1m1 0h1m1 0h6m4 0h1m5 0h1M1 7.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M9 8.5h1m1 0h4M1 9.5h1m1 0h5m2 0h1m1 0h2m1 0h1m2 0h1m2 0h1m1 0h5M4 10.5h1m1 0h1m3 0h4m3 0h1m1 0h3m1 0h3m3 0h1M3 11.5h1m2 0h3m2 0h2m3 0h1m1 0h2m2 0h1m1 0h2M2 12.5h3m1 0h1m2 0h3m1 0h1m1 0h2m6 0h4m1 0h1M2 13.5h1m1 0h1m2 0h2m1 0h1m1 0h2m2 0h3m2 0h1m2 0h1m1 0h2M6 14.5h1m2 0h2m2 0h3m1 0h1m2 0h6m3 0h1M3 15.5h1m3 0h2m1 0h1m1 0h6m3 0h1m2 0h1m1 0h2M3 16.5h4m2 0h3m1 0h2m1 0h1m5 0h2m1 0h1m2 0h1M1 17.5h1m1 0h1m1 0h1m1 0h2m1 0h2m1 0h1m1 0h2m1 0h1m7 0h2M1 18.5h1m1 0h1m1 0h1m5 0h2m4 0h1m2 0h6m1 0h1m1 0h1M1 19.5h1m1 0h2m1 0h3m4 0h1m2 0h1m1 0h2m3 0h2m2 0h1M1 20.5h1m1 0h1m2 0h1m1 0h3m2 0h1m1 0h1m1 0h1m2 0h3m1 0h1m3 0h1M1 21.5h1m1 0h5m1 0h1m1 0h1m6 0h1m1 0h6m1 0h3M9 22.5h1m1 0h1m2 0h2m3 0h1m1 0h1m3 0h5M1 23.5h7m3 0h1m1 0h6m1 0h2m1 0h1m1 0h3M1 24.5h1m5 0h1m1 0h1m2 0h3m2 0h1m1 0h1m1 0h1m3 0h1m3 0h1M1 25.5h1m1 0h3m1 0h1m1 0h5m1 0h4m2 0h5m1 0h2M1 26.5h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h2m2 0h5m4 0h4M1 27.5h1m1 0h3m1 0h1m1 0h4m2 0h3m2 0h1m1 0h7M1 28.5h1m5 0h1m3 0h3m1 0h1m1 0h1m1 0h3m1 0h1m2 0h1m1 0h1M1 29.5h7m1 0h7m2 0h1m1 0h1m2 0h3m1 0h1"/></svg>`
+
+const features = [
+  { label: 'Today', icon: LayoutDashboard, desc: 'Your focus queue for the day' },
+  { label: 'Messages', icon: MessageSquare, desc: 'Direct updates and chat feed' },
+  { label: 'My Skills', icon: BookOpen, desc: 'Active practice & habit mastery' },
+  { label: 'Calendar', icon: Calendar, desc: 'Schedule and routine planner' },
+  { label: 'Progress', icon: TrendingUp, desc: 'Visual analytics and streak stats' },
+  { label: 'Notes', icon: StickyNote, desc: 'Quick capture for thoughts & docs' },
+  { label: 'Money', icon: IndianRupee, desc: 'Track spending and savings' },
+]
+
+const headlineWords = ['Plan,', 'learn,', 'and', 'track', 'your', 'day.']
+
+const EASE_OUT: [number, number, number, number] = [0.22, 1, 0.36, 1]
+
 export function AuthExperience({
   initialMode = 'signin',
   initialError = null,
 }: AuthExperienceProps) {
+  const shouldReduceMotion = useReducedMotion()
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode)
   const [showForgotModal, setShowForgotModal] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
@@ -49,11 +84,98 @@ export function AuthExperience({
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(initialError)
   const [isLoading, setIsLoading] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
+  const [shake, setShake] = useState(false)
 
-  // Switch mode without page reload, keeping URL in sync
+  // Interactivity states
+  const [isTouchDevice, setIsTouchDevice] = useState(false)
+  const [isApkHovered, setIsApkHovered] = useState(false)
+  const [qrSvg, setQrSvg] = useState<string>('')
+  const [isCardHovered, setIsCardHovered] = useState(false)
+
+  // Card 3D tilt & border highlight tracking
+  const cardRef = useRef<HTMLDivElement>(null)
+  const cardRotateX = useMotionValue(0)
+  const cardRotateY = useMotionValue(0)
+  const smoothCardRotateX = useSpring(cardRotateX, { stiffness: 220, damping: 24, mass: 0.4 })
+  const smoothCardRotateY = useSpring(cardRotateY, { stiffness: 220, damping: 24, mass: 0.4 })
+  const cardBorderX = useMotionValue(-1000)
+  const cardBorderY = useMotionValue(-1000)
+
+  // Background spotlight tracking (lerped)
+  const spotlightX = useMotionValue(-1000)
+  const spotlightY = useMotionValue(-1000)
+  const smoothSpotlightX = useSpring(spotlightX, { stiffness: 120, damping: 25, mass: 0.5 })
+  const smoothSpotlightY = useSpring(spotlightY, { stiffness: 120, damping: 25, mass: 0.5 })
+
+  // Heading refined oval grey backdrop parallax
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const ellipseParallaxX = useMotionValue(0)
+  const ellipseParallaxY = useMotionValue(0)
+  const smoothEllipseX = useSpring(ellipseParallaxX, { stiffness: 90, damping: 20, mass: 0.5 })
+  const smoothEllipseY = useSpring(ellipseParallaxY, { stiffness: 90, damping: 20, mass: 0.5 })
+
+  const spotlightBackground = useMotionTemplate`radial-gradient(550px circle at ${smoothSpotlightX}px ${smoothSpotlightY}px, rgba(255, 255, 255, 0.035), transparent 80%)`
+  const cardBorderBackground = useMotionTemplate`radial-gradient(180px circle at ${cardBorderX}px ${cardBorderY}px, rgba(59, 130, 246, 0.4), transparent 75%)`
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const isTouch = window.matchMedia('(pointer: coarse)').matches
+    setIsTouchDevice(isTouch)
+
+    // Generate dynamic QR code matching origin
+    const url = `https://github.com/priyanshu-bindal/Personal-Productivity-System/releases/download/v1.0.0/FocusFlow.apk`
+    QRCode.toString(url, {
+      type: 'svg',
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+    })
+      .then(setQrSvg)
+      .catch(() => setQrSvg(DEFAULT_QR_SVG))
+
+    if (isTouch || shouldReduceMotion) {
+      headingRef.current?.style.setProperty('--px', '0px')
+      headingRef.current?.style.setProperty('--py', '0px')
+      return
+    }
+
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      spotlightX.set(e.clientX)
+      spotlightY.set(e.clientY)
+
+      // Slight parallax: shift ellipse up to 12px toward cursor
+      if (headingRef.current) {
+        const rect = headingRef.current.getBoundingClientRect()
+        const centerX = rect.left + rect.width / 2
+        const centerY = rect.top + rect.height / 2
+        const halfW = window.innerWidth / 2 || 1
+        const halfH = window.innerHeight / 2 || 1
+        const normX = Math.max(-1, Math.min(1, (e.clientX - centerX) / halfW))
+        const normY = Math.max(-1, Math.min(1, (e.clientY - centerY) / halfH))
+        ellipseParallaxX.set(normX * 12)
+        ellipseParallaxY.set(normY * 12)
+      }
+    }
+
+    const unsubX = smoothEllipseX.on('change', (latestX) => {
+      headingRef.current?.style.setProperty('--px', `${latestX.toFixed(2)}px`)
+    })
+    const unsubY = smoothEllipseY.on('change', (latestY) => {
+      headingRef.current?.style.setProperty('--py', `${latestY.toFixed(2)}px`)
+    })
+
+    window.addEventListener('mousemove', handleWindowMouseMove, { passive: true })
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove)
+      unsubX()
+      unsubY()
+    }
+  }, [spotlightX, spotlightY, isTouchDevice, shouldReduceMotion, ellipseParallaxX, ellipseParallaxY, smoothEllipseX, smoothEllipseY])
+
   const switchMode = (newMode: 'signin' | 'signup') => {
     if (newMode === mode) return
     setMode(newMode)
@@ -84,9 +206,17 @@ export function AuthExperience({
     return undefined
   }
 
+  const triggerErrorShake = (errorMsg: string) => {
+    setFormError(errorMsg)
+    if (!shouldReduceMotion) {
+      setShake(true)
+      setTimeout(() => setShake(false), 400)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (isLoading) return
+    if (isLoading || isSuccess) return
 
     setFormError(null)
     const errors: FieldErrors = {}
@@ -105,6 +235,7 @@ export function AuthExperience({
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors)
+      triggerErrorShake('Please correct the highlighted fields.')
       return
     }
 
@@ -122,7 +253,7 @@ export function AuthExperience({
       if (isSignUp) {
         const result = await signup(formData)
         if (result?.error) {
-          setFormError(result.error)
+          triggerErrorShake(result.error)
           if (
             result.error.toLowerCase().includes('already exists') ||
             result.error.toLowerCase().includes('sign in')
@@ -131,20 +262,28 @@ export function AuthExperience({
           }
           setIsLoading(false)
         } else if (result?.success) {
-          window.location.href = '/'
+          setIsLoading(false)
+          setIsSuccess(true)
+          setTimeout(() => {
+            window.location.href = '/'
+          }, 450)
         }
       } else {
         const result = await login(formData)
         if (result?.error) {
-          setFormError(result.error)
+          triggerErrorShake(result.error)
           setIsLoading(false)
         } else if (result?.success) {
-          window.location.href = '/'
+          setIsLoading(false)
+          setIsSuccess(true)
+          setTimeout(() => {
+            window.location.href = '/'
+          }, 450)
         }
       }
     } catch (err: any) {
       if (err?.message !== 'NEXT_REDIRECT') {
-        setFormError(
+        triggerErrorShake(
           mode === 'signup'
             ? 'Unable to create account. Please check your details and try again.'
             : 'Incorrect email or password. Please try again.'
@@ -180,439 +319,484 @@ export function AuthExperience({
     }
   }
 
+  const handleCardMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isTouchDevice || shouldReduceMotion) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    const centerX = rect.width / 2
+    const centerY = rect.height / 2
+    const rX = ((y - centerY) / centerY) * -3
+    const rY = ((x - centerX) / centerX) * 3
+    cardRotateX.set(rX)
+    cardRotateY.set(rY)
+    cardBorderX.set(x)
+    cardBorderY.set(y)
+    setIsCardHovered(true)
+  }
+
+  const handleCardMouseLeave = () => {
+    cardRotateX.set(0)
+    cardRotateY.set(0)
+    setIsCardHovered(false)
+  }
+
+  // Animation variants
+  const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: shouldReduceMotion ? 0 : 0.06,
+        delayChildren: 0.05,
+      },
+    },
+  }
+
+  const itemVariants: Variants = {
+    hidden: {
+      opacity: 0,
+      y: shouldReduceMotion ? 0 : 12,
+    },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.4,
+        ease: EASE_OUT,
+      },
+    },
+  }
+
+  const headlineContainerVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: shouldReduceMotion ? 0 : 0.045,
+      },
+    },
+  }
+
+  const wordVariants: Variants = {
+    hidden: {
+      opacity: 0,
+      y: shouldReduceMotion ? 0 : 8,
+    },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.35,
+        ease: EASE_OUT,
+      },
+    },
+  }
+
   return (
-    <div className="relative min-h-[100dvh] w-full bg-[#05070D] text-[#F1F5F9] flex flex-col justify-between overflow-x-hidden selection:bg-[#3978FF]/30 selection:text-cyan-200 antialiased">
-      {/* ── 1. CINEMATIC DARK BACKGROUND & RESTRAINED AMBIENT LIGHTING ── */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        {/* Subtle geometric dot grid pattern */}
-        <div
-          className="absolute inset-0 opacity-[0.14]"
+    <div className="relative min-h-screen w-full bg-[#0A0A0B] text-[#FAFAFA] flex items-center justify-center p-6 sm:p-8 lg:p-12 antialiased overflow-x-clip">
+      
+      {/* ── 1. BACKGROUND: DOT-GRID (4% OPACITY) ── */}
+      <div
+        className="fixed inset-0 pointer-events-none z-0"
+        style={{
+          backgroundImage: 'radial-gradient(rgba(250, 250, 250, 0.25) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+          opacity: 0.04,
+        }}
+      />
+
+      {/* ── 2. BACKGROUND: LERPED RADIAL SPOTLIGHT (HIDDEN ON TOUCH & REDUCED MOTION) ── */}
+      {!isTouchDevice && !shouldReduceMotion && (
+        <motion.div
+          className="fixed inset-0 pointer-events-none z-0"
           style={{
-            backgroundImage: `radial-gradient(rgba(56, 189, 248, 0.25) 1px, transparent 1px)`,
-            backgroundSize: '36px 36px',
-            maskImage: 'radial-gradient(ellipse at 50% 50%, black 40%, transparent 90%)',
-            WebkitMaskImage: 'radial-gradient(ellipse at 50% 50%, black 40%, transparent 90%)',
+            background: spotlightBackground,
           }}
         />
+      )}
 
-        {/* Top-Left Ambient Cyan/Blue Light */}
-        <div
-          className="absolute -top-[15%] -left-[10%] w-[580px] h-[580px] rounded-full blur-[140px] opacity-20"
-          style={{
-            background: 'radial-gradient(circle, #0284c7 0%, #0369a1 40%, transparent 70%)',
-            animation: 'ambient-drift 24s ease-in-out infinite alternate',
-          }}
-        />
-
-        {/* Center-Right Subtle Indigo Atmosphere */}
-        <div
-          className="absolute top-[25%] -right-[15%] w-[620px] h-[620px] rounded-full blur-[160px] opacity-15"
-          style={{
-            background: 'radial-gradient(circle, #38bdf8 0%, #4338ca 45%, transparent 70%)',
-            animation: 'ambient-drift 30s ease-in-out infinite alternate-reverse',
-          }}
-        />
-
-        {/* Subtle Vignette Overlay */}
-        <div className="absolute inset-0 bg-radial-[circle_at_center,transparent_45%,#05070D_95%]" />
-      </div>
-
-      {/* ── 2. TOP BRAND HEADER ── */}
-      <header className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-1 sm:pt-6 sm:pb-2 flex items-center justify-between shrink-0">
-        <Link
-          href="/"
-          className="group flex items-center gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3978FF] rounded-xl p-1 transition-transform active:scale-[0.98]"
-        >
-          {/* Refined FocusFlow Logo Badge */}
-          <div className="relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-br from-cyan-500/15 via-[#3978FF]/20 to-indigo-700/30 border border-[#3978FF]/30 shadow-[0_2px_12px_rgba(57,120,255,0.2)] group-hover:border-[#3978FF]/60 transition-all duration-300">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 32 32"
-              className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400"
-              fill="none"
-            >
-              <path
-                d="M10 8L4 16l6 8M22 8l6 8-6 8M19 6l-6 20"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-          <div>
-            <span className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-1">
-              Focus<span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-[#3978FF]">Flow</span>
-            </span>
-            <span className="hidden sm:block text-[10px] tracking-widest uppercase font-semibold text-cyan-400/80 -mt-1">
-              Consistency Platform
-            </span>
-          </div>
-        </Link>
-
-        {/* Status indicator */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.03] border border-white/[0.08] backdrop-blur-md text-xs text-[#94A3B8]">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span>All systems online</span>
-        </div>
-      </header>
-
-      {/* ── 3. MAIN HERO + AUTH CARD SECTION ── */}
-      <main className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-1 pb-4 sm:pt-2 sm:pb-6 flex-1 flex flex-col justify-center">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 xl:gap-14 items-start">
+      {/* ── 3. MAIN CONTENT CONTAINER (STAGGERED ENTRANCE) ── */}
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="relative z-10 w-full max-w-6xl mx-auto"
+      >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           
-          {/* ══════════════════════════════════════════════════════════════════
-              LEFT SIDE: DYNAMIC PRODUCT SHOWCASE & LIVING DASHBOARD
-          ══════════════════════════════════════════════════════════════════ */}
-          <div className="lg:col-span-7 flex flex-col justify-center space-y-6 lg:space-y-7 lg:pr-2">
-            {/* Headline and Copy */}
-            <div className="space-y-3 sm:space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-cyan-500/10 via-[#3978FF]/10 to-indigo-500/10 border border-cyan-500/25 text-cyan-300 text-xs font-semibold tracking-wide">
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Consistency Over Intensity</span>
-              </div>
-
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-extrabold tracking-tight text-white leading-[1.12] min-h-[2.24em] select-none">
-                Your Next Level <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-[#3978FF]">
-                  <TextType
-                    text={['Starts Today.']}
-                    typingSpeed={75}
-                    pauseDuration={1500}
-                    showCursor
-                    cursorCharacter="_"
-                    cursorBlinkDuration={0.5}
-                    deletingSpeed={50}
-                    variableSpeedEnabled={false}
-                    variableSpeedMin={60}
-                    variableSpeedMax={120}
-                    cursorClassName="text-cyan-400 font-bold"
-                  />
+          {/* ══════════════════════════════════════════
+              LEFT COLUMN
+          ══════════════════════════════════════════ */}
+          <div className="flex flex-col justify-center space-y-8 lg:space-y-10 lg:pr-6">
+            
+            {/* 1. Logo + Name */}
+            <motion.div variants={itemVariants}>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-3 w-fit focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3B82F6] rounded-md transition-opacity duration-150 hover:opacity-90"
+              >
+                <div className="w-9 h-9 rounded-[8px] bg-[#111113] border border-[#232326] flex items-center justify-center text-[#FAFAFA]">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 32 32"
+                    className="w-5 h-5 text-[#FAFAFA]"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M10 8L4 16l6 8M22 8l6 8-6 8M19 6l-6 20"
+                      stroke="currentColor"
+                      strokeWidth="2.25"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+                <span className="text-xl font-semibold tracking-tight text-[#FAFAFA]">
+                  FocusFlow
                 </span>
-              </h1>
+              </Link>
+            </motion.div>
 
-              <p className="text-sm sm:text-base lg:text-lg text-[#94A3B8] max-w-xl font-normal leading-relaxed">
-                Build consistency. Master new skills. Take control of your day with the private platform designed for continuous progress.
-              </p>
+            {/* 2. Headline & Subtext (Refined oval grey backdrop via ::before pseudo-element) */}
+            <div className="space-y-4">
+              <motion.h1
+                ref={headingRef}
+                variants={itemVariants}
+                className="hero-heading text-3xl sm:text-4xl lg:text-[46px] font-bold text-white tracking-tight leading-[1.12]"
+              >
+                <motion.span
+                  variants={headlineContainerVariants}
+                  className="inline-block"
+                >
+                  {headlineWords.map((word, i) => (
+                    <motion.span
+                      key={i}
+                      variants={wordVariants}
+                      className="inline-block mr-[0.25em] last:mr-0 text-white"
+                    >
+                      {word}
+                    </motion.span>
+                  ))}
+                </motion.span>
+              </motion.h1>
+
+              {/* 3. Subtext */}
+              <motion.p
+                variants={itemVariants}
+                className="text-base sm:text-[17px] text-[#A1A1AA] leading-relaxed max-w-lg font-normal"
+              >
+                One private workspace for your tasks, skills and money.
+              </motion.p>
             </div>
 
-            {/* Living Productivity Visualization (Illustrative Dashboard) */}
-            <div className="relative group">
-              {/* Main Clean Showcase Card */}
-              <div className="relative rounded-2xl sm:rounded-3xl bg-[#091122]/90 border border-[rgba(71,115,170,0.3)] p-4 sm:p-5 lg:p-6 shadow-[0_16px_40px_rgba(0,0,0,0.5)] space-y-4 sm:space-y-5 overflow-hidden">
-                {/* Dashboard Header Bar */}
-                <div className="flex items-center justify-between pb-3 sm:pb-4 border-b border-white/[0.06]">
-                  <div className="flex items-center gap-2.5 sm:gap-3">
-                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-cyan-500/10 border border-cyan-400/25 flex items-center justify-center text-cyan-400">
-                      <Activity className="w-4 h-4" />
+            {/* 4. Features (small icon + label, 2-column grid, interactive hover) */}
+            <motion.div
+              variants={itemVariants}
+              className="grid grid-cols-2 gap-x-6 gap-y-3.5 pt-2"
+            >
+              {features.map((feature) => {
+                const Icon = feature.icon
+                return (
+                  <div
+                    key={feature.label}
+                    className="group relative flex items-start gap-2.5 p-1.5 -ml-1.5 rounded-[8px] transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:translate-x-1 cursor-default min-h-[44px]"
+                  >
+                    <div className="mt-0.5 shrink-0 transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-110">
+                      <Icon
+                        className="w-4 h-4 text-[#A1A1AA] transition-colors duration-150 group-hover:text-[#3B82F6]"
+                        strokeWidth={1.75}
+                      />
                     </div>
-                    <div>
-                      <div className="text-xs sm:text-sm font-semibold text-white flex items-center gap-2">
-                        Today&apos;s Focus Sprint
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/25">
-                          Live
-                        </span>
-                      </div>
-                      <p className="text-[10px] sm:text-[11px] text-[#94A3B8] font-mono">
-                        Illustrative preview • 3 of 4 objectives completed
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-[#FAFAFA] block leading-tight transition-colors duration-150 group-hover:text-[#FAFAFA]">
+                        {feature.label}
+                      </span>
+                      <p className="text-xs text-[#71717A] mt-0.5 leading-tight opacity-0 -translate-y-0.5 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] truncate">
+                        {feature.desc}
                       </p>
                     </div>
                   </div>
+                )
+              })}
+            </motion.div>
 
-                  {/* Streak Indicator with Warm Flame Accent */}
-                  <div className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] sm:text-xs font-bold">
-                    <Flame className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
-                    <span>14 Day Streak</span>
-                  </div>
-                </div>
+            {/* 5. APK Button Section with Bounce & QR Popover */}
+            <motion.div variants={itemVariants} className="pt-2">
+              <div
+                className="relative inline-block"
+                onMouseEnter={() => setIsApkHovered(true)}
+                onMouseLeave={() => setIsApkHovered(false)}
+              >
+                <a
+                  href="https://github.com/priyanshu-bindal/Personal-Productivity-System/releases/download/v1.0.0/FocusFlow.apk"
+                  download="FocusFlow.apk"
+                  className="inline-flex items-center justify-center gap-2.5 h-[44px] px-5 rounded-[8px] bg-[#111113] border border-[#232326] hover:border-[#3B82F6] hover:bg-[#18181B] text-[#FAFAFA] text-sm font-medium transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3B82F6] group cursor-pointer"
+                >
+                  <AndroidIcon className="w-4 h-4 shrink-0 text-[#FAFAFA]" />
+                  <span>Download Android App (APK)</span>
+                  <motion.div
+                    animate={
+                      isApkHovered && !shouldReduceMotion
+                        ? { y: [0, 4, 0] }
+                        : { y: 0 }
+                    }
+                    transition={{ duration: 0.3, ease: EASE_OUT }}
+                    className="shrink-0 text-[#A1A1AA] group-hover:text-[#3B82F6] transition-colors duration-150"
+                  >
+                    <Download className="w-4 h-4" strokeWidth={1.75} />
+                  </motion.div>
+                </a>
 
-                {/* Active Skill Progress Bars */}
-                <div className="space-y-3">
-                  {/* Skill 1: Full-Stack Systems */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-[#F1F5F9] font-medium flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                        Next.js Architecture & Systems
-                      </span>
-                      <span className="text-cyan-300 font-mono font-semibold">82%</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-white/[0.06] overflow-hidden p-0.5">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-[#3978FF]"
-                        style={{ width: '82%' }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Skill 2: UI Motion */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-[#F1F5F9] font-medium flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-indigo-400" />
-                        Fluid Motion & Micro-Interactions
-                      </span>
-                      <span className="text-indigo-300 font-mono font-semibold">68%</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-white/[0.06] overflow-hidden p-0.5">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-[#3978FF]"
-                        style={{ width: '68%' }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Interactive Weekly Progress Micro-Chart & Stats Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                  {/* Metric 1 */}
-                  <div className="p-2.5 sm:p-3 rounded-xl bg-white/[0.025] border border-white/[0.06] flex flex-col justify-between">
-                    <span className="text-[10px] sm:text-[11px] text-[#94A3B8]">Total Focus</span>
-                    <div className="text-base sm:text-lg font-bold text-white font-mono mt-0.5">42.5 hrs</div>
-                    <span className="text-[10px] text-emerald-400 font-medium">+14% this week</span>
-                  </div>
-
-                  {/* Metric 2 */}
-                  <div className="p-2.5 sm:p-3 rounded-xl bg-white/[0.025] border border-white/[0.06] flex flex-col justify-between">
-                    <span className="text-[10px] sm:text-[11px] text-[#94A3B8]">Completed</span>
-                    <div className="text-base sm:text-lg font-bold text-white font-mono mt-0.5">28 Tasks</div>
-                    <span className="text-[10px] text-cyan-400 font-medium">93% on time</span>
-                  </div>
-
-                  {/* Metric 3: Weekly Activity Bar Sparkline */}
-                  <div className="col-span-2 p-2.5 sm:p-3 rounded-xl bg-white/[0.025] border border-white/[0.06] flex flex-col justify-between">
-                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-[#94A3B8] mb-1.5">
-                      <span>Weekly Momentum</span>
-                      <span className="text-cyan-400 font-mono text-[10px]">M T W T F S S</span>
-                    </div>
-                    {/* 7-day sparkline bars */}
-                    <div className="flex items-end justify-between gap-1.5 h-7 sm:h-8">
-                      {[40, 65, 80, 50, 95, 75, 90].map((height, idx) => (
-                        <div
-                          key={idx}
-                          className="flex-1 bg-white/[0.06] rounded-t-sm flex flex-col justify-end"
-                          style={{ height: '100%' }}
-                        >
+                {/* Scan to install QR Popover (Desktop only) */}
+                <AnimatePresence>
+                  {isApkHovered && (
+                    <motion.div
+                      role="tooltip"
+                      initial={{ opacity: 0, y: shouldReduceMotion ? 0 : 8, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: shouldReduceMotion ? 0 : 6, scale: 0.96 }}
+                      transition={{ duration: 0.18, ease: EASE_OUT }}
+                      className="hidden lg:block absolute bottom-full mb-3 left-0 z-30 w-44 rounded-[12px] bg-[#111113] border border-[#232326] p-3 shadow-2xl pointer-events-none"
+                    >
+                      <div className="flex flex-col items-center text-center space-y-2">
+                        <div className="w-28 h-28 rounded-[6px] bg-white p-1.5 flex items-center justify-center overflow-hidden">
                           <div
-                            className={`w-full rounded-t-sm ${
-                              idx === 6
-                                ? 'bg-gradient-to-t from-cyan-500 to-sky-300'
-                                : 'bg-gradient-to-t from-[#3978FF]/70 to-cyan-500/80'
-                            }`}
-                            style={{ height: `${height}%` }}
+                            className="w-full h-full [&>svg]:w-full [&>svg]:h-full"
+                            dangerouslySetInnerHTML={{ __html: qrSvg || DEFAULT_QR_SVG }}
                           />
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                        <div className="space-y-0.5">
+                          <p className="text-xs font-medium text-[#FAFAFA]">Scan to install</p>
+                          <p className="text-[11px] text-[#A1A1AA]">Instant install • Free &amp; private on mobile</p>
+                        </div>
+                      </div>
+                      {/* Triangle Pointer */}
+                      <div className="absolute top-full left-8 -mt-[1px] w-2 h-2 rotate-45 bg-[#111113] border-r border-b border-[#232326]" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-
-              {/* Floating Glass Accent Pill 1 - Top Right */}
-              <div
-                className="hidden sm:flex absolute -top-3 -right-2 items-center gap-2 px-3 py-1.5 rounded-xl bg-[#091122]/95 border border-[rgba(71,115,170,0.35)] shadow-[0_8px_20px_rgba(0,0,0,0.5)] text-xs text-[#F1F5F9] z-20"
-                style={{ animation: 'float-slow 6s ease-in-out infinite' }}
-              >
-                <div className="w-5 h-5 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400">
-                  <CheckCircle2 className="w-3 h-3" />
-                </div>
-                <div>
-                  <div className="font-semibold text-white leading-tight">Daily Target Met</div>
-                  <div className="text-[10px] text-[#94A3B8]">120 min deep work</div>
-                </div>
+              <div className="mt-2.5 flex items-center gap-2 text-xs text-[#A1A1AA]">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
+                <span className="font-medium text-[#E4E4E7]">Take your focus anywhere • 100% free &amp; private</span>
               </div>
-
-              {/* Floating Glass Accent Pill 2 - Bottom Left */}
-              <div
-                className="hidden sm:flex absolute -bottom-3 -left-2 items-center gap-2 px-3 py-1.5 rounded-xl bg-[#091122]/95 border border-[rgba(71,115,170,0.35)] shadow-[0_8px_20px_rgba(0,0,0,0.5)] text-xs text-[#F1F5F9] z-20"
-                style={{ animation: 'float-slow 7s ease-in-out infinite reverse' }}
-              >
-                <div className="w-5 h-5 rounded-lg bg-[#3978FF]/20 border border-[#3978FF]/40 flex items-center justify-center text-cyan-300">
-                  <Zap className="w-3 h-3" />
-                </div>
-                <div>
-                  <div className="font-semibold text-white leading-tight">Focus Flow Activated</div>
-                  <div className="text-[10px] text-cyan-300">Clean cognitive state</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Three Compact Feature Highlights */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-0.5">
-              {/* Highlight 1: Smart Planner */}
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-cyan-500/25 transition-colors">
-                <div className="w-7 h-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-2">
-                  <Calendar className="w-3.5 h-3.5" />
-                </div>
-                <h2 className="text-xs sm:text-sm font-semibold text-white">Smart Planner</h2>
-                <p className="text-[11px] text-[#94A3B8] mt-0.5 leading-relaxed">
-                  Daily focus queue designed for priority execution.
-                </p>
-              </div>
-
-              {/* Highlight 2: Skill Progress */}
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-[#3978FF]/25 transition-colors">
-                <div className="w-7 h-7 rounded-lg bg-[#3978FF]/10 border border-[#3978FF]/20 flex items-center justify-center text-[#3978FF] mb-2">
-                  <TrendingUp className="w-3.5 h-3.5" />
-                </div>
-                <h2 className="text-xs sm:text-sm font-semibold text-white">Skill Progress</h2>
-                <p className="text-[11px] text-[#94A3B8] mt-0.5 leading-relaxed">
-                  Visual mastery logs and retention timelines.
-                </p>
-              </div>
-
-              {/* Highlight 3: Money Tracker */}
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-indigo-500/25 transition-colors">
-                <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-2">
-                  <IndianRupee className="w-3.5 h-3.5" />
-                </div>
-                <h2 className="text-xs sm:text-sm font-semibold text-white">Money Tracker</h2>
-                <p className="text-[11px] text-[#94A3B8] mt-0.5 leading-relaxed">
-                  Financial discipline seamlessly linked with time.
-                </p>
-              </div>
-            </div>
+            </motion.div>
           </div>
 
-          {/* ══════════════════════════════════════════════════════════════════
-              RIGHT SIDE: REFINED SOLID DEEP NAVY AUTHENTICATION CARD
-              - Positioned high and vertically centered with hero section
-              - Solid deep navy #0B1426 with subtle border rgba(71, 115, 170, 0.35)
-              - No excessive outer glow or animated luminous shadow
-              - Smooth, polished mode transition (300ms ease-out)
-          ══════════════════════════════════════════════════════════════════ */}
-          <div className="lg:col-span-5 w-full max-w-md mx-auto lg:max-w-none">
-            {/* The Authentic Premium Card */}
-            <div className="relative rounded-2xl sm:rounded-3xl bg-[#0B1426] border border-[rgba(71,115,170,0.35)] p-6 sm:p-7 shadow-[0_16px_36px_rgba(0,0,0,0.55)] transition-all duration-300 auth-card-entrance">
-              
-              {/* Segmented Mode Switcher Tabs */}
-              <div className="relative p-1 rounded-xl bg-[#070D19] border border-[rgba(71,115,170,0.2)] mb-6 flex">
-                {/* Smooth Animated Tab Pill Indicator */}
-                <div
-                  className="absolute top-1 bottom-1 rounded-lg bg-[#3978FF] shadow-[0_2px_8px_rgba(57,120,255,0.3)] transition-all duration-300 ease-out"
-                  style={{
-                    left: mode === 'signin' ? '4px' : 'calc(50% + 2px)',
-                    width: 'calc(50% - 6px)',
-                  }}
-                />
+          {/* ══════════════════════════════════════════
+              RIGHT COLUMN: AUTH CARD (GLASSY, SHARP, HIGHLIGHTED)
+          ══════════════════════════════════════════ */}
+          <motion.div
+            variants={itemVariants}
+            className="relative flex items-center justify-center lg:justify-end w-full"
+            style={{ perspective: 1000 }}
+          >
+            {/* Ambient Backlight Highlight behind the card */}
+            <div
+              className="absolute -inset-4 sm:-inset-6 -z-10 rounded-3xl pointer-events-none opacity-80"
+              style={{
+                background:
+                  'radial-gradient(ellipse at center, rgba(59, 130, 246, 0.12) 0%, rgba(255, 255, 255, 0.04) 45%, transparent 75%)',
+                filter: 'blur(36px)',
+              }}
+              aria-hidden="true"
+            />
 
+            <motion.div
+              ref={cardRef}
+              onMouseMove={handleCardMouseMove}
+              onMouseLeave={handleCardMouseLeave}
+              animate={
+                shake && !shouldReduceMotion
+                  ? { x: [0, -6, 6, -4, 4, -2, 2, 0] }
+                  : { x: 0 }
+              }
+              transition={
+                shake
+                  ? { duration: 0.35, ease: EASE_OUT }
+                  : { duration: 0.2 }
+              }
+              style={{
+                rotateX: shouldReduceMotion ? 0 : smoothCardRotateX,
+                rotateY: shouldReduceMotion ? 0 : smoothCardRotateY,
+                transformStyle: 'preserve-3d',
+              }}
+              className="relative w-full max-w-[420px] rounded-[14px] bg-[#121316]/80 backdrop-blur-2xl border border-white/[0.14] p-6 sm:p-8 overflow-hidden shadow-[0_24px_50px_-12px_rgba(0,0,0,0.85),0_0_0_1px_rgba(255,255,255,0.06),0_1px_2px_rgba(255,255,255,0.08)_inset]"
+            >
+              {/* Top specular glass rim reflection */}
+              <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.28] to-transparent pointer-events-none z-20" />
+
+              {/* Inner ambient glass sheen */}
+              <div className="absolute inset-0 bg-gradient-to-b from-white/[0.035] via-transparent to-black/[0.2] pointer-events-none rounded-[14px]" />
+
+              {/* 1px Border Highlight Tracking Pointer */}
+              <motion.div
+                className="absolute -inset-[1px] rounded-[15px] pointer-events-none z-20"
+                style={{
+                  opacity: isCardHovered && !isTouchDevice && !shouldReduceMotion ? 1 : 0,
+                  transition: 'opacity 200ms ease',
+                  background: cardBorderBackground,
+                  mask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                  maskComposite: 'exclude',
+                  WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                  WebkitMaskComposite: 'xor',
+                  padding: '1px',
+                }}
+              />
+
+              {/* Tabs: Sign In / Create Account with Sliding Pill */}
+              <div
+                role="tablist"
+                aria-label="Authentication Options"
+                className="relative grid grid-cols-2 p-1 mb-6 rounded-[8px] bg-[#0A0B0E]/85 backdrop-blur-md border border-white/[0.1] z-10 shadow-inner"
+              >
                 <button
                   type="button"
+                  role="tab"
+                  id="tab-signin"
+                  aria-selected={mode === 'signin'}
+                  aria-controls="panel-signin"
                   onClick={() => switchMode('signin')}
-                  className={`relative z-10 flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-colors duration-200 ${
-                    mode === 'signin' ? 'text-white' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
-                  }`}
+                  className="relative h-9 text-xs sm:text-sm font-medium rounded-[6px] transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3B82F6] cursor-pointer"
                 >
-                  Sign In
+                  {mode === 'signin' && (
+                    <motion.div
+                      layoutId="tab-pill"
+                      className="absolute inset-0 bg-white/[0.09] border border-white/[0.18] rounded-[6px] shadow-[0_2px_8px_rgba(0,0,0,0.5)] z-0"
+                      transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                    />
+                  )}
+                  <span
+                    className={`relative z-10 transition-colors duration-150 ${
+                      mode === 'signin' ? 'text-white font-semibold' : 'text-[#A1A1AA] hover:text-white'
+                    }`}
+                  >
+                    Sign In
+                  </span>
                 </button>
                 <button
                   type="button"
+                  role="tab"
+                  id="tab-signup"
+                  aria-selected={mode === 'signup'}
+                  aria-controls="panel-signup"
                   onClick={() => switchMode('signup')}
-                  className={`relative z-10 flex-1 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-colors duration-200 ${
-                    mode === 'signup' ? 'text-white' : 'text-[#94A3B8] hover:text-[#F1F5F9]'
-                  }`}
+                  className="relative h-9 text-xs sm:text-sm font-medium rounded-[6px] transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3B82F6] cursor-pointer"
                 >
-                  Create Account
+                  {mode === 'signup' && (
+                    <motion.div
+                      layoutId="tab-pill"
+                      className="absolute inset-0 bg-white/[0.09] border border-white/[0.18] rounded-[6px] shadow-[0_2px_8px_rgba(0,0,0,0.5)] z-0"
+                      transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                    />
+                  )}
+                  <span
+                    className={`relative z-10 transition-colors duration-150 ${
+                      mode === 'signup' ? 'text-white font-semibold' : 'text-[#A1A1AA] hover:text-white'
+                    }`}
+                  >
+                    Create Account
+                  </span>
                 </button>
               </div>
 
-              {/* Mode-Specific Content with Smooth Transition */}
-              <div key={mode} className="auth-form-transition">
-                {/* Card Title & Subtitle */}
-                <div className="mb-5 space-y-1">
-                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#F1F5F9]">
-                    {mode === 'signin' ? 'Welcome back' : 'Start your journey'}
-                  </h2>
-                  <p className="text-xs sm:text-sm text-[#94A3B8]">
-                    {mode === 'signin'
-                      ? 'Enter your credentials to access your dashboard'
-                      : 'Create your private account in under 30 seconds'}
-                  </p>
-                </div>
-
-                {/* Main Auth Form */}
-                <form onSubmit={handleSubmit} noValidate className="space-y-4">
+              {/* Form Content: Cross-Fade with 8px Slide on Switch */}
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.form
+                  key={mode}
+                  id={mode === 'signin' ? 'panel-signin' : 'panel-signup'}
+                  role="tabpanel"
+                  aria-labelledby={mode === 'signin' ? 'tab-signin' : 'tab-signup'}
+                  initial={{ opacity: 0, x: shouldReduceMotion ? 0 : mode === 'signin' ? -8 : 8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: shouldReduceMotion ? 0 : mode === 'signin' ? 8 : -8 }}
+                  transition={{ duration: 0.2, ease: EASE_OUT }}
+                  onSubmit={handleSubmit}
+                  noValidate
+                  className="space-y-4 relative z-10"
+                >
                   {/* Full Name Field (Sign Up Only) */}
                   {mode === 'signup' && (
-                    <div className="space-y-1.5">
-                      <label htmlFor="full_name" className="text-xs font-medium text-[#F1F5F9] flex items-center justify-between">
-                        <span>Full Name</span>
+                    <div className="space-y-1.5 group">
+                      <label
+                        htmlFor="full_name"
+                        className="block text-xs font-medium text-[#E4E4E7] transition-colors duration-150 group-focus-within:text-[#3B82F6]"
+                      >
+                        Full Name
                       </label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#94A3B8]">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <input
-                          id="full_name"
-                          name="full_name"
-                          type="text"
-                          value={fullName}
-                          onChange={e => {
-                            setFullName(e.target.value)
-                            if (fieldErrors.fullName) {
-                              setFieldErrors(prev => ({ ...prev, fullName: undefined }))
-                            }
-                          }}
-                          placeholder="Your Name"
-                          disabled={isLoading}
-                          className={`w-full h-11 pl-10 pr-4 rounded-xl bg-[#070D19] border text-sm text-[#F1F5F9] placeholder-slate-500 focus:outline-none transition-colors duration-200 ${
-                            fieldErrors.fullName
-                              ? 'border-red-500/80 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                              : 'border-[rgba(71,115,170,0.25)] focus:border-[#3978FF] focus:ring-1 focus:ring-[#3978FF] hover:border-[rgba(71,115,170,0.4)]'
-                          }`}
-                        />
-                      </div>
+                      <input
+                        id="full_name"
+                        name="full_name"
+                        type="text"
+                        autoComplete="name"
+                        value={fullName}
+                        onChange={e => {
+                          setFullName(e.target.value)
+                          if (fieldErrors.fullName) {
+                            setFieldErrors(prev => ({ ...prev, fullName: undefined }))
+                          }
+                        }}
+                        placeholder="Enter your name"
+                        disabled={isLoading || isSuccess}
+                        className={`w-full h-[44px] px-3.5 rounded-[8px] bg-[#0A0B0E]/70 backdrop-blur-md border text-sm text-[#FAFAFA] placeholder:text-[#71717A] focus:outline-none transition-all duration-150 ${
+                          fieldErrors.fullName
+                            ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                            : 'border-white/[0.12] hover:border-white/[0.22] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/30'
+                        }`}
+                      />
                       {fieldErrors.fullName && (
-                        <p className="text-xs text-red-400 font-medium flex items-center gap-1.5 mt-1">
-                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          <span>{fieldErrors.fullName}</span>
-                        </p>
+                        <p className="text-xs text-red-400 mt-1">{fieldErrors.fullName}</p>
                       )}
                     </div>
                   )}
 
                   {/* Email Field */}
-                  <div className="space-y-1.5">
-                    <label htmlFor="email" className="text-xs font-medium text-[#F1F5F9] flex items-center justify-between">
-                      <span>Email address</span>
+                  <div className="space-y-1.5 group">
+                    <label
+                      htmlFor="email"
+                      className="block text-xs font-medium text-[#E4E4E7] transition-colors duration-150 group-focus-within:text-[#3B82F6]"
+                    >
+                      Email
                     </label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#94A3B8]">
-                        <Mail className="w-4 h-4" />
-                      </div>
-                      <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        value={email}
-                        onChange={e => {
-                          setEmail(e.target.value)
-                          if (fieldErrors.email) {
-                            setFieldErrors(prev => ({ ...prev, email: undefined }))
-                          }
-                        }}
-                        placeholder="you@example.com"
-                        disabled={isLoading}
-                        autoComplete="email"
-                        className={`w-full h-11 pl-10 pr-4 rounded-xl bg-[#070D19] border text-sm text-[#F1F5F9] placeholder-slate-500 focus:outline-none transition-colors duration-200 ${
-                          fieldErrors.email
-                            ? 'border-red-500/80 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                            : 'border-[rgba(71,115,170,0.25)] focus:border-[#3978FF] focus:ring-1 focus:ring-[#3978FF] hover:border-[rgba(71,115,170,0.4)]'
-                        }`}
-                      />
-                    </div>
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={e => {
+                        setEmail(e.target.value)
+                        if (fieldErrors.email) {
+                          setFieldErrors(prev => ({ ...prev, email: undefined }))
+                        }
+                      }}
+                      placeholder="Enter your email"
+                      disabled={isLoading || isSuccess}
+                      className={`w-full h-[44px] px-3.5 rounded-[8px] bg-[#0A0B0E]/70 backdrop-blur-md border text-sm text-[#FAFAFA] placeholder:text-[#71717A] focus:outline-none transition-all duration-150 ${
+                        fieldErrors.email
+                          ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                          : 'border-white/[0.12] hover:border-white/[0.22] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/30'
+                      }`}
+                    />
                     {fieldErrors.email && (
-                      <p className="text-xs text-red-400 font-medium flex items-center gap-1.5 mt-1">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>{fieldErrors.email}</span>
-                      </p>
+                      <p className="text-xs text-red-400 mt-1">{fieldErrors.email}</p>
                     )}
                   </div>
 
-                  {/* Password Field */}
-                  <div className="space-y-1.5">
+                  {/* Password Field with Eye Toggle Morph */}
+                  <div className="space-y-1.5 group">
                     <div className="flex items-center justify-between">
-                      <label htmlFor="password" className="text-xs font-medium text-[#F1F5F9]">Password</label>
+                      <label
+                        htmlFor="password"
+                        className="block text-xs font-medium text-[#E4E4E7] transition-colors duration-150 group-focus-within:text-[#3B82F6]"
+                      >
+                        Password
+                      </label>
                       {mode === 'signin' && (
                         <button
                           type="button"
@@ -622,20 +806,18 @@ export function AuthExperience({
                             setForgotSuccess(false)
                             setForgotError(null)
                           }}
-                          className="text-xs text-[#22C7E8] hover:text-cyan-300 transition-colors focus:outline-none"
+                          className="text-xs text-[#3B82F6] hover:underline transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3B82F6] rounded"
                         >
                           Forgot password?
                         </button>
                       )}
                     </div>
                     <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#94A3B8]">
-                        <Lock className="w-4 h-4" />
-                      </div>
                       <input
                         id="password"
                         name="password"
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
+                        autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                         value={password}
                         onChange={e => {
                           setPassword(e.target.value)
@@ -643,261 +825,248 @@ export function AuthExperience({
                             setFieldErrors(prev => ({ ...prev, password: undefined }))
                           }
                         }}
-                        placeholder="••••••••"
-                        disabled={isLoading}
-                        autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-                        className={`w-full h-11 pl-10 pr-4 rounded-xl bg-[#070D19] border text-sm text-[#F1F5F9] placeholder-slate-500 focus:outline-none transition-colors duration-200 ${
+                        placeholder="Enter your password"
+                        disabled={isLoading || isSuccess}
+                        className={`w-full h-[44px] pl-3.5 pr-10 rounded-[8px] bg-[#0A0B0E]/70 backdrop-blur-md border text-sm text-[#FAFAFA] placeholder:text-[#71717A] focus:outline-none transition-all duration-150 ${
                           fieldErrors.password
-                            ? 'border-red-500/80 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                            : 'border-[rgba(71,115,170,0.25)] focus:border-[#3978FF] focus:ring-1 focus:ring-[#3978FF] hover:border-[rgba(71,115,170,0.4)]'
+                            ? 'border-red-500 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                            : 'border-white/[0.12] hover:border-white/[0.22] focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/30'
                         }`}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(p => !p)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#71717A] hover:text-[#FAFAFA] transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3B82F6] rounded p-1 cursor-pointer"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        <AnimatePresence mode="wait" initial={false}>
+                          {showPassword ? (
+                            <motion.div
+                              key="eye-off"
+                              initial={{ opacity: 0, scale: 0.8, rotate: -20 }}
+                              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                              exit={{ opacity: 0, scale: 0.8, rotate: 20 }}
+                              transition={{ duration: 0.15, ease: EASE_OUT }}
+                            >
+                              <EyeOff className="w-4 h-4" />
+                            </motion.div>
+                          ) : (
+                            <motion.div
+                              key="eye"
+                              initial={{ opacity: 0, scale: 0.8, rotate: 20 }}
+                              animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                              exit={{ opacity: 0, scale: 0.8, rotate: -20 }}
+                              transition={{ duration: 0.15, ease: EASE_OUT }}
+                            >
+                              <Eye className="w-4 h-4" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </button>
                     </div>
                     {fieldErrors.password && (
-                      <p className="text-xs text-red-400 font-medium flex items-center gap-1.5 mt-1">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>{fieldErrors.password}</span>
-                      </p>
+                      <p className="text-xs text-red-400 mt-1">{fieldErrors.password}</p>
                     )}
                   </div>
 
-                  {/* Form Error Banner */}
-                  {formError && !fieldErrors.email?.includes('already exists') && (
-                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                      <span className="leading-relaxed">{formError}</span>
-                    </div>
-                  )}
+                  {/* Inline Error Message */}
+                  <AnimatePresence>
+                    {formError && !fieldErrors.email?.includes('already exists') && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.2, ease: EASE_OUT }}
+                        className="p-3 rounded-[8px] bg-red-500/10 border border-red-500/20 text-xs text-red-400 leading-relaxed"
+                      >
+                        {formError}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                  {/* Primary Action Button */}
-                  <button
+                  {/* Primary Action Button (Premium iOS Style Glass) */}
+                  <motion.button
                     type="submit"
-                    disabled={isLoading}
-                    className="relative w-full h-11 mt-2 rounded-xl bg-[#3978FF] hover:bg-[#2F68E6] active:bg-[#2558CC] text-white font-semibold text-sm tracking-wide shadow-[0_4px_16px_rgba(57,120,255,0.25)] hover:shadow-[0_6px_20px_rgba(57,120,255,0.35)] active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 group cursor-pointer"
+                    disabled={isLoading || isSuccess}
+                    whileHover={shouldReduceMotion ? undefined : { y: -0.5, filter: 'brightness(1.05)' }}
+                    whileTap={shouldReduceMotion ? undefined : { scale: 0.985, filter: 'brightness(0.95)' }}
+                    transition={{ duration: 0.15, ease: EASE_OUT }}
+                    className="relative w-full h-[40px] mt-2.5 rounded-[10px] bg-gradient-to-b from-[#3B82F6]/95 via-[#2563EB]/90 to-[#1D4ED8]/95 backdrop-blur-xl border border-white/25 hover:border-white/35 text-white text-[13.5px] font-semibold tracking-[-0.01em] transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3B82F6] focus-visible:ring-offset-2 focus-visible:ring-offset-[#111113] disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer group shadow-[inset_0_1px_1px_rgba(255,255,255,0.45),inset_0_-1px_1px_rgba(0,0,0,0.3),0_4px_14px_-2px_rgba(37,99,235,0.45),0_1px_3px_rgba(0,0,0,0.3)] overflow-hidden"
                   >
-                    {isLoading ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin text-white" />
-                        <span>{mode === 'signin' ? 'Authenticating...' : 'Creating Account...'}</span>
-                      </span>
-                    ) : (
-                      <>
-                        <span>{mode === 'signin' ? 'Sign In to FocusFlow' : 'Create Free Account'}</span>
-                        <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                      </>
-                    )}
-                  </button>
-                </form>
+                    {/* Top specular glass reflection line */}
+                    <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/60 to-transparent pointer-events-none" />
 
-                {/* Footer Link */}
-                <div className="mt-5 pt-4 border-t border-[rgba(71,115,170,0.18)] flex items-center justify-between text-xs text-[#94A3B8]">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-[#22C7E8]" />
-                    <span>256-bit Encrypted</span>
-                  </div>
-                  <div>
-                    {mode === 'signin' ? (
-                      <span>
-                        Need an account?{' '}
-                        <button
-                          type="button"
-                          onClick={() => switchMode('signup')}
-                          className="text-[#22C7E8] hover:text-cyan-300 font-medium hover:underline cursor-pointer"
+                    {/* Upper subtle glass sheen */}
+                    <div className="absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/[0.12] to-transparent pointer-events-none rounded-t-[10px]" />
+
+                    <AnimatePresence mode="wait" initial={false}>
+                      {isSuccess ? (
+                        <motion.div
+                          key="success"
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2, ease: EASE_OUT }}
+                          className="relative z-10 flex items-center gap-1.5"
                         >
-                          Sign Up
-                        </button>
-                      </span>
-                    ) : (
-                      <span>
-                        Already registered?{' '}
-                        <button
-                          type="button"
-                          onClick={() => switchMode('signin')}
-                          className="text-[#22C7E8] hover:text-cyan-300 font-medium hover:underline cursor-pointer"
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="w-4 h-4 text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <motion.path
+                              d="M5 13l4 4L19 7"
+                              initial={{ pathLength: 0 }}
+                              animate={{ pathLength: 1 }}
+                              transition={{ duration: 0.3, ease: EASE_OUT }}
+                            />
+                          </svg>
+                        </motion.div>
+                      ) : isLoading ? (
+                        <motion.span
+                          key="loading"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="relative z-10 flex items-center gap-2 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]"
                         >
-                          Sign In
-                        </button>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                          <span>{mode === 'signin' ? 'Signing in…' : 'Creating account…'}</span>
+                        </motion.span>
+                      ) : (
+                        <motion.span
+                          key="default"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="relative z-10 flex items-center gap-1.5 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]"
+                        >
+                          <span>{mode === 'signin' ? 'Sign in' : 'Create account'}</span>
+                          <ArrowRight className="w-3.5 h-3.5 stroke-[2.25] transition-transform duration-150 group-hover:translate-x-0.5" />
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </motion.button>
+                </motion.form>
+              </AnimatePresence>
+            </motion.div>
+          </motion.div>
+
         </div>
-      </main>
+      </motion.div>
 
-      {/* ── 4. SUBTLE BOTTOM FOOTER ── */}
-      <footer className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-xs text-[#94A3B8]/80 shrink-0">
-        FocusFlow • Consistency platform for personal mastery.
-      </footer>
-
-      {/* ── 5. FORGOT PASSWORD MODAL ── */}
-      {showForgotModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md rounded-2xl bg-[#0B1426] border border-[rgba(71,115,170,0.35)] p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Lock className="w-4 h-4 text-[#22C7E8]" />
-                Reset your password
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowForgotModal(false)}
-                className="text-[#94A3B8] hover:text-white text-xs px-2 py-1 rounded-lg hover:bg-white/[0.06] cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-
-            {forgotSuccess ? (
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 space-y-2 text-xs">
-                <div className="flex items-center gap-2 font-bold text-sm">
-                  <Check className="w-4 h-4 text-emerald-400" />
-                  Instructions Sent!
-                </div>
-                <p className="leading-relaxed">
-                  We&apos;ve sent a password reset link to <strong className="text-white">{forgotEmail}</strong>. Please check your inbox and spam folder.
-                </p>
+      {/* ── FORGOT PASSWORD MODAL ── */}
+      <AnimatePresence>
+        {showForgotModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="forgot-modal-title"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: shouldReduceMotion ? 1 : 0.98, y: shouldReduceMotion ? 0 : 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: shouldReduceMotion ? 1 : 0.98, y: shouldReduceMotion ? 0 : 6 }}
+              transition={{ duration: 0.2, ease: EASE_OUT }}
+              className="relative w-full max-w-md rounded-[14px] bg-[#121316]/90 backdrop-blur-2xl border border-white/[0.14] p-6 space-y-4 shadow-[0_24px_50px_rgba(0,0,0,0.85),0_0_0_1px_rgba(255,255,255,0.06),0_1px_2px_rgba(255,255,255,0.08)_inset] overflow-hidden"
+            >
+              <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.28] to-transparent pointer-events-none" />
+              <div className="flex items-center justify-between">
+                <h3 id="forgot-modal-title" className="text-base font-semibold text-[#FAFAFA]">
+                  Reset your password
+                </h3>
                 <button
                   type="button"
                   onClick={() => setShowForgotModal(false)}
-                  className="w-full mt-3 py-2 rounded-xl bg-emerald-500 text-black font-bold text-xs hover:bg-emerald-400 transition-colors cursor-pointer"
+                  className="text-xs text-[#A1A1AA] hover:text-[#FAFAFA] transition-colors duration-150 focus:outline-none focus-visible:ring-1 focus-visible:ring-[#3B82F6] rounded px-1.5 py-0.5 cursor-pointer"
                 >
-                  Return to Sign In
+                  Close
                 </button>
               </div>
-            ) : (
-              <form onSubmit={handleForgotPasswordSubmit} className="space-y-4">
-                <p className="text-xs text-[#94A3B8] leading-relaxed">
-                  Enter your FocusFlow account email. We&apos;ll send you a secure link to reset your password.
-                </p>
 
-                <div className="space-y-1.5">
-                  <label htmlFor="forgot_email" className="text-xs font-medium text-[#F1F5F9]">Email Address</label>
-                  <input
-                    id="forgot_email"
-                    type="email"
-                    value={forgotEmail}
-                    onChange={e => setForgotEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    required
-                    className="w-full h-11 px-4 rounded-xl bg-[#070D19] border border-[rgba(71,115,170,0.3)] text-sm text-[#F1F5F9] focus:outline-none focus:border-[#3978FF] focus:ring-1 focus:ring-[#3978FF]"
-                  />
-                </div>
-
-                {forgotError && (
-                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{forgotError}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2 pt-2">
+              {forgotSuccess ? (
+                <div className="p-4 rounded-[8px] bg-[#0A0A0B] border border-[#232326] space-y-3 text-xs text-[#A1A1AA]">
+                  <p className="text-sm font-medium text-[#FAFAFA]">
+                    Instructions sent
+                  </p>
+                  <p className="leading-relaxed">
+                    We&apos;ve sent a password reset link to <strong className="text-[#FAFAFA]">{forgotEmail}</strong>. Please check your inbox.
+                  </p>
                   <button
                     type="button"
                     onClick={() => setShowForgotModal(false)}
-                    className="flex-1 h-10 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] text-xs font-semibold text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
+                    className="w-full h-[44px] rounded-[8px] bg-[#18181B] hover:bg-[#202024] border border-[#232326] text-[#FAFAFA] text-sm font-medium transition-colors duration-150 cursor-pointer"
                   >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={forgotLoading}
-                    className="flex-1 h-10 rounded-xl bg-[#3978FF] hover:bg-[#2F68E6] text-xs font-bold text-white shadow-[0_2px_10px_rgba(57,120,255,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    {forgotLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      'Send Reset Link'
-                    )}
+                    Return to Sign In
                   </button>
                 </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
+              ) : (
+                <form onSubmit={handleForgotPasswordSubmit} noValidate className="space-y-4">
+                  <p className="text-xs text-[#A1A1AA] leading-relaxed">
+                    Enter your email address and we&apos;ll send you a link to reset your password.
+                  </p>
 
-      {/* Scoped CSS for polished transitions and animations */}
-      <style jsx global>{`
-        /* Smooth card entrance on page load */
-        .auth-card-entrance {
-          animation: card-enter 350ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
+                  <div className="space-y-1.5 group">
+                    <label
+                      htmlFor="forgot_email"
+                      className="block text-xs font-medium text-[#FAFAFA] transition-colors duration-150 group-focus-within:text-[#3B82F6]"
+                    >
+                      Email
+                    </label>
+                    <input
+                      id="forgot_email"
+                      type="email"
+                      autoComplete="email"
+                      value={forgotEmail}
+                      onChange={e => setForgotEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      required
+                      className="w-full h-[44px] px-3.5 rounded-[8px] bg-[#0A0B0E]/70 backdrop-blur-md border border-white/[0.12] hover:border-white/[0.22] text-sm text-[#FAFAFA] placeholder:text-[#71717A] focus:outline-none focus:border-[#3B82F6] focus:ring-2 focus:ring-[#3B82F6]/30 transition-all duration-150"
+                    />
+                  </div>
 
-        @keyframes card-enter {
-          from {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+                  {forgotError && (
+                    <div className="p-3 rounded-[8px] bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+                      {forgotError}
+                    </div>
+                  )}
 
-        /* Mode switch transition */
-        .auth-form-transition {
-          animation: form-switch 300ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
-        @keyframes form-switch {
-          from {
-            opacity: 0;
-            transform: translateY(8px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes ambient-drift {
-          0% {
-            transform: translate(0px, 0px) scale(1);
-          }
-          50% {
-            transform: translate(25px, 15px) scale(1.03);
-          }
-          100% {
-            transform: translate(-15px, 25px) scale(0.98);
-          }
-        }
-
-        @keyframes float-slow {
-          0%, 100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(-6px);
-          }
-        }
-
-        /* Typewriter blinking cursor */
-        .typewriter-cursor {
-          animation: cursor-blink 1.05s infinite;
-        }
-
-        @keyframes cursor-blink {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0;
-          }
-        }
-
-        /* Respect reduced motion */
-        @media (prefers-reduced-motion: reduce) {
-          .auth-card-entrance,
-          .auth-form-transition,
-          .typewriter-cursor,
-          div[style*="animation: float-slow"] {
-            animation: none !important;
-          }
-        }
-      `}</style>
+                  <div className="flex items-center gap-2.5 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotModal(false)}
+                      className="flex-1 h-[40px] rounded-[10px] bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] text-xs font-medium text-[#A1A1AA] hover:text-white transition-colors duration-150 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={forgotLoading}
+                      className="relative flex-1 h-[40px] rounded-[10px] bg-gradient-to-b from-[#3B82F6]/95 via-[#2563EB]/90 to-[#1D4ED8]/95 backdrop-blur-xl border border-white/25 hover:border-white/35 text-white text-[13px] font-semibold tracking-[-0.01em] shadow-[inset_0_1px_1px_rgba(255,255,255,0.45),inset_0_-1px_1px_rgba(0,0,0,0.3),0_4px_14px_-2px_rgba(37,99,235,0.45)] transition-all duration-150 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 overflow-hidden"
+                    >
+                      <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/60 to-transparent pointer-events-none" />
+                      {forgotLoading ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+                      ) : (
+                        'Send reset link'
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
