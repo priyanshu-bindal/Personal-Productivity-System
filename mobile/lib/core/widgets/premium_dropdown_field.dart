@@ -171,7 +171,7 @@ class _PremiumDropdownFieldState<T> extends State<PremiumDropdownField<T>>
                 offset: const Offset(0, 8),
               ),
               BoxShadow(
-                color: AppColors.secondary.withValues(alpha: 0.08),
+                color: Colors.transparent,
                 blurRadius: 16,
                 offset: const Offset(0, 4),
               ),
@@ -354,7 +354,7 @@ class _PremiumDropdownFieldState<T> extends State<PremiumDropdownField<T>>
             boxShadow: _isOpen
                 ? [
                     BoxShadow(
-                      color: AppColors.secondary.withValues(alpha: 0.12),
+                      color: Colors.transparent,
                       blurRadius: 10,
                       offset: const Offset(0, 2),
                     ),

@@ -25,6 +25,7 @@ import 'widgets/money_pdf_export_dialog.dart';
 import 'widgets/month_selector_bar.dart';
 import 'widgets/spending_trend_chart.dart';
 import 'widgets/transaction_list_item.dart';
+import '../../core/widgets/shell_leading_button.dart';
 
 class MoneyScreen extends ConsumerStatefulWidget {
   const MoneyScreen({super.key});
@@ -155,9 +156,9 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen>
         backgroundColor: OceanTheme.bg,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimary),
-          onPressed: () => context.pop(),
+        leading: const Padding(
+          padding: EdgeInsets.only(left: 8),
+          child: ShellLeadingButton(),
         ),
         title: const Text(
           'Personal Finance',
@@ -681,16 +682,16 @@ class _ExpensesSearchFieldState extends ConsumerState<_ExpensesSearchField> {
       curve: Curves.easeOutCubic,
       height: 42,
       decoration: BoxDecoration(
-        color: const Color(0xFF0E1526),
+        color: const Color(0xFF0D0D0F),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: _isFocused ? const Color(0xFF2F6BFF) : const Color(0xFF1B2B48),
+          color: _isFocused ? const Color(0xFF4F8CFF) : const Color(0xFF222226),
           width: _isFocused ? 1.2 : 1.0,
         ),
         boxShadow: _isFocused
             ? const [
                 BoxShadow(
-                  color: Color(0x332F6BFF),
+                  color: Colors.transparent,
                   blurRadius: 8,
                   offset: Offset(0, 1),
                 ),
@@ -701,7 +702,7 @@ class _ExpensesSearchFieldState extends ConsumerState<_ExpensesSearchField> {
         children: [
           const Padding(
             padding: EdgeInsets.only(left: 12, right: 8),
-            child: Icon(LucideIcons.search, size: 16, color: Color(0xFF7E93A8)),
+            child: Icon(LucideIcons.search, size: 16, color: Color(0xFFA1A1AA)),
           ),
           Expanded(
             child: TextField(
@@ -738,7 +739,7 @@ class _ExpensesSearchFieldState extends ConsumerState<_ExpensesSearchField> {
               },
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 10),
-                child: Icon(LucideIcons.x, size: 14, color: Color(0xFF7E93A8)),
+                child: Icon(LucideIcons.x, size: 14, color: Color(0xFFA1A1AA)),
               ),
             ),
         ],
@@ -791,9 +792,9 @@ class _ExpensesTab extends ConsumerWidget {
                     height: 42,
                     padding: const EdgeInsets.symmetric(horizontal: 13),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0E1526),
+                      color: const Color(0xFF0D0D0F),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFF1B2B48)),
+                      border: Border.all(color: const Color(0xFF222226)),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x18000000),
@@ -805,12 +806,12 @@ class _ExpensesTab extends ConsumerWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: const [
-                        Icon(LucideIcons.fileDown, color: Color(0xFF2F6BFF), size: 15),
+                        Icon(LucideIcons.fileDown, color: Color(0xFF4F8CFF), size: 15),
                         SizedBox(width: 6),
                         Text(
                           'Export PDF',
                           style: TextStyle(
-                            color: Color(0xFF2F6BFF),
+                            color: Color(0xFF4F8CFF),
                             fontWeight: FontWeight.bold,
                             fontSize: 12.5,
                           ),
@@ -913,12 +914,12 @@ class _ExpensesTab extends ConsumerWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFF0E1526).withValues(alpha: 0.7),
+          color: const Color(0xFF0D0D0F).withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(11),
           border: Border.all(
             color: filterState.hasActiveFilters
-                ? const Color(0xFF2F6BFF).withValues(alpha: 0.35)
-                : const Color(0xFF1B2B48),
+                ? const Color(0xFF4F8CFF).withValues(alpha: 0.35)
+                : const Color(0xFF222226),
             width: 0.9,
           ),
         ),
@@ -927,20 +928,20 @@ class _ExpensesTab extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(4.5),
               decoration: BoxDecoration(
-                color: const Color(0xFF2F6BFF).withValues(alpha: 0.15),
+                color: const Color(0xFF4F8CFF).withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 LucideIcons.listFilter,
                 size: 12,
-                color: Color(0xFF2F6BFF),
+                color: Color(0xFF4F8CFF),
               ),
             ),
             const SizedBox(width: 8),
             Text(
               '$count ${count == 1 ? 'transaction' : 'transactions'}',
               style: const TextStyle(
-                color: Color(0xFF93C5FD),
+                color: Color(0xFF8FB3FF),
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -949,7 +950,7 @@ class _ExpensesTab extends ConsumerWidget {
             const Text(
               'Total: ',
               style: TextStyle(
-                color: Color(0xFF7E93A8),
+                color: Color(0xFFA1A1AA),
                 fontSize: 12,
               ),
             ),
@@ -986,7 +987,7 @@ class _ExpensesTab extends ConsumerWidget {
             title: 'No expenses yet',
             description:
                 'Start tracking your spending to understand where your money goes.',
-            accentColor: Color(0xFF2F6BFF),
+            accentColor: Color(0xFF4F8CFF),
             minHeight: 180,
             showGrid: false,
           ),
@@ -996,7 +997,7 @@ class _ExpensesTab extends ConsumerWidget {
             icon: const Icon(LucideIcons.plus, size: 16),
             label: const Text('Add Expense'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2F6BFF),
+              backgroundColor: const Color(0xFF4F8CFF),
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
@@ -1025,7 +1026,7 @@ class _ExpensesTab extends ConsumerWidget {
             icon: LucideIcons.calendarX,
             title: 'Nothing recorded here',
             description: 'No expenses were recorded for this period.',
-            accentColor: Color(0xFF2F6BFF),
+            accentColor: Color(0xFF4F8CFF),
             minHeight: 180,
             showGrid: false,
           ),
@@ -1035,7 +1036,7 @@ class _ExpensesTab extends ConsumerWidget {
             icon: const Icon(LucideIcons.plus, size: 16),
             label: const Text('Add Expense'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2F6BFF),
+              backgroundColor: const Color(0xFF4F8CFF),
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
@@ -1056,7 +1057,7 @@ class _ExpensesTab extends ConsumerWidget {
           icon: LucideIcons.searchX,
           title: 'No matching expenses',
           description: 'Try changing your filters or date range.',
-          accentColor: Color(0xFF2F6BFF),
+          accentColor: Color(0xFF4F8CFF),
           minHeight: 180,
           showGrid: false,
         ),
@@ -1070,7 +1071,7 @@ class _ExpensesTab extends ConsumerWidget {
           icon: const Icon(LucideIcons.rotateCcw, size: 16),
           label: const Text('Clear Filters'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2F6BFF),
+            backgroundColor: const Color(0xFF4F8CFF),
             foregroundColor: Colors.white,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
@@ -1333,12 +1334,12 @@ class _MoneyTabBarState extends State<_MoneyTabBar> {
                             color: const Color(0xFF132238),
                             borderRadius: BorderRadius.circular(_pillRadius),
                             border: Border.all(
-                              color: const Color(0xFF2F6BFF).withValues(alpha: 0.8),
+                              color: const Color(0xFF4F8CFF).withValues(alpha: 0.8),
                               width: 1.0,
                             ),
                             boxShadow: const [
                               BoxShadow(
-                                color: Color(0x332F6BFF),
+                                color: Colors.transparent,
                                 blurRadius: 8,
                                 spreadRadius: 0.5,
                               ),

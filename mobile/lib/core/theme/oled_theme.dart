@@ -1,43 +1,47 @@
 import 'package:flutter/material.dart';
 
-/// Centralized OLED Design System Tokens for FocusFlow
-/// Near-black true OLED foundation with a balanced, semantic multi-accent palette.
+/// Centralized OLED design tokens for FocusFlow.
+///
+/// Philosophy: true-black canvas, neutral graphite surfaces, hairline borders,
+/// and a deliberately small accent palette. Accents are solid and readable —
+/// never neon, never glowing.
 class OledTheme {
   // ── Background Surfaces ───────────────────────────────────────────────────
-  static const Color bg = Color(0xFF000000);              // #000000 True OLED Black
-  static const Color bgSecondary = Color(0xFF05070B);     // #05070B Deep Navy-Black
-  static const Color card = Color(0xFF0B1018);             // #0B1018 Primary Card
-  static const Color cardElevated = Color(0xFF111824);     // #111824 Elevated Surface
-  static const Color subtleSurface = Color(0xFF151E2B);    // #151E2B Subtle Interactive Surface
+  static const Color bg = Color(0xFF000000); // True OLED black
+  static const Color bgSecondary = Color(0xFF000000);
+  static const Color card = Color(0xFF0D0D0F); // Grouped surface
+  static const Color cardElevated = Color(0xFF151518); // Raised surface
+  static const Color subtleSurface = Color(0xFF1C1C20); // Controls / chips
 
   // ── Borders ───────────────────────────────────────────────────────────────
-  static const Color border = Color(0xFF202B38);           // #202B38 Restrained Card Border
-  static const Color borderSubtle = Color(0x28202B38);
-  static const Color borderHighlight = Color(0xFF2C3B4E);
+  static const Color border = Color(0xFF222226); // Hairline card border
+  static const Color borderSubtle = Color(0x14FFFFFF);
+  static const Color borderHighlight = Color(0xFF2E2E34);
 
   // ── Typography ────────────────────────────────────────────────────────────
-  static const Color textPrimary = Color(0xFFF4F7FB);      // #F4F7FB High Contrast White
-  static const Color textSecondary = Color(0xFF96A3B5);    // #96A3B5 Cool Medium Slate
-  static const Color textMuted = Color(0xFF657286);        // #657286 Subtle Label Text
+  static const Color textPrimary = Color(0xFFF5F5F7);
+  static const Color textSecondary = Color(0xFFA1A1AA);
+  static const Color textMuted = Color(0xFF75757E);
 
-  // ── Multi-Accent Semantic Palette ─────────────────────────────────────────
-  static const Color emerald = Color(0xFF20D6A1);          // #20D6A1 Completed, success, positive
-  static const Color cyan = Color(0xFF35D9F8);             // #35D9F8 Learning & skills
-  static const Color violet = Color(0xFFA78BFA);           // #A78BFA Insights, analytics, highlights
-  static const Color coral = Color(0xFFFF7D87);            // #FF7D87 Missed sessions, errors
-  static const Color amber = Color(0xFFFFC66D);            // #FFC66D Streaks, goals, reminders
-  static const Color electricBlue = Color(0xFF5B8CFF);     // #5B8CFF Navigation active & emphasis
-  static const Color pink = Color(0xFFF472B6);             // #F472B6 Secondary accent highlights
+  // ── Restrained Accent Palette ─────────────────────────────────────────────
+  // One brand accent (blue) + semantic colors. Others are toned to sit quietly.
+  static const Color accent = Color(0xFF4F8CFF); // Brand / interactive
+  static const Color electricBlue = accent;
+  static const Color emerald = Color(0xFF3DC787); // Success / completed
+  static const Color amber = Color(0xFFF2B544); // Streaks / goals
+  static const Color coral = Color(0xFFFF6B6B); // Errors / missed
+  static const Color violet = Color(0xFF9D8CFF); // Insights (sparingly)
+  static const Color cyan = Color(0xFF5AB0F0); // Learning (blue family)
+  static const Color pink = Color(0xFFE38BB4); // Rare highlight
 
-  // ── Background Atmospheric Gradient ───────────────────────────────────────
-  static const BoxDecoration backgroundDecoration = BoxDecoration(
-    color: bg,
-    gradient: LinearGradient(
-      colors: [bgSecondary, bg],
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-    ),
-  );
+  // ── Glass (navbar / sidebar) ──────────────────────────────────────────────
+  static const Color glassFill = Color(0xB8141416); // ~72% graphite
+  static const Color glassFillOpaque = Color(0xF5121214); // Low-end fallback
+  static const Color glassBorder = Color(0x1AFFFFFF);
+  static const Color glassHighlight = Color(0x14FFFFFF);
+
+  // ── Background ────────────────────────────────────────────────────────────
+  static const BoxDecoration backgroundDecoration = BoxDecoration(color: bg);
 
   // ── Category Accent Helper ────────────────────────────────────────────────
   static Color getCategoryAccent(String? category, String? name) {

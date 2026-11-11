@@ -207,10 +207,9 @@ class _PremiumSuccessOverlayState extends State<PremiumSuccessOverlay>
 
   @override
   Widget build(BuildContext context) {
-    const emeraldAccent = OledTheme.emerald; // #20D6A1
-    const cyanAccent = OledTheme.cyan;       // #35D9F8
-    const cardBg = Color(0xFF0D121B);        // Deep OLED Card Surface
-    const cardBorder = Color(0xFF222E3F);    // Restrained Border
+    const emeraldAccent = OledTheme.emerald;
+    const cardBg = OledTheme.cardElevated;
+    const cardBorder = OledTheme.border;
 
     return PopScope(
       canPop: _dismissed, // Disallow dismissing early by back gesture to keep animation pristine
@@ -243,8 +242,7 @@ class _PremiumSuccessOverlayState extends State<PremiumSuccessOverlay>
                         ),
                         // Gentle emerald/cyan glow
                         BoxShadow(
-                          color: Color.lerp(emeraldAccent, cyanAccent, 0.4)!
-                              .withValues(alpha: 0.18 * _glowOpacity.value),
+                          color: Colors.transparent,
                           blurRadius: 32,
                           spreadRadius: 2,
                           offset: const Offset(0, 4),

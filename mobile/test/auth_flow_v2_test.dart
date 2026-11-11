@@ -5,192 +5,129 @@ import 'package:focus_flow/features/auth_v2/auth_flow_v2_screen.dart';
 import 'package:focus_flow/features/auth_v2/widgets/auth_background_v2.dart';
 import 'package:focus_flow/features/auth_v2/widgets/auth_logo_v2.dart';
 import 'package:focus_flow/features/auth_v2/widgets/glass_auth_field_v2.dart';
-import 'package:focus_flow/features/auth_v2/widgets/liquid_glass_auth_card_v2.dart';
 import 'package:focus_flow/features/auth_v2/widgets/liquid_glass_primary_button_v2.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  // Configure mobile test viewport (e.g. 412x915 Pixel 7 device size)
-  void setMobileViewport(WidgetTester tester) {
+  Future<void> pumpAuth(WidgetTester tester,
+      {AuthModeV2 mode = AuthModeV2.login}) async {
     tester.view.physicalSize = const Size(412, 915);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(home: AuthFlowV2Screen(initialMode: mode)),
+      ),
+    );
+    await tester.pumpAndSettle();
   }
 
-  group('AuthFlowV2Screen UI & Interactions Tests', () {
-    testWidgets('Renders Login mode by default with all required elements',
-        (tester) async {
-      setMobileViewport(tester);
+  Future<void> tapText(WidgetTester tester, String text) async {
+    final f = find.text(text);
+    await tester.ensureVisible(f.first);
+    await tester.tap(f.first);
+    await tester.pumpAndSettle();
+  }
 
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: AuthFlowV2Screen(),
-          ),
-        ),
-      );
+  group('AuthFlowV2Screen', () {
+    testWidgets('Sign in renders brand, segmented control and form', (tester) async {
+      await pumpAuth(tester);
 
-      // Fast forward opening animation (350ms)
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
-
-      // 1. Verify Background and Logo
       expect(find.byType(AuthBackgroundV2), findsOneWidget);
       expect(find.byType(AuthLogoV2), findsOneWidget);
+      expect(find.text('FocusFlow'), findsOneWidget);
       expect(find.text('Stay focused. Keep growing.'), findsOneWidget);
 
-      // 2. Verify Liquid Glass Card
-      expect(find.byType(LiquidGlassAuthCardV2), findsOneWidget);
-
-      // 3. Verify Titles
-      expect(find.text('Welcome Back'), findsOneWidget);
-      expect(find.text('Sign in to continue to FocusFlow'), findsOneWidget);
-
-      // 4. Verify Fields & Buttons
-      expect(find.byType(GlassAuthFieldV2), findsNWidgets(2)); // Email & Password
-      expect(find.text('Sign In'), findsOneWidget);
+      expect(find.text('Welcome back'), findsOneWidget);
+      expect(find.text('Sign up'), findsOneWidget);
+      // "Sign in" appears in the segmented control and on the button.
+      expect(find.text('Sign in'), findsNWidgets(2));
+      expect(find.byType(GlassAuthFieldV2), findsNWidgets(2));
       expect(find.byType(LiquidGlassPrimaryButtonV2), findsOneWidget);
-      expect(find.text('Continue with Google'), findsNothing);
       expect(find.text('Forgot password?'), findsOneWidget);
-      expect(find.text('Sign Up'), findsOneWidget);
     });
 
-    testWidgets('Validates empty fields on Login submission', (tester) async {
-      setMobileViewport(tester);
+    testWidgets('Validates empty sign-in fields', (tester) async {
+      await pumpAuth(tester);
 
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: AuthFlowV2Screen(),
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      final button = find.byType(LiquidGlassPrimaryButtonV2);
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
 
-      final signInButton = find.byType(LiquidGlassPrimaryButtonV2);
-      await tester.ensureVisible(signInButton);
-      await tester.tap(signInButton);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
-
-      // Error messages should appear
       expect(find.text('Please enter your email address.'), findsOneWidget);
       expect(find.text('Please enter your password.'), findsOneWidget);
     });
 
-    testWidgets('Switches to Sign Up mode and back to Login smoothly',
-        (tester) async {
-      setMobileViewport(tester);
+    testWidgets('Segmented control switches to Sign up and back', (tester) async {
+      await pumpAuth(tester);
 
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: AuthFlowV2Screen(),
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await tapText(tester, 'Sign up');
+      expect(find.text('Create your account'), findsOneWidget);
+      expect(find.text('Create account'), findsOneWidget);
+      expect(find.byType(GlassAuthFieldV2), findsNWidgets(4));
 
-      // Tap Sign Up link
-      final signUpLink = find.text('Sign Up');
-      await tester.ensureVisible(signUpLink);
-      await tester.tap(signUpLink);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
-
-      // Verify Sign Up view: both title and button say "Create Account"
-      expect(find.text('Create Account'), findsNWidgets(2));
-      expect(find.text('Start building better habits with FocusFlow.'),
-          findsOneWidget);
-      expect(find.byType(GlassAuthFieldV2),
-          findsNWidgets(4)); // Name, Email, Password, Confirm
-
-      // Tap Sign In link to switch back
-      final signInLink = find.text('Sign In');
-      await tester.ensureVisible(signInLink);
-      await tester.tap(signInLink);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
-
-      // Verify back in Login mode
-      expect(find.text('Welcome Back'), findsOneWidget);
+      await tapText(tester, 'Sign in');
+      expect(find.text('Welcome back'), findsOneWidget);
       expect(find.byType(GlassAuthFieldV2), findsNWidgets(2));
     });
 
-    testWidgets('Switches to Forgot Password mode and back to Login',
-        (tester) async {
-      setMobileViewport(tester);
+    testWidgets('Forgot password opens reset step and returns', (tester) async {
+      await pumpAuth(tester);
 
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: AuthFlowV2Screen(),
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await tapText(tester, 'Forgot password?');
+      expect(find.text('Reset password'), findsOneWidget);
+      expect(find.text('Send reset link'), findsOneWidget);
+      // Segmented control is hidden on the reset step.
+      expect(find.text('Sign up'), findsNothing);
 
-      // Tap Forgot password?
-      final forgotLink = find.text('Forgot password?');
-      await tester.ensureVisible(forgotLink);
-      await tester.tap(forgotLink);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
-
-      // Verify Forgot Password view
-      expect(find.text('Reset Password'), findsOneWidget);
-      expect(find.text('Send Reset Link'), findsOneWidget);
-      expect(find.text('Back to Sign In'), findsOneWidget);
-
-      // Tap Back to Sign In
-      final backLink = find.text('Back to Sign In');
-      await tester.ensureVisible(backLink);
-      await tester.tap(backLink);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 350));
-
-      // Verify back in Login mode
-      expect(find.text('Welcome Back'), findsOneWidget);
+      await tapText(tester, 'Sign in'); // back chevron label
+      expect(find.text('Welcome back'), findsOneWidget);
     });
 
-    testWidgets('Validates Sign Up passwords match', (tester) async {
-      setMobileViewport(tester);
+    testWidgets('Reset step validates email', (tester) async {
+      await pumpAuth(tester, mode: AuthModeV2.forgotPassword);
 
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(
-            home: AuthFlowV2Screen(
-              initialMode: AuthModeV2.register,
-            ),
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+      await tapText(tester, 'Send reset link');
+      expect(find.text('Please enter your email address.'), findsOneWidget);
+    });
 
-      // Enter text into the 4 fields
-      final textFields = find.byType(TextField);
-      expect(textFields, findsNWidgets(4));
+    testWidgets('Sign up validates matching passwords and shows strength',
+        (tester) async {
+      await pumpAuth(tester, mode: AuthModeV2.register);
 
-      await tester.enterText(textFields.at(0), 'John Doe');
-      await tester.enterText(textFields.at(1), 'john@example.com');
-      await tester.enterText(textFields.at(2), 'password123');
-      await tester.enterText(textFields.at(3), 'password999');
+      final fields = find.byType(TextField);
+      expect(fields, findsNWidgets(4));
+      await tester.enterText(fields.at(0), 'John Doe');
+      await tester.enterText(fields.at(1), 'john@example.com');
+      await tester.enterText(fields.at(2), 'Password123!x');
+      await tester.enterText(fields.at(3), 'password999');
+      await tester.pumpAndSettle();
 
-      final createButton = find.byType(LiquidGlassPrimaryButtonV2);
-      await tester.ensureVisible(createButton);
-      await tester.tap(createButton);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('Strong'), findsOneWidget);
+
+      final button = find.byType(LiquidGlassPrimaryButtonV2);
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
 
       expect(find.text('Passwords do not match.'), findsOneWidget);
+    });
+
+    testWidgets('Password visibility toggles', (tester) async {
+      await pumpAuth(tester);
+
+      TextField passwordField() =>
+          tester.widget<TextField>(find.byType(TextField).at(1));
+      expect(passwordField().obscureText, isTrue);
+
+      await tester.tap(find.bySemanticsLabel('Show password'));
+      await tester.pumpAndSettle();
+      expect(passwordField().obscureText, isFalse);
     });
   });
 }

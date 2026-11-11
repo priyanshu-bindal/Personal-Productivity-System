@@ -255,7 +255,7 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
                 boxShadow: _isNameFocused
                     ? [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.12),
+                          color: Colors.transparent,
                           blurRadius: 10,
                           offset: const Offset(0, 2),
                         ),
@@ -432,7 +432,7 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
                         boxShadow: isSelected
                             ? [
                                 BoxShadow(
-                                  color: const Color(0xFF3B82F6).withValues(alpha: 0.22),
+                                  color: Colors.transparent,
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 )
@@ -489,7 +489,7 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.28),
+                      color: Colors.transparent,
                       blurRadius: 16,
                       offset: const Offset(0, 4),
                     ),

@@ -1,37 +1,30 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/theme/app_motion.dart';
+import '../../core/theme/oled_theme.dart';
 import 'widgets/auth_background_v2.dart';
 import 'widgets/auth_logo_v2.dart';
-import 'widgets/liquid_glass_auth_card_v2.dart';
+import 'widgets/forgot_password_content_v2.dart';
 import 'widgets/login_content_v2.dart';
 import 'widgets/signup_content_v2.dart';
-import 'widgets/forgot_password_content_v2.dart';
 
-/// Available modes for the single-shell Auth Flow V2
-enum AuthModeV2 {
-  login,
-  register,
-  forgotPassword,
-}
+/// Modes handled by the single auth screen.
+enum AuthModeV2 { login, register, forgotPassword }
 
-/// Premium iOS-inspired Liquid Glass Authentication Screen V2.
+/// Sign in / Sign up / Reset password — one persistent screen.
 ///
-/// Features:
-/// - One unified, persistent screen with zero page transitions between modes
-/// - Stable background atmosphere and stationary brand logo
-/// - Smooth opening animation (fade + scale 0.96→1.0 + subtle upward micro-glide, 350ms easeOutCubic)
-/// - Seamless card height morphing via [AnimatedSize]
-/// - Ultra-smooth content switching via [AnimatedSwitcher] (fade + subtle scale + micro vertical movement)
-/// - Single unified input fields with #2F6BFF focus states (no cyan/green)
-/// - 60fps performance with RepaintBoundary and static BackdropFilter
+/// - Static OLED background, no per-frame painting.
+/// - Sign in ⇄ Sign up via an iOS segmented control; forms slide in the
+///   direction of travel while the container height morphs smoothly.
+/// - Reset password slides in as a sub-step with its own back control.
+/// - Staggered entrance; every animation is transform/opacity only.
 class AuthFlowV2Screen extends ConsumerStatefulWidget {
   final AuthModeV2 initialMode;
 
-  const AuthFlowV2Screen({
-    super.key,
-    this.initialMode = AuthModeV2.login,
-  });
+  const AuthFlowV2Screen({super.key, this.initialMode = AuthModeV2.login});
 
   @override
   ConsumerState<AuthFlowV2Screen> createState() => _AuthFlowV2ScreenState();
@@ -39,256 +32,181 @@ class AuthFlowV2Screen extends ConsumerStatefulWidget {
 
 class _AuthFlowV2ScreenState extends ConsumerState<AuthFlowV2Screen>
     with SingleTickerProviderStateMixin {
-  late AuthModeV2 _currentMode;
-  final TextEditingController _sharedEmailController = TextEditingController();
+  late AuthModeV2 _mode;
+  int _direction = 1;
+  final _sharedEmailController = TextEditingController();
 
-  // Screen Entrance Animation Controller (350ms duration)
-  late final AnimationController _entranceController;
-  late final Animation<double> _bgFadeAnimation;
-  late final Animation<double> _logoFadeAnimation;
-  late final Animation<Offset> _logoSlideAnimation;
-  late final Animation<double> _cardFadeAnimation;
-  late final Animation<double> _cardScaleAnimation;
-  late final Animation<Offset> _cardSlideAnimation;
+  late final AnimationController _entrance;
+  late final List<Animation<double>> _stagger;
 
   @override
   void initState() {
     super.initState();
-    _currentMode = widget.initialMode;
-
-    // 350ms smooth opening animation without bounce or overshoot
-    _entranceController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
-
-    _bgFadeAnimation = CurvedAnimation(
-      parent: _entranceController,
-      curve: Curves.easeOutCubic,
-    );
-
-    // Logo fade + subtle upward micro-glide
-    _logoFadeAnimation = CurvedAnimation(
-      parent: _entranceController,
-      curve: const Interval(0.0, 0.85, curve: Curves.easeOutCubic),
-    );
-    _logoSlideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.05), // ~10px upward
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.0, 0.85, curve: Curves.easeOutCubic),
-      ),
-    );
-
-    // Card fade + scale 0.96 -> 1.0 + vertical movement ~8px -> 0
-    _cardFadeAnimation = CurvedAnimation(
-      parent: _entranceController,
-      curve: const Interval(0.15, 1.0, curve: Curves.easeOutCubic),
-    );
-    _cardScaleAnimation = Tween<double>(
-      begin: 0.96,
-      end: 1.0,
-    ).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.15, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
-    _cardSlideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.025), // ~8px upward
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.15, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
-
-    _entranceController.forward();
+    _mode = widget.initialMode;
+    _entrance = AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
+    _stagger = List.generate(4, (i) {
+      final start = i * 0.12;
+      return CurvedAnimation(
+        parent: _entrance,
+        curve: Interval(start, (start + 0.6).clamp(0.0, 1.0), curve: AppMotion.enter),
+      );
+    });
+    _entrance.forward();
   }
 
   @override
   void dispose() {
-    _entranceController.dispose();
+    _entrance.dispose();
     _sharedEmailController.dispose();
     super.dispose();
   }
 
-  void _switchMode(AuthModeV2 newMode) {
-    if (_currentMode == newMode) return;
+  void _switchMode(AuthModeV2 next) {
+    if (_mode == next) return;
     FocusScope.of(context).unfocus();
+    HapticFeedback.selectionClick();
     setState(() {
-      _currentMode = newMode;
+      _direction = next.index > _mode.index ? 1 : -1;
+      _mode = next;
     });
+  }
+
+  Widget _enter(int i, Widget child) {
+    final a = _stagger[i];
+    return FadeTransition(
+      opacity: a,
+      child: SlideTransition(
+        position: Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(a),
+        child: child,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final reducedMotion = MediaQuery.of(context).disableAnimations;
-
     return PopScope(
-      canPop: _currentMode == AuthModeV2.login,
+      canPop: _mode == AuthModeV2.login,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
-          _switchMode(AuthModeV2.login);
-        }
+        if (!didPop) _switchMode(AuthModeV2.login);
       },
-      child: Scaffold(
-        backgroundColor: const Color(0xFF000000), // Pure OLED black
-        body: GestureDetector(
-          onTap: () => FocusScope.of(context).unfocus(),
-          behavior: HitTestBehavior.opaque,
-          child: Stack(
-            children: [
-              // ── 1. Stable Persistent Dark OLED/Navy Background ─────────
-              Positioned.fill(
-                child: reducedMotion
-                    ? const AuthBackgroundV2()
-                    : FadeTransition(
-                        opacity: _bgFadeAnimation,
-                        child: const AuthBackgroundV2(),
-                      ),
-              ),
-
-              // ── 2. Keyboard-Safe Foreground Shell ───────────────────────
-              SafeArea(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    // Proportional top spacing to fit standard ~800dp mobile screens
-                    final double topSpacing =
-                        (constraints.maxHeight * 0.045).clamp(16.0, 44.0);
-                    final double cardSpacing =
-                        (constraints.maxHeight * 0.025).clamp(18.0, 28.0);
-                    final double bottomSpacing =
-                        (constraints.maxHeight * 0.03).clamp(12.0, 28.0);
-
-                    return SingleChildScrollView(
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.light.copyWith(
+          statusBarColor: Colors.transparent,
+          systemNavigationBarColor: Colors.black,
+        ),
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            behavior: HitTestBehavior.opaque,
+            child: Stack(
+              children: [
+                const Positioned.fill(child: AuthBackgroundV2()),
+                SafeArea(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                       child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20.0,
-                            vertical: 8.0,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              SizedBox(height: topSpacing),
-
-                              // ── Stationary Brand Logo (Top Prominent) ──
-                              if (reducedMotion)
-                                const AuthLogoV2()
-                              else
-                                FadeTransition(
-                                  opacity: _logoFadeAnimation,
-                                  child: SlideTransition(
-                                    position: _logoSlideAnimation,
-                                    child: const AuthLogoV2(),
-                                  ),
-                                ),
-
-                              SizedBox(height: cardSpacing),
-
-                              // ── Persistent Liquid Glass Card Shell ─────
-                              if (reducedMotion)
-                                _buildCard()
-                              else
-                                FadeTransition(
-                                  opacity: _cardFadeAnimation,
-                                  child: ScaleTransition(
-                                    scale: _cardScaleAnimation,
-                                    child: SlideTransition(
-                                      position: _cardSlideAnimation,
-                                      child: _buildCard(),
-                                    ),
-                                  ),
-                                ),
-
-                              SizedBox(height: bottomSpacing),
-                            ],
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 440),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  _enter(0, const Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: AuthLogoV2(),
+                                  )),
+                                  SizedBox(height: (constraints.maxHeight * 0.06).clamp(24.0, 56.0)),
+                                  _enter(1, _buildSegment()),
+                                  _enter(2, _buildForm()),
+                                  const SizedBox(height: 28),
+                                  _enter(3, _buildFooter()),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    );
-                  },
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCard() {
-    return LiquidGlassAuthCardV2(
-      borderRadius: 24.0,
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 18.0),
-      child: AnimatedSize(
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-        alignment: Alignment.topCenter,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 260),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          layoutBuilder: (currentChild, previousChildren) {
-            return Stack(
-              alignment: Alignment.topCenter,
-              children: <Widget>[
-                ...previousChildren,
-                ?currentChild,
               ],
-            );
-          },
-          transitionBuilder: (child, animation) {
-            final isIncoming =
-                child.key == ValueKey<AuthModeV2>(_currentMode);
-
-            // Subtle vertical micro-movement (~5px) + subtle scale (0.98→1.0)
-            final startOffset = isIncoming
-                ? const Offset(0, 0.02)
-                : const Offset(0, -0.015);
-
-            return FadeTransition(
-              opacity: animation,
-              child: ScaleTransition(
-                scale: Tween<double>(
-                  begin: 0.98,
-                  end: 1.0,
-                ).animate(animation),
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: startOffset,
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
-              ),
-            );
-          },
-          child: KeyedSubtree(
-            key: ValueKey<AuthModeV2>(_currentMode),
-            child: _buildContentForMode(_currentMode),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildContentForMode(AuthModeV2 mode) {
+  Widget _buildSegment() {
+    final visible = _mode != AuthModeV2.forgotPassword;
+    return AnimatedSize(
+      duration: AppMotion.standard,
+      curve: AppMotion.enter,
+      alignment: Alignment.topCenter,
+      child: AnimatedOpacity(
+        duration: AppMotion.fast,
+        opacity: visible ? 1 : 0,
+        child: visible
+            ? Padding(
+                padding: const EdgeInsets.only(bottom: 30),
+                child: _AuthSegmentedControl(
+                  selected: _mode == AuthModeV2.register ? 1 : 0,
+                  labels: const ['Sign in', 'Sign up'],
+                  onChanged: (i) => _switchMode(i == 0 ? AuthModeV2.login : AuthModeV2.register),
+                ),
+              )
+            : const SizedBox(width: double.infinity),
+      ),
+    );
+  }
+
+  Widget _buildForm() {
+    final dir = _direction.toDouble();
+    return AnimatedSize(
+      duration: AppMotion.emphasized,
+      curve: AppMotion.enter,
+      alignment: Alignment.topCenter,
+      child: AnimatedSwitcher(
+        duration: AppMotion.emphasized,
+        reverseDuration: AppMotion.fast,
+        switchInCurve: AppMotion.enter,
+        switchOutCurve: Curves.easeIn,
+        layoutBuilder: (current, previous) => Stack(
+          alignment: Alignment.topCenter,
+          children: [...previous, ?current],
+        ),
+        transitionBuilder: (child, animation) {
+          final incoming = child.key == ValueKey<AuthModeV2>(_mode);
+          final offset = Tween<Offset>(
+            begin: Offset((incoming ? 0.08 : -0.05) * dir, 0),
+            end: Offset.zero,
+          ).animate(animation);
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(position: offset, child: child),
+          );
+        },
+        child: KeyedSubtree(
+          key: ValueKey<AuthModeV2>(_mode),
+          child: _content(_mode),
+        ),
+      ),
+    );
+  }
+
+  Widget _content(AuthModeV2 mode) {
     switch (mode) {
       case AuthModeV2.login:
         return LoginContentV2(
           emailController: _sharedEmailController,
           onSwitchToSignUp: () => _switchMode(AuthModeV2.register),
-          onSwitchToForgotPassword: () =>
-              _switchMode(AuthModeV2.forgotPassword),
+          onSwitchToForgotPassword: () => _switchMode(AuthModeV2.forgotPassword),
         );
       case AuthModeV2.register:
         return SignUpContentV2(
@@ -301,5 +219,92 @@ class _AuthFlowV2ScreenState extends ConsumerState<AuthFlowV2Screen>
           onBackToLogin: () => _switchMode(AuthModeV2.login),
         );
     }
+  }
+
+  Widget _buildFooter() {
+    return Text(
+      'Stay focused. Keep growing.',
+      textAlign: TextAlign.center,
+      style: GoogleFonts.inter(fontSize: 12, color: OledTheme.textMuted),
+    );
+  }
+}
+
+/// iOS-style segmented control with a sliding thumb.
+class _AuthSegmentedControl extends StatelessWidget {
+  final int selected;
+  final List<String> labels;
+  final ValueChanged<int> onChanged;
+
+  const _AuthSegmentedControl({
+    required this.selected,
+    required this.labels,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111114),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: const Color(0xFF1F1F23)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final w = c.maxWidth / labels.length;
+          return Stack(
+            children: [
+              TweenAnimationBuilder<double>(
+                tween: Tween(end: selected.toDouble()),
+                duration: AppMotion.emphasized,
+                curve: AppMotion.enter,
+                builder: (context, v, child) =>
+                    Transform.translate(offset: Offset(v * w, 0), child: child),
+                child: Container(
+                  width: w,
+                  height: c.maxHeight,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF232328),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0x14FFFFFF), width: 0.6),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  for (var i = 0; i < labels.length; i++)
+                    Expanded(
+                      child: Semantics(
+                        button: true,
+                        selected: i == selected,
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => onChanged(i),
+                          child: Center(
+                            child: AnimatedDefaultTextStyle(
+                              duration: AppMotion.fast,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: i == selected
+                                    ? OledTheme.textPrimary
+                                    : OledTheme.textMuted,
+                              ),
+                              child: Text(labels[i]),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }

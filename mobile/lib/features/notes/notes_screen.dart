@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
@@ -13,6 +12,7 @@ import '../../core/widgets/traffic_loader.dart';
 import '../../models/note.dart';
 import '../../providers/notes_provider.dart';
 import 'add_note_sheet.dart';
+import '../../core/widgets/shell_leading_button.dart';
 
 class NotesScreen extends ConsumerWidget {
   const NotesScreen({super.key});
@@ -78,9 +78,9 @@ class NotesScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(LucideIcons.arrowLeft, color: AppColors.textPrimary),
-          onPressed: () => context.pop(),
+        leading: const Padding(
+          padding: EdgeInsets.only(left: 8),
+          child: ShellLeadingButton(),
         ),
         title: const Text(
           'Personal Notes',

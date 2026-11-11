@@ -307,7 +307,7 @@ class _TrashScreenState extends ConsumerState<TrashScreen>
         boxShadow: isRestoringThis
             ? [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.12),
+                  color: Colors.transparent,
                   blurRadius: 10,
                 ),
               ]

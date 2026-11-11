@@ -231,7 +231,7 @@ class _CategoryTransactionsScreenState
                           offset: const Offset(0, 4),
                         ),
                         BoxShadow(
-                          color: catColor.withValues(alpha: 0.08),
+                          color: Colors.transparent,
                           blurRadius: 20,
                           offset: const Offset(0, 2),
                         ),

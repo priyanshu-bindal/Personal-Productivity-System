@@ -7,8 +7,15 @@ import 'package:focus_flow/providers/chat_provider.dart';
 import 'package:focus_flow/routes/scaffold_with_nav_bar.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 GoRouter _createTestRouter() {
+  StatefulShellBranch branch(String path, String label) => StatefulShellBranch(
+        routes: [
+          GoRoute(path: path, builder: (context, state) => Text(label)),
+        ],
+      );
+
   return GoRouter(
     initialLocation: '/today',
     routes: [
@@ -17,58 +24,45 @@ GoRouter _createTestRouter() {
           return ScaffoldWithNavBar(navigationShell: navigationShell);
         },
         branches: [
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/today',
-                builder: (context, state) => const Text('TodayScreenContent'),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/skills',
-                builder: (context, state) => const Text('SkillsScreenContent'),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/calendar',
-                builder: (context, state) => const Text('CalendarScreenContent'),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/progress',
-                builder: (context, state) => const Text('ProgressScreenContent'),
-              ),
-            ],
-          ),
+          branch('/today', 'TodayScreenContent'),
+          branch('/skills', 'SkillsScreenContent'),
+          branch('/calendar', 'CalendarScreenContent'),
+          branch('/progress', 'ProgressScreenContent'),
+          branch('/notes', 'NotesScreenContent'),
+          branch('/money', 'MoneyScreenContent'),
+          branch('/settings', 'SettingsScreenContent'),
         ],
       ),
       GoRoute(
         path: '/messages',
         builder: (context, state) => const Text('MessagesScreenContent'),
       ),
-      GoRoute(
-        path: '/notes',
-        builder: (context, state) => const Text('NotesScreenContent'),
-      ),
-      GoRoute(
-        path: '/money',
-        builder: (context, state) => const Text('MoneyScreenContent'),
-      ),
-      GoRoute(
-        path: '/settings',
-        builder: (context, state) => const Text('SettingsScreenContent'),
-      ),
     ],
   );
+}
+
+Future<void> _pumpShell(WidgetTester tester, {int unread = 0}) async {
+  SharedPreferences.setMockInitialValues({});
+  tester.view.physicalSize = const Size(412, 915);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(() {
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+  });
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        totalUnreadChatCountProvider.overrideWith((ref) => Stream.value(unread)),
+      ],
+      child: MaterialApp.router(routerConfig: _createTestRouter()),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openSidebar(WidgetTester tester) async {
+  await tester.tap(find.text('More'));
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -229,122 +223,117 @@ void main() {
     });
   });
 
-  group('ScaffoldWithNavBar More Menu Tests', () {
-    testWidgets('Tapping More tab opens floating menu with 4 options and unread badge',
+  group('ScaffoldWithNavBar glass navbar & sidebar', () {
+    testWidgets('Navbar shows default pinned tabs plus More; More opens sidebar',
         (WidgetTester tester) async {
-      final router = _createTestRouter();
+      await _pumpShell(tester, unread: 3);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            totalUnreadChatCountProvider.overrideWith((ref) => Stream.value(3)),
-          ],
-          child: MaterialApp.router(
-            routerConfig: router,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Initial state: 5 tab items and Today content
-      expect(find.text('Today'), findsOneWidget);
-      expect(find.text('Skills'), findsOneWidget);
-      expect(find.text('Calendar'), findsOneWidget);
-      expect(find.text('Progress'), findsOneWidget);
-      expect(find.text('More'), findsOneWidget);
+      for (final label in ['Today', 'Skills', 'Calendar', 'Progress', 'More']) {
+        expect(find.text(label), findsOneWidget);
+      }
       expect(find.text('TodayScreenContent'), findsOneWidget);
+      expect(find.text('NAVIGATE'), findsNothing);
 
-      // More menu should not be open yet
-      expect(find.text('MORE FEATURES'), findsNothing);
-      expect(find.text('Messages'), findsNothing);
+      await _openSidebar(tester);
 
-      // Tap "More" tab
-      await tester.tap(find.text('More'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      // Floating menu is now open!
-      expect(find.text('MORE FEATURES'), findsOneWidget);
-      expect(find.text('Messages'), findsOneWidget);
-      expect(find.text('Notes'), findsOneWidget);
-      expect(find.text('Money Tracker'), findsOneWidget);
-      expect(find.text('Settings'), findsOneWidget);
-
-      // Verify unread badge count (3)
+      expect(find.text('NAVIGATE'), findsOneWidget);
+      for (final label in ['Notes', 'Money', 'Messages', 'Settings']) {
+        expect(find.text(label), findsOneWidget);
+      }
+      // Unread badge on the Messages row
       expect(find.text('3'), findsOneWidget);
 
-      // Tapping "More" tab again closes the menu
-      await tester.tap(find.text('More'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-
-      expect(find.text('MORE FEATURES'), findsNothing);
-      expect(find.text('Messages'), findsNothing);
+      // Tapping the scrim closes it
+      await tester.tapAt(const Offset(405, 400));
+      await tester.pumpAndSettle();
+      expect(find.text('NAVIGATE'), findsNothing);
     });
 
-    testWidgets('Tapping another nav tab closes More menu and switches branch',
-        (WidgetTester tester) async {
-      final router = _createTestRouter();
+    testWidgets('Tapping a navbar tab switches branch', (WidgetTester tester) async {
+      await _pumpShell(tester);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            totalUnreadChatCountProvider.overrideWith((ref) => Stream.value(0)),
-          ],
-          child: MaterialApp.router(
-            routerConfig: router,
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Open More menu
-      await tester.tap(find.text('More'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('MORE FEATURES'), findsOneWidget);
-
-      // Tap Skills tab (index 1)
       await tester.tap(find.text('Skills'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
-
-      // Should have switched branch and closed menu
       expect(find.text('SkillsScreenContent'), findsOneWidget);
-      expect(find.text('MORE FEATURES'), findsNothing);
     });
 
-    testWidgets('Selecting Messages item in More menu closes menu and pushes /messages',
+    testWidgets('Selecting a sidebar tab switches branch and closes sidebar',
         (WidgetTester tester) async {
-      final router = _createTestRouter();
+      await _pumpShell(tester);
+      await _openSidebar(tester);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            totalUnreadChatCountProvider.overrideWith((ref) => Stream.value(5)),
-          ],
-          child: MaterialApp.router(
-            routerConfig: router,
-          ),
-        ),
-      );
+      await tester.tap(find.text('Notes'));
       await tester.pumpAndSettle();
 
-      // Open More menu
-      await tester.tap(find.text('More'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('MORE FEATURES'), findsOneWidget);
+      expect(find.text('NotesScreenContent'), findsOneWidget);
+      expect(find.text('NAVIGATE'), findsNothing);
+    });
 
-      // Tap Messages
+    testWidgets('Selecting Messages in sidebar pushes /messages',
+        (WidgetTester tester) async {
+      await _pumpShell(tester, unread: 5);
+      await _openSidebar(tester);
+
       await tester.tap(find.text('Messages'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
 
-      // Navigated to MessagesScreenContent
       expect(find.text('MessagesScreenContent'), findsOneWidget);
+    });
+
+    testWidgets('Pinning a tab in the sidebar editor adds it to the navbar',
+        (WidgetTester tester) async {
+      await _pumpShell(tester);
+      // Unpin Progress, pin Money.
+      await _openSidebar(tester);
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+
+      final progressMinus = find.byIcon(LucideIcons.minusCircle).at(3); // Progress
+      await tester.ensureVisible(progressMinus);
+      await tester.pumpAndSettle();
+      await tester.tap(progressMinus);
+      await tester.pumpAndSettle();
+      final moneyRow = find.ancestor(
+        of: find.text('Money').last,
+        matching: find.byType(Row),
+      );
+      final moneyPlus =
+          find.descendant(of: moneyRow.first, matching: find.byIcon(LucideIcons.plusCircle));
+      await tester.ensureVisible(moneyPlus);
+      await tester.pumpAndSettle();
+      await tester.tap(moneyPlus);
+      await tester.pumpAndSettle();
+
+      await tester.ensureVisible(find.text('Done'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Done'));
+      await tester.pumpAndSettle();
+      await tester.tapAt(const Offset(405, 400));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Progress'), findsNothing);
+      expect(find.text('Money'), findsOneWidget);
+
+      await tester.tap(find.text('Money'));
+      await tester.pumpAndSettle();
+      expect(find.text('MoneyScreenContent'), findsOneWidget);
+    });
+
+    testWidgets('Cannot unpin below the 2-tab minimum', (WidgetTester tester) async {
+      await _pumpShell(tester);
+      await _openSidebar(tester);
+      await tester.tap(find.text('Edit'));
+      await tester.pumpAndSettle();
+
+      for (var i = 0; i < 3; i++) {
+        final minus = find.byIcon(LucideIcons.minusCircle).first;
+        await tester.ensureVisible(minus);
+        await tester.pumpAndSettle();
+        await tester.tap(minus);
+        await tester.pumpAndSettle();
+      }
+      expect(find.byIcon(LucideIcons.minusCircle), findsNWidgets(2));
+      await tester.pump(const Duration(seconds: 2)); // let the limit hint fade
     });
   });
 }

@@ -4,14 +4,17 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
+import '../../../core/theme/app_motion.dart';
+import '../../../core/theme/oled_theme.dart';
 import '../../../core/utils/error_formatter.dart';
 import '../../../providers/auth_provider.dart';
+import 'auth_heading_v2.dart';
 import 'glass_auth_field_v2.dart';
 import 'liquid_glass_primary_button_v2.dart';
 
+final _emailRegex = RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
 
-
-/// Compact, premium Sign Up content for AuthFlowV2Screen.
+/// Create-account form.
 class SignUpContentV2 extends ConsumerStatefulWidget {
   final TextEditingController emailController;
   final VoidCallback onSwitchToLogin;
@@ -53,62 +56,46 @@ class _SignUpContentV2State extends ConsumerState<SignUpContentV2> {
     super.dispose();
   }
 
-  bool _isValidEmail(String email) =>
-      RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
-          .hasMatch(email);
-
   bool _validate() {
-    setState(() {
-      _nameError = null;
-      _emailError = null;
-      _passwordError = null;
-      _confirmError = null;
-      _generalError = null;
-    });
-
-    bool isValid = true;
     final name = _nameController.text.trim();
     final email = widget.emailController.text.trim();
     final password = _passwordController.text;
     final confirm = _confirmController.text;
 
-    if (name.isEmpty) {
-      setState(() => _nameError = 'Please enter your full name.');
-      isValid = false;
-    }
-
+    String? nameError, emailError, passwordError, confirmError;
+    if (name.isEmpty) nameError = 'Please enter your full name.';
     if (email.isEmpty) {
-      setState(() => _emailError = 'Please enter your email address.');
-      isValid = false;
-    } else if (!_isValidEmail(email)) {
-      setState(() => _emailError = 'Please enter a valid email address.');
-      isValid = false;
+      emailError = 'Please enter your email address.';
+    } else if (!_emailRegex.hasMatch(email)) {
+      emailError = 'Please enter a valid email address.';
     }
-
     if (password.isEmpty) {
-      setState(() => _passwordError = 'Please enter a password.');
-      isValid = false;
+      passwordError = 'Please enter a password.';
     } else if (password.length < 6) {
-      setState(
-          () => _passwordError = 'Password must be at least 6 characters.');
-      isValid = false;
+      passwordError = 'Password must be at least 6 characters.';
     }
-
     if (confirm.isEmpty) {
-      setState(() => _confirmError = 'Please confirm your password.');
-      isValid = false;
+      confirmError = 'Please confirm your password.';
     } else if (password != confirm) {
-      setState(() => _confirmError = 'Passwords do not match.');
-      isValid = false;
+      confirmError = 'Passwords do not match.';
     }
 
-    return isValid;
+    setState(() {
+      _nameError = nameError;
+      _emailError = emailError;
+      _passwordError = passwordError;
+      _confirmError = confirmError;
+      _generalError = null;
+    });
+    return nameError == null &&
+        emailError == null &&
+        passwordError == null &&
+        confirmError == null;
   }
 
   Future<void> _handleRegister() async {
     FocusScope.of(context).unfocus();
-    if (!_validate()) return;
-    if (_isSuccess) return;
+    if (!_validate() || _isSuccess) return;
 
     try {
       final res = await ref.read(authControllerProvider.notifier).signUp(
@@ -116,224 +103,199 @@ class _SignUpContentV2State extends ConsumerState<SignUpContentV2> {
             password: _passwordController.text,
             fullName: _nameController.text.trim(),
           );
-
       if (!mounted) return;
-
       if (res.session == null && res.user != null) {
-        context.go('/email-verification',
-            extra: widget.emailController.text.trim());
+        context.go('/email-verification', extra: widget.emailController.text.trim());
       } else {
         setState(() => _isSuccess = true);
         context.go('/today');
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isSuccess = false);
       final msg = ErrorFormatter.format(e);
-
-      if (msg.toLowerCase().contains('already exists') ||
-          msg.toLowerCase().contains('already registered')) {
-        setState(() => _emailError = msg);
-      } else {
-        setState(() => _generalError = msg);
-      }
+      final lower = msg.toLowerCase();
+      setState(() {
+        _isSuccess = false;
+        if (lower.contains('already exists') || lower.contains('already registered')) {
+          _emailError = msg;
+        } else {
+          _generalError = msg;
+        }
+      });
     }
   }
-
-
-
 
   @override
   Widget build(BuildContext context) {
     final isLoading = ref.watch(authControllerProvider).isLoading;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Title
-        Text(
-          'Create Account',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.spaceGrotesk(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            color: const Color(0xFFF8FAFC),
-            letterSpacing: -0.4,
+    return AutofillGroup(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const AuthHeadingV2(
+            title: 'Create your account',
+            subtitle: 'Build steady habits, one focused session at a time.',
           ),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          'Start building better habits with FocusFlow.',
-          textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            color: const Color(0xFF8291A7),
-            fontWeight: FontWeight.w400,
+          AuthErrorBanner(message: _generalError),
+          GlassAuthFieldV2(
+            controller: _nameController,
+            label: 'Full name',
+            hintText: 'Your name',
+            prefixIcon: LucideIcons.user,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.name],
+            errorText: _nameError,
+            onChanged: (_) {
+              if (_nameError != null) setState(() => _nameError = null);
+            },
+            onSubmitted: (_) => _emailFocusNode.requestFocus(),
           ),
-        ),
-        const SizedBox(height: 14),
+          const SizedBox(height: 16),
+          GlassAuthFieldV2(
+            controller: widget.emailController,
+            focusNode: _emailFocusNode,
+            label: 'Email',
+            hintText: 'you@example.com',
+            prefixIcon: LucideIcons.mail,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.email],
+            errorText: _emailError,
+            onChanged: (_) {
+              if (_emailError != null) setState(() => _emailError = null);
+            },
+            onSubmitted: (_) => _passwordFocusNode.requestFocus(),
+          ),
+          const SizedBox(height: 16),
+          GlassAuthFieldV2(
+            controller: _passwordController,
+            focusNode: _passwordFocusNode,
+            label: 'Password',
+            hintText: 'At least 6 characters',
+            prefixIcon: LucideIcons.lock,
+            isPassword: true,
+            textInputAction: TextInputAction.next,
+            autofillHints: const [AutofillHints.newPassword],
+            errorText: _passwordError,
+            onChanged: (_) {
+              if (_passwordError != null) setState(() => _passwordError = null);
+            },
+            onSubmitted: (_) => _confirmFocusNode.requestFocus(),
+          ),
+          _PasswordStrength(controller: _passwordController),
+          const SizedBox(height: 16),
+          GlassAuthFieldV2(
+            controller: _confirmController,
+            focusNode: _confirmFocusNode,
+            label: 'Confirm password',
+            hintText: 'Repeat password',
+            prefixIcon: LucideIcons.shieldCheck,
+            isPassword: true,
+            textInputAction: TextInputAction.done,
+            autofillHints: const [AutofillHints.newPassword],
+            errorText: _confirmError,
+            onChanged: (_) {
+              if (_confirmError != null) setState(() => _confirmError = null);
+            },
+            onSubmitted: (_) => _handleRegister(),
+          ),
+          const SizedBox(height: 26),
+          LiquidGlassPrimaryButtonV2(
+            label: 'Create account',
+            isLoading: isLoading,
+            onTap: _handleRegister,
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'By continuing you agree to the Terms of Service and Privacy Policy.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 11.5,
+              color: OledTheme.textMuted,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-        // General Error Banner (if any)
-        AnimatedSize(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          child: _generalError != null
-              ? Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: const Color(0x18FF5C68),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: const Color(0x35FF5C68),
-                      width: 1,
-                    ),
-                  ),
+/// Four-segment strength meter that fills as the password improves.
+class _PasswordStrength extends StatelessWidget {
+  final TextEditingController controller;
+  const _PasswordStrength({required this.controller});
+
+  static int _score(String p) {
+    if (p.isEmpty) return 0;
+    var s = 0;
+    if (p.length >= 6) s++;
+    if (p.length >= 10) s++;
+    if (RegExp(r'[A-Z]').hasMatch(p) && RegExp(r'[a-z]').hasMatch(p)) s++;
+    if (RegExp(r'[0-9]').hasMatch(p) && RegExp(r'[^A-Za-z0-9]').hasMatch(p)) s++;
+    return s.clamp(1, 4);
+  }
+
+  static const _labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+  static const _colors = [
+    OledTheme.border,
+    OledTheme.coral,
+    OledTheme.amber,
+    OledTheme.accent,
+    OledTheme.emerald,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, value, _) {
+        final score = _score(value.text);
+        return AnimatedSize(
+          duration: AppMotion.fast,
+          curve: AppMotion.standardCurve,
+          alignment: Alignment.topCenter,
+          child: score == 0
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: const EdgeInsets.only(top: 10, left: 2, right: 2),
                   child: Row(
                     children: [
-                      const Icon(
-                        LucideIcons.alertTriangle,
-                        color: Color(0xFFFF5C68),
-                        size: 15,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
+                      for (var i = 1; i <= 4; i++) ...[
+                        Expanded(
+                          child: AnimatedContainer(
+                            duration: AppMotion.standard,
+                            curve: AppMotion.standardCurve,
+                            height: 3.5,
+                            decoration: BoxDecoration(
+                              color: i <= score ? _colors[score] : const Color(0xFF1F1F23),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                      ],
+                      const SizedBox(width: 4),
+                      SizedBox(
+                        width: 46,
                         child: Text(
-                          _generalError!,
+                          _labels[score],
+                          textAlign: TextAlign.right,
                           style: GoogleFonts.inter(
-                            fontSize: 12.5,
-                            color: const Color(0xFFFF5C68),
-                            fontWeight: FontWeight.w500,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: _colors[score],
                           ),
                         ),
                       ),
                     ],
                   ),
-                )
-              : const SizedBox.shrink(),
-        ),
-
-        // Full Name Field
-        GlassAuthFieldV2(
-          controller: _nameController,
-          label: 'Full Name',
-          hintText: 'Your name',
-          prefixIcon: LucideIcons.user,
-          textCapitalization: TextCapitalization.words,
-          textInputAction: TextInputAction.next,
-          autofillHints: const [AutofillHints.name],
-          errorText: _nameError,
-          onChanged: (_) {
-            if (_nameError != null) setState(() => _nameError = null);
-          },
-          onSubmitted: (_) => _emailFocusNode.requestFocus(),
-        ),
-        const SizedBox(height: 8),
-
-        // Email Field
-        GlassAuthFieldV2(
-          controller: widget.emailController,
-          focusNode: _emailFocusNode,
-          label: 'Email address',
-          hintText: 'name@example.com',
-          prefixIcon: LucideIcons.mail,
-          keyboardType: TextInputType.emailAddress,
-          textInputAction: TextInputAction.next,
-          autofillHints: const [AutofillHints.email],
-          errorText: _emailError,
-          onChanged: (_) {
-            if (_emailError != null) setState(() => _emailError = null);
-          },
-          onSubmitted: (_) => _passwordFocusNode.requestFocus(),
-        ),
-        const SizedBox(height: 8),
-
-        // Password Field
-        GlassAuthFieldV2(
-          controller: _passwordController,
-          focusNode: _passwordFocusNode,
-          label: 'Password',
-          hintText: 'At least 6 characters',
-          prefixIcon: LucideIcons.lock,
-          isPassword: true,
-          textInputAction: TextInputAction.next,
-          autofillHints: const [AutofillHints.newPassword],
-          errorText: _passwordError,
-          onChanged: (_) {
-            if (_passwordError != null) setState(() => _passwordError = null);
-          },
-          onSubmitted: (_) => _confirmFocusNode.requestFocus(),
-        ),
-        const SizedBox(height: 8),
-
-        // Confirm Password Field
-        GlassAuthFieldV2(
-          controller: _confirmController,
-          focusNode: _confirmFocusNode,
-          label: 'Confirm Password',
-          hintText: 'Repeat password',
-          prefixIcon: LucideIcons.lock,
-          isPassword: true,
-          textInputAction: TextInputAction.done,
-          autofillHints: const [AutofillHints.newPassword],
-          errorText: _confirmError,
-          onChanged: (_) {
-            if (_confirmError != null) setState(() => _confirmError = null);
-          },
-          onSubmitted: (_) => _handleRegister(),
-        ),
-        const SizedBox(height: 12),
-
-        // Primary Create Account Button
-        LiquidGlassPrimaryButtonV2(
-          label: 'Create Account',
-          isLoading: isLoading,
-          onTap: _handleRegister,
-        ),
-        const SizedBox(height: 14),
-
-
-
-        // Switch to Sign In Prompt
-        Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              'Already have an account?',
-              style: GoogleFonts.inter(
-                fontSize: 12.5,
-                color: const Color(0xFF8291A7),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(4),
-                onTap: () {
-                  FocusScope.of(context).unfocus();
-                  widget.onSwitchToLogin();
-                },
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
-                  child: Text(
-                    'Sign In',
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF2F6BFF),
-                    ),
-                  ),
                 ),
-              ),
-            ),
-          ],
-        ),
-      ],
+        );
+      },
     );
   }
 }

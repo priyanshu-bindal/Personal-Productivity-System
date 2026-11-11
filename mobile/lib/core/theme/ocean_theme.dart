@@ -1,43 +1,31 @@
 import 'package:flutter/material.dart';
+import 'oled_theme.dart';
 
-/// Centralized Bioluminescent Ocean Theme Palette
+/// Legacy palette name kept for existing screens.
+/// Every value now resolves to the unified OLED design tokens.
 class OceanTheme {
-  // Base Backgrounds (True OLED Black)
-  static const Color bg = Color(0xFF000000);
-  static const Color bgGradientTop = Color(0xFF050C18);
+  static const Color bg = OledTheme.bg;
+  static const Color bgGradientTop = OledTheme.bg;
 
-  // Cards & Surfaces
-  static const Color card = Color(0xFF0E1526);
-  static const Color cardHi = Color(0xFF132038);
+  static const Color card = OledTheme.card;
+  static const Color cardHi = OledTheme.cardElevated;
 
-  // Borders
-  static const Color border = Color(0xFF1C2C46);
+  static const Color border = OledTheme.border;
 
-  // Typography
-  static const Color textPrimary = Color(0xFFEAF2F5);
-  static const Color textDim = Color(0xFF7E93A8);
-  static const Color textFaint = Color(0xFF4C5E70);
+  static const Color textPrimary = OledTheme.textPrimary;
+  static const Color textDim = OledTheme.textSecondary;
+  static const Color textFaint = OledTheme.textMuted;
 
-  // Primary Accent — Premium Emerald-Teal #14C8A8
-  // Less neon, more sophisticated, consistent throughout app
-  static const Color primary = Color(0xFF14C8A8);
-  static const Color primaryHover = Color(0xFF20D6B5);
-  static const Color primaryDim = Color(0xFF0A2E2A);
+  static const Color primary = OledTheme.accent;
+  static const Color primaryHover = Color(0xFF6B9EFF);
+  static const Color primaryDim = Color(0xFF0E1A2E);
 
-  // Secondary Accent — Sapphire Blue #3B82F6
-  static const Color secondary = Color(0xFF3B82F6);
-  static const Color secondaryHighlight = Color(0xFF60A5FA);
-  static const Color secondaryDim = Color(0xFF13284A);
+  static const Color secondary = OledTheme.accent;
+  static const Color secondaryHighlight = Color(0xFF7FA9FF);
+  static const Color secondaryDim = Color(0xFF0E1A2E);
 
-  // Amber (Streaks / Highlights Only)
-  static const Color amber = Color(0xFFFFB020);
+  static const Color amber = OledTheme.amber;
 
-  // Background Gradient (OLED Black base with subtle deep top glow)
-  static const BoxDecoration backgroundGradientDecoration = BoxDecoration(
-    gradient: LinearGradient(
-      colors: [bgGradientTop, bg],
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-    ),
-  );
+  static const BoxDecoration backgroundGradientDecoration =
+      BoxDecoration(color: OledTheme.bg);
 }

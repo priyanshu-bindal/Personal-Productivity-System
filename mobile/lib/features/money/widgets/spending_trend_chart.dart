@@ -298,15 +298,15 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
   ) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF060D1A),
+        color: const Color(0xFF000000),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: const Color(0xFF1A2D4A),
+          color: const Color(0xFF222226),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF168BFF).withValues(alpha: 0.06),
+            color: Colors.transparent,
             blurRadius: 24,
             offset: const Offset(0, 4),
           ),
@@ -338,15 +338,15 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: const Color(0xFF168BFF).withValues(alpha: 0.08),
+              color: const Color(0xFF4F8CFF).withValues(alpha: 0.08),
               shape: BoxShape.circle,
               border: Border.all(
-                color: const Color(0xFF168BFF).withValues(alpha: 0.18),
+                color: const Color(0xFF4F8CFF).withValues(alpha: 0.18),
               ),
             ),
             child: const Icon(
               Icons.show_chart_rounded,
-              color: Color(0xFF168BFF),
+              color: Color(0xFF4F8CFF),
               size: 26,
             ),
           ),
@@ -417,7 +417,7 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                   drawVerticalLine: false,
                   horizontalInterval: chartMaxY / 4,
                   getDrawingHorizontalLine: (_) => FlLine(
-                    color: const Color(0xFF1A2D4A).withValues(alpha: 0.9),
+                    color: const Color(0xFF222226).withValues(alpha: 0.9),
                     strokeWidth: 0.7,
                     dashArray: [3, 8],
                   ),
@@ -488,7 +488,7 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                     isCurved: true,
                     curveSmoothness: 0.35,
                     preventCurveOverShooting: true,
-                    color: const Color(0xFF168BFF),
+                    color: const Color(0xFF4F8CFF),
                     barWidth: 2.2,
                     isStrokeCapRound: true,
                     dotData: FlDotData(
@@ -505,20 +505,20 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                         if (isSelected) {
                           return _GlowDotPainter(
                             radius: 5.5,
-                            color: const Color(0xFF168BFF),
-                            glowColor: const Color(0xFF168BFF)
+                            color: const Color(0xFF4F8CFF),
+                            glowColor: const Color(0xFF4F8CFF)
                                 .withValues(alpha: 0.4),
-                            strokeColor: const Color(0xFF060D1A),
+                            strokeColor: const Color(0xFF000000),
                             strokeWidth: 1.8,
                           );
                         }
                         // Tiny dot that fades in with the line
                         return FlDotCirclePainter(
                           radius: 2.2 * dotProgress,
-                          color: const Color(0xFF168BFF)
+                          color: const Color(0xFF4F8CFF)
                               .withValues(alpha: 0.7 * dotProgress),
                           strokeWidth: 1.2,
-                          strokeColor: const Color(0xFF060D1A),
+                          strokeColor: const Color(0xFF000000),
                         );
                       },
                     ),
@@ -528,7 +528,7 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          const Color(0xFF168BFF)
+                          const Color(0xFF4F8CFF)
                               .withValues(alpha: 0.18 * animValue),
                           const Color(0xFF20D9FF)
                               .withValues(alpha: 0.04 * animValue),
@@ -564,7 +564,7 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                     return spotIndexes.map((i) {
                       return TouchedSpotIndicatorData(
                         FlLine(
-                          color: const Color(0xFF168BFF)
+                          color: const Color(0xFF4F8CFF)
                               .withValues(alpha: 0.35),
                           strokeWidth: 1.0,
                           dashArray: [3, 6],
@@ -577,7 +577,7 @@ class _SpendingTrendChartState extends ConsumerState<SpendingTrendChart>
                     getTooltipColor: (_) => const Color(0xFF0C1A30),
                     tooltipRoundedRadius: 10,
                     tooltipBorder: const BorderSide(
-                      color: Color(0x80168BFF),
+                      color: Color(0x804F8CFF),
                       width: 1,
                     ),
                     tooltipPadding: const EdgeInsets.symmetric(
@@ -701,7 +701,7 @@ class _PeriodSelectorState extends State<_PeriodSelector>
         decoration: BoxDecoration(
           color: const Color(0xFF080F1E),
           borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: const Color(0xFF1A2D4A)),
+          border: Border.all(color: const Color(0xFF222226)),
         ),
         child: AnimatedBuilder(
           animation: _slideAnim,
@@ -725,7 +725,7 @@ class _PeriodSelectorState extends State<_PeriodSelector>
                       borderRadius: BorderRadius.circular(7),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF168BFF).withValues(alpha: 0.35),
+                          color: Colors.transparent,
                           blurRadius: 8,
                           spreadRadius: -2,
                         ),

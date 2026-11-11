@@ -22,6 +22,7 @@ import '../../services/supabase_service.dart';
 import '../../services/notification_service.dart';
 import '../../services/fcm_notification_service.dart';
 import 'services/pdf_export_service.dart';
+import '../../core/widgets/shell_leading_button.dart';
 
 // ─── COLOR SYSTEM TOKENS ───────────────────────────────────────────────────────
 // OLED-first premium palette (#000000 true black, #111316 card surface,
@@ -71,29 +72,9 @@ class SettingsScreen extends ConsumerWidget {
           backgroundColor: _SettingsColors.background,
           elevation: 0,
           scrolledUnderElevation: 0,
-          leading: Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: Center(
-              child: PressableScale(
-                scaleFactor: 0.94,
-                onTap: () => context.pop(),
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: _SettingsColors.card,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: _SettingsColors.border),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    LucideIcons.arrowLeft,
-                    color: _SettingsColors.textPrimary,
-                    size: 18,
-                  ),
-                ),
-              ),
-            ),
+          leading: const Padding(
+            padding: EdgeInsets.only(left: 8),
+            child: ShellLeadingButton(),
           ),
           title: Text(
             'Settings',
@@ -1241,12 +1222,12 @@ class _DataAndPrivacyCardState extends ConsumerState<_DataAndPrivacyCard> {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF2F6BFF).withValues(alpha: 0.15),
+                      color: const Color(0xFF4F8CFF).withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
                       LucideIcons.refreshCw,
-                      color: Color(0xFF2F6BFF),
+                      color: Color(0xFF4F8CFF),
                       size: 20,
                     ),
                   ),
@@ -1268,7 +1249,7 @@ class _DataAndPrivacyCardState extends ConsumerState<_DataAndPrivacyCard> {
               Text(
                 'Cached data ($_cacheSize) will be removed. Your account, skills, and expenses are safe — they will simply reload from the server on your next visit.',
                 style: const TextStyle(
-                  color: Color(0xFF8291A7),
+                  color: Color(0xFFA1A1AA),
                   fontSize: 14,
                   height: 1.5,
                 ),
@@ -1290,7 +1271,7 @@ class _DataAndPrivacyCardState extends ConsumerState<_DataAndPrivacyCard> {
                         child: const Text(
                           'Cancel',
                           style: TextStyle(
-                            color: Color(0xFF8291A7),
+                            color: Color(0xFFA1A1AA),
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
@@ -1305,7 +1286,7 @@ class _DataAndPrivacyCardState extends ConsumerState<_DataAndPrivacyCard> {
                       child: Container(
                         height: 44,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2F6BFF),
+                          color: const Color(0xFF4F8CFF),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         alignment: Alignment.center,
@@ -1753,7 +1734,7 @@ class _EditProfileModalState extends ConsumerState<_EditProfileModal> {
                       ? null
                       : const [
                           BoxShadow(
-                            color: Color(0x302F6BFF),
+                            color: Colors.transparent,
                             blurRadius: 10,
                             offset: Offset(0, 3),
                           ),
@@ -1957,7 +1938,7 @@ class _ChangePasswordModalState extends State<_ChangePasswordModal> {
               alignment: Alignment.center,
               child: const Icon(
                 LucideIcons.keyRound,
-                color: Color(0xFF2F6BFF),
+                color: Color(0xFF4F8CFF),
                 size: 17,
               ),
             ),
@@ -2096,19 +2077,19 @@ class _ChangePasswordModalState extends State<_ChangePasswordModal> {
                 padding: const EdgeInsets.symmetric(horizontal: 18),
                 decoration: BoxDecoration(
                   color: _isUpdating
-                      ? const Color(0xFF2F6BFF).withValues(alpha: 0.65)
-                      : const Color(0xFF2F6BFF),
+                      ? const Color(0xFF4F8CFF).withValues(alpha: 0.65)
+                      : const Color(0xFF4F8CFF),
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: _isUpdating
                       ? null
                       : const [
                           BoxShadow(
-                            color: Color(0x281A3D80),
+                            color: Colors.transparent,
                             blurRadius: 12,
                             offset: Offset(0, 4),
                           ),
                           BoxShadow(
-                            color: Color(0x302F6BFF),
+                            color: Colors.transparent,
                             blurRadius: 8,
                             offset: Offset(0, 2),
                           ),
@@ -2155,10 +2136,10 @@ class _ChangePasswordModalState extends State<_ChangePasswordModal> {
     final List<BoxShadow> shadows;
 
     if (isFocused) {
-      borderColor = const Color(0xFF2F6BFF);
+      borderColor = const Color(0xFF4F8CFF);
       shadows = const [
         BoxShadow(
-          color: Color(0x242F6BFF),
+          color: Colors.transparent,
           blurRadius: 6,
           spreadRadius: 0,
         ),
@@ -2167,7 +2148,7 @@ class _ChangePasswordModalState extends State<_ChangePasswordModal> {
       borderColor = _SettingsColors.destructive;
       shadows = const [
         BoxShadow(
-          color: Color(0x18FF5C68),
+          color: Colors.transparent,
           blurRadius: 6,
           spreadRadius: 0,
         ),
@@ -2206,7 +2187,7 @@ class _ChangePasswordModalState extends State<_ChangePasswordModal> {
                   controller: controller,
                   focusNode: focusNode,
                   obscureText: obscureText,
-                  cursorColor: const Color(0xFF2F6BFF),
+                  cursorColor: const Color(0xFF4F8CFF),
                   cursorWidth: 1.5,
                   style: GoogleFonts.inter(
                     fontSize: 14,
@@ -2611,7 +2592,7 @@ class _DeleteAccountModalState extends State<_DeleteAccountModal> {
                     boxShadow: _isConfirmed
                         ? const [
                             BoxShadow(
-                              color: Color(0x30FF5C68),
+                              color: Colors.transparent,
                               blurRadius: 10,
                               offset: Offset(0, 3),
                             ),
@@ -2738,7 +2719,7 @@ class _UnifiedTextFieldState extends State<_UnifiedTextField> {
         boxShadow: _isFocused
             ? const [
                 BoxShadow(
-                  color: Color(0x1E2F6BFF),
+                  color: Colors.transparent,
                   blurRadius: 6,
                   spreadRadius: 0,
                 ),
@@ -2826,7 +2807,7 @@ class _UnifiedDeleteFieldState extends State<_UnifiedDeleteField> {
     final shadows = widget.isConfirmed
         ? const [
             BoxShadow(
-              color: Color(0x18FF5C68),
+              color: Colors.transparent,
               blurRadius: 6,
               spreadRadius: 0,
             ),
@@ -2834,7 +2815,7 @@ class _UnifiedDeleteFieldState extends State<_UnifiedDeleteField> {
         : _isFocused
             ? const [
                 BoxShadow(
-                  color: Color(0x1E2F6BFF),
+                  color: Colors.transparent,
                   blurRadius: 6,
                   spreadRadius: 0,
                 ),

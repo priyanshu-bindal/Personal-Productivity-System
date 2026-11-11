@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
 
@@ -8,57 +9,196 @@ import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../core/animation/tab_activation_scope.dart';
-import '../core/theme/app_colors.dart';
+import '../core/navigation/app_shell_scope.dart';
+import '../core/theme/app_motion.dart';
 import '../core/theme/oled_theme.dart';
+import '../providers/auth_provider.dart';
 import '../providers/chat_provider.dart';
+import '../providers/nav_prefs_provider.dart';
+import '../providers/profile_provider.dart';
+import '../widgets/floating_dock.dart';
 import 'app_router.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Per-destination accent colors for the glass navbar
+//  Layout constants & helpers (public — screens use these for bottom padding)
 // ─────────────────────────────────────────────────────────────────────────────
-const _kNavAccents = <Color>[
-  OledTheme.electricBlue, // Today
-  OledTheme.cyan,         // Skills
-  OledTheme.violet,       // Calendar
-  OledTheme.amber,        // Progress
-  OledTheme.electricBlue, // More
-];
 
 /// Height of the floating glass capsule (without bottom safe-area inset).
-const double _kNavBarHeight = 68.0;
+const double _kNavBarHeight = 64.0;
 
-/// Bottom margin between the capsule and the safe-area bottom edge.
-const double _kNavBarBottomMargin = 14.0;
+/// Gap between the capsule and the safe-area bottom edge.
+const double _kNavBarBottomMargin = 10.0;
 
-/// Horizontal margin as a fraction of screen width (clamped).
-const double _kNavBarHorizontalPaddingFraction = 0.04;
-
-/// Calculates the bottom positioning for the floating navbar,
-/// guaranteeing the 14 px gap is measured strictly above the device's bottom safe
-/// area / system navigation controls (gesture pill or 3-button bar).
+/// Distance from the bottom of the screen to the bottom of the navbar.
 double getFloatingNavBarBottom(BuildContext context) {
-  final mediaQuery = MediaQuery.of(context);
-  final systemBottomInset =
-      math.max(mediaQuery.padding.bottom, mediaQuery.viewPadding.bottom);
-  // Ensure at least a minimal 10 px clearance even on devices reporting 0 safe area
-  final effectiveBottomSafe = math.max(systemBottomInset, 10.0);
-  return effectiveBottomSafe + _kNavBarBottomMargin;
+  final mq = MediaQuery.of(context);
+  final systemBottomInset = math.max(mq.padding.bottom, mq.viewPadding.bottom);
+  return math.max(systemBottomInset, 10.0) + _kNavBarBottomMargin;
 }
 
-/// Total clearance needed above the bottom of the screen so scrolling content
-/// is never obscured behind the floating glass capsule.
+/// Bottom clearance scrolling content needs so nothing hides behind the bar.
 double getNavBarClearance(BuildContext context) {
-  final bottomPos = getFloatingNavBarBottom(context);
-  return bottomPos + _kNavBarHeight + 12.0;
+  return getFloatingNavBarBottom(context) + _kNavBarHeight + 12.0;
 }
+
+/// Wraps a tab whose screen isn't navbar-aware: reports the navbar as bottom
+/// safe-area so its SafeArea, lists and FAB sit above the floating capsule.
+class NavBarSafeInset extends StatelessWidget {
+  final Widget child;
+  const NavBarSafeInset({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    if (mq.viewInsets.bottom > 80) return child; // navbar hides with keyboard
+    final clearance = getNavBarClearance(context) - 8;
+    return MediaQuery(
+      data: mq.copyWith(
+        padding: mq.padding.copyWith(bottom: math.max(mq.padding.bottom, clearance)),
+        viewPadding:
+            mq.viewPadding.copyWith(bottom: math.max(mq.viewPadding.bottom, clearance)),
+      ),
+      child: child,
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  AnimatedBranchContainer — smooth cross-fade between tabs
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// Keeps every visited tab alive (like IndexedStack) but fades + lifts the
+/// incoming tab over the outgoing one. Only the incoming tab animates, using
+/// opacity + translate, so the cost is one composited layer for ~280ms.
+/// Hidden tabs are offstage with tickers paused, so they cost nothing.
+class AnimatedBranchContainer extends StatefulWidget {
+  final int currentIndex;
+  final List<Widget> children;
+
+  const AnimatedBranchContainer({
+    super.key,
+    required this.currentIndex,
+    required this.children,
+  });
+
+  @override
+  State<AnimatedBranchContainer> createState() => _AnimatedBranchContainerState();
+}
+
+class _AnimatedBranchContainerState extends State<AnimatedBranchContainer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _lift;
+  late int _current;
+  int? _previous;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.currentIndex;
+    _controller = AnimationController(
+      vsync: this,
+      duration: AppMotion.standard,
+      value: 1.0,
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && _previous != null && mounted) {
+          setState(() => _previous = null);
+        }
+      });
+    final curved = CurvedAnimation(parent: _controller, curve: AppMotion.enter);
+    _fade = curved;
+    _lift = Tween<Offset>(begin: const Offset(0, 0.012), end: Offset.zero).animate(curved);
+  }
+
+  @override
+  void didUpdateWidget(AnimatedBranchContainer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.currentIndex != _current) {
+      _previous = _current;
+      _current = widget.currentIndex;
+      _controller.forward(from: 0.0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final order = <int>[
+      for (var i = 0; i < widget.children.length; i++)
+        if (i != _current && i != _previous) i,
+      if (_previous != null && _previous! < widget.children.length) _previous!,
+      _current,
+    ];
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (final i in order)
+          _BranchSlot(
+            key: ValueKey<int>(i),
+            visible: i == _current || i == _previous,
+            animate: i == _current && _previous != null,
+            fade: _fade,
+            lift: _lift,
+            child: widget.children[i],
+          ),
+      ],
+    );
+  }
+}
+
+class _BranchSlot extends StatelessWidget {
+  final bool visible;
+  final bool animate;
+  final Animation<double> fade;
+  final Animation<Offset> lift;
+  final Widget child;
+
+  const _BranchSlot({
+    super.key,
+    required this.visible,
+    required this.animate,
+    required this.fade,
+    required this.lift,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Structure is identical in every state so branch state is never lost.
+    return Offstage(
+      offstage: !visible,
+      child: TickerMode(
+        enabled: visible,
+        child: IgnorePointer(
+          ignoring: !visible,
+          child: FadeTransition(
+            opacity: animate ? fade : kAlwaysCompleteAnimation,
+            child: SlideTransition(
+              position: animate ? lift : const AlwaysStoppedAnimation(Offset.zero),
+              child: RepaintBoundary(child: child),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  ScaffoldWithNavBar — the app shell
+// ═════════════════════════════════════════════════════════════════════════════
 
 class ScaffoldWithNavBar extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
 
-  const ScaffoldWithNavBar({
-    super.key,
-    required this.navigationShell,
-  });
+  const ScaffoldWithNavBar({super.key, required this.navigationShell});
 
   @override
   ConsumerState<ScaffoldWithNavBar> createState() => _ScaffoldWithNavBarState();
@@ -66,165 +206,126 @@ class ScaffoldWithNavBar extends ConsumerStatefulWidget {
 
 class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
     with TickerProviderStateMixin, RouteAware {
-  // ── Tab activation tick counter for card animation replay ─────────────
   int _activationTick = 0;
   int _lastIndex = -1;
 
-  // ── More-menu animations ────────────────────────────────────────────────
-  late final AnimationController _menuController;
-  late final Animation<double> _curvedAnimation;
-  late final Animation<double> _fadeAnimation;
-  late final Animation<double> _scaleAnimation;
+  late final AnimationController _sidebar;
+  late final AnimationController _entrance;
+  late final Animation<Offset> _navEntrance;
+  late final Animation<double> _navEntranceFade;
 
-  // ── Entrance animations (run once on auth) ──────────────────────────────
-  late final AnimationController _entranceController;
-  late final Animation<double> _contentFade;
-  late final Animation<Offset> _contentSlide;
-  late final Animation<double> _contentScale;
-  late final Animation<double> _navBarFade;
-  late final Animation<Offset> _navBarSlide;
+  final ValueNotifier<bool> _sidebarOpen = ValueNotifier<bool>(false);
+  double _sidebarWidth = 300;
 
-  final ValueNotifier<bool> _isMenuOpenNotifier = ValueNotifier<bool>(false);
-  bool _isNavigating = false;
+  @override
+  void initState() {
+    super.initState();
+    DevicePerformance.start();
+
+    _sidebar = AnimationController(
+      vsync: this,
+      duration: AppMotion.emphasized,
+      reverseDuration: AppMotion.standard,
+    )..addStatusListener((s) {
+        _sidebarOpen.value = s != AnimationStatus.dismissed;
+      });
+
+    _entrance = AnimationController(vsync: this, duration: const Duration(milliseconds: 520));
+    final entranceCurve = CurvedAnimation(
+      parent: _entrance,
+      curve: const Interval(0.2, 1.0, curve: AppMotion.enter),
+    );
+    _navEntrance = Tween<Offset>(begin: const Offset(0, 0.6), end: Offset.zero)
+        .animate(entranceCurve);
+    _navEntranceFade = entranceCurve;
+    _entrance.forward();
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final modalRoute = ModalRoute.of(context);
-    if (modalRoute != null) {
-      appRouteObserver.subscribe(this, modalRoute);
-    }
+    if (modalRoute != null) appRouteObserver.subscribe(this, modalRoute);
   }
 
   @override
   void didPopNext() {
     super.didPopNext();
-    // Returning from a pushed route (e.g. /skills/:id, /notes, /money, /settings)
-    // Increment activation tick so cards on the active tab replay their entrance animation!
-    setState(() {
-      _activationTick++;
-    });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-
-    // ── More-menu controller (230 ms open / 200 ms close) ─────────────────
-    _menuController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 230),
-      reverseDuration: const Duration(milliseconds: 200),
-    );
-
-    _curvedAnimation = CurvedAnimation(
-      parent: _menuController,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
-    );
-
-    _fadeAnimation =
-        Tween<double>(begin: 0.0, end: 1.0).animate(_curvedAnimation);
-    _scaleAnimation =
-        Tween<double>(begin: 0.95, end: 1.0).animate(_curvedAnimation);
-
-    // ── 480 ms coordinated entrance ─────────────────────────────────────
-    _entranceController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 480),
-    );
-
-    _contentFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.0, 0.85, curve: Curves.easeOutCubic),
-      ),
-    );
-    _contentSlide = Tween<Offset>(
-      begin: const Offset(0, 14.0),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.0, 0.85, curve: Curves.easeOutCubic),
-      ),
-    );
-    _contentScale = Tween<double>(begin: 0.985, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.0, 0.85, curve: Curves.easeOutCubic),
-      ),
-    );
-
-    _navBarFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.15, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
-    _navBarSlide = Tween<Offset>(
-      begin: const Offset(0, 24.0),
-      end: Offset.zero,
-    ).animate(
-      CurvedAnimation(
-        parent: _entranceController,
-        curve: const Interval(0.15, 1.0, curve: Curves.easeOutCubic),
-      ),
-    );
-
-    _entranceController.forward();
+    setState(() => _activationTick++);
   }
 
   @override
   void dispose() {
     appRouteObserver.unsubscribe(this);
-    _isMenuOpenNotifier.dispose();
-    _entranceController.dispose();
-    _menuController.dispose();
+    _sidebar.dispose();
+    _entrance.dispose();
+    _sidebarOpen.dispose();
     super.dispose();
   }
 
-  // ── More-menu helpers ─────────────────────────────────────────────────
-  void _openMoreMenu() {
-    if (_isMenuOpenNotifier.value) return;
-    _isMenuOpenNotifier.value = true;
-    _menuController.forward(from: 0.0);
+  // ── Sidebar control ──────────────────────────────────────────────────────
+  void _openSidebar() {
+    HapticFeedback.selectionClick();
+    FocusManager.instance.primaryFocus?.unfocus();
+    _sidebar.animateTo(1.0, curve: AppMotion.enter, duration: AppMotion.emphasized);
   }
 
-  Future<void> _closeMoreMenu() async {
-    if (!_isMenuOpenNotifier.value && _menuController.isDismissed) return;
-    await _menuController.reverse();
-    if (mounted) {
-      _isMenuOpenNotifier.value = false;
+  void _closeSidebar() {
+    _sidebar.animateBack(0.0, curve: AppMotion.enter, duration: AppMotion.standard);
+  }
+
+  void _settleSidebar(double velocity) {
+    final v = velocity / _sidebarWidth;
+    if (v > 0.8 || (v > -0.8 && _sidebar.value > 0.5)) {
+      _sidebar.animateTo(1.0, curve: AppMotion.enter, duration: AppMotion.standard);
+    } else {
+      _closeSidebar();
     }
   }
 
-  void _onTap(int index) {
-    if (index == 4) {
-      if (_menuController.isAnimating) return;
-      if (_isMenuOpenNotifier.value) {
-        _closeMoreMenu();
-      } else {
-        _openMoreMenu();
-      }
-    } else {
-      if (_isMenuOpenNotifier.value) {
-        _closeMoreMenu();
-      }
+  void _dragSidebar(double dx) {
+    _sidebar.value = (_sidebar.value + dx / _sidebarWidth).clamp(0.0, 1.0);
+  }
+
+  // ── Navigation ───────────────────────────────────────────────────────────
+  int get _branchCount => widget.navigationShell.route.branches.length;
+
+  void _goTo(AppDestination dest) {
+    final index = dest.branchIndex;
+    if (index != null && index < _branchCount) {
       widget.navigationShell.goBranch(
         index,
-        initialLocation: false,
+        // Re-tapping the active tab pops it back to its root (iOS behaviour).
+        initialLocation: index == widget.navigationShell.currentIndex,
       );
+    } else if (index == null) {
+      context.push(dest.path);
+    } else {
+      context.go(dest.path);
     }
   }
 
-  void _navigateFromMore(String route) async {
-    if (_isNavigating) return;
-    _isNavigating = true;
-    await _closeMoreMenu();
-    if (mounted) {
-      _isNavigating = false;
-      context.push(route);
+  void _onSidebarSelect(AppDestination dest) {
+    _closeSidebar();
+    _goTo(dest);
+  }
+
+  void _onDockChanged(
+    int index,
+    List<AppDestination> pinned,
+    int moreIndex,
+  ) {
+    if (index == moreIndex) {
+      if (_sidebar.value > 0.5) {
+        _closeSidebar();
+      } else {
+        _openSidebar();
+      }
+    } else if (index >= 0 && index < pinned.length) {
+      if (_sidebar.value > 0) {
+        _closeSidebar();
+      }
+      _goTo(pinned[index]);
     }
   }
 
@@ -235,972 +336,1057 @@ class _ScaffoldWithNavBarState extends ConsumerState<ScaffoldWithNavBar>
       _lastIndex = currentIndex;
       _activationTick++;
     }
-    final totalUnread = ref.watch(totalUnreadChatCountProvider).value ?? 0;
-    final navBarBottom = getFloatingNavBarBottom(context);
-    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 80;
 
-    String currentPath = '';
+    final prefs = ref.watch(navPrefsProvider);
+    final pinned = prefs.pinnedDestinations
+        .where((d) => d.branchIndex! < _branchCount)
+        .toList(growable: false);
+    final unread = ref.watch(totalUnreadChatCountProvider).value ?? 0;
+    final navBottom = getFloatingNavBarBottom(context);
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 80;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    _sidebarWidth = math.min(320.0, screenWidth * 0.84);
+
+    String path = '';
     try {
-      currentPath = GoRouterState.of(context).uri.path;
+      path = GoRouterState.of(context).uri.path;
     } catch (_) {}
+    final isNestedRoute = path.split('/').where((s) => s.isNotEmpty).length > 1;
 
-    final menuItems = [
-      _MoreItemData(
-        route: '/messages',
-        icon: LucideIcons.messageSquare,
-        color: const Color(0xFF3B82F6),
-        title: 'Messages',
-        subtitle: '1-to-1 private chat & discussions',
-        badgeCount: totalUnread,
-        isActive: currentPath.startsWith('/messages'),
-      ),
-      _MoreItemData(
-        route: '/notes',
-        icon: LucideIcons.fileText,
-        color: AppColors.accentCyan,
-        title: 'Notes',
-        subtitle: 'Personal learning notes & tags',
-        isActive: currentPath.startsWith('/notes'),
-      ),
-      _MoreItemData(
-        route: '/money',
-        icon: LucideIcons.wallet,
-        color: AppColors.primary,
-        title: 'Money Tracker',
-        subtitle: 'Personal expenses & monthly budgets',
-        isActive: currentPath.startsWith('/money'),
-      ),
-      _MoreItemData(
-        route: '/settings',
-        icon: LucideIcons.settings,
-        color: AppColors.secondary,
-        title: 'Settings',
-        subtitle: 'App preferences & account',
-        isActive: currentPath.startsWith('/settings'),
-      ),
-    ];
-
-    return ValueListenableBuilder<bool>(
-      valueListenable: _isMenuOpenNotifier,
-      builder: (context, isMenuOpen, child) {
-        return PopScope(
-          canPop: !isMenuOpen,
-          onPopInvokedWithResult: (didPop, result) {
-            if (!didPop && _isMenuOpenNotifier.value) {
-              _closeMoreMenu();
-            }
+    return AppShellScope(
+      openSidebar: _openSidebar,
+      closeSidebar: _closeSidebar,
+      child: ValueListenableBuilder<bool>(
+        valueListenable: _sidebarOpen,
+        builder: (context, open, child) => PopScope(
+          canPop: !open,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop && open) _closeSidebar();
           },
           child: child!,
-        );
-      },
-      child: Scaffold(
-        backgroundColor: const Color(0xFF030508),
-        extendBody: true,
-        body: Stack(
-          children: [
-            // ── Main content ─────────────────────────────────────────────
-            RepaintBoundary(
-              child: AnimatedBuilder(
-                animation: _entranceController,
+        ),
+        child: Scaffold(
+          backgroundColor: OledTheme.bg,
+          extendBody: true,
+          resizeToAvoidBottomInset: false,
+          body: Stack(
+            children: [
+              // ── Content (gently pushed right while the sidebar opens) ──
+              AnimatedBuilder(
+                animation: _sidebar,
                 builder: (context, child) => Transform.translate(
-                  offset: _contentSlide.value,
-                  child: Transform.scale(
-                    scale: _contentScale.value,
-                    child: Opacity(
-                      opacity: _contentFade.value.clamp(0.0, 1.0),
-                      child: child,
-                    ),
+                  offset: Offset(_sidebar.value * 28.0, 0),
+                  child: child,
+                ),
+                child: RepaintBoundary(
+                  child: TabActivationScope(
+                    activeTabIndex: currentIndex,
+                    activationTick: _activationTick,
+                    child: widget.navigationShell,
                   ),
                 ),
-                child: TabActivationScope(
-                  activeTabIndex: currentIndex,
-                  activationTick: _activationTick,
-                  child: widget.navigationShell,
-                ),
               ),
-            ),
 
-            // ── More-menu overlay ────────────────────────────────────────
-            _DockedMoreMenuOverlay(
-              menuController: _menuController,
-              isOpenNotifier: _isMenuOpenNotifier,
-              fadeAnimation: _fadeAnimation,
-              scaleAnimation: _scaleAnimation,
-              curvedAnimation: _curvedAnimation,
-              onClose: _closeMoreMenu,
-              onNavigate: _navigateFromMore,
-              menuItems: menuItems,
-            ),
-
-            // ── Floating Glass Navbar (Smooth keyboard hide/restore) ──────
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: navBarBottom,
-              child: RepaintBoundary(
-                child: AnimatedSlide(
-                  offset: isKeyboardOpen ? const Offset(0, 1.8) : Offset.zero,
-                  duration: const Duration(milliseconds: 240),
-                  curve: isKeyboardOpen ? Curves.easeInCubic : Curves.easeOutCubic,
-                  child: AnimatedOpacity(
-                    opacity: isKeyboardOpen ? 0.0 : 1.0,
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeInOut,
+              // ── Floating glass dock navbar ────────────────────────────
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: RepaintBoundary(
+                  child: AnimatedSlide(
+                    offset: keyboardOpen ? const Offset(0, 1.8) : Offset.zero,
+                    duration: AppMotion.standard,
+                    curve: AppMotion.enter,
                     child: IgnorePointer(
-                      ignoring: isKeyboardOpen,
-                      child: AnimatedBuilder(
-                        animation: _entranceController,
-                        builder: (context, child) => Transform.translate(
-                          offset: _navBarSlide.value,
-                          child: Opacity(
-                            opacity: _navBarFade.value.clamp(0.0, 1.0),
-                            child: child,
+                      ignoring: keyboardOpen,
+                      child: FadeTransition(
+                        opacity: _navEntranceFade,
+                        child: SlideTransition(
+                          position: _navEntrance,
+                          child: ValueListenableBuilder<bool>(
+                            valueListenable: _sidebarOpen,
+                            builder: (context, open, _) {
+                              final dockItems = pinned.length == 4 &&
+                                      pinned[0].id == 'today' &&
+                                      pinned[1].id == 'skills' &&
+                                      pinned[2].id == 'calendar' &&
+                                      pinned[3].id == 'progress'
+                                  ? [
+                                      const DockItem(
+                                        icon: Icons.today_rounded,
+                                        label: 'Today',
+                                      ),
+                                      const DockItem(
+                                        icon: Icons.psychology_rounded,
+                                        label: 'Skills',
+                                      ),
+                                      const DockItem(
+                                        icon: Icons.calendar_month_rounded,
+                                        label: 'Calendar',
+                                      ),
+                                      const DockItem(
+                                        icon: Icons.insights_rounded,
+                                        label: 'Progress',
+                                      ),
+                                      DockItem(
+                                        icon: Icons.grid_view_rounded,
+                                        label: 'More',
+                                        badge: unread > 0,
+                                        actionOnly: true,
+                                      ),
+                                    ]
+                                  : [
+                                      for (final d in pinned)
+                                        DockItem(
+                                          icon: d.icon,
+                                          label: d.label,
+                                        ),
+                                      DockItem(
+                                        icon: Icons.grid_view_rounded,
+                                        label: 'More',
+                                        badge: unread > 0,
+                                        actionOnly: true,
+                                      ),
+                                    ];
+
+                              final moreIndex = dockItems.length - 1;
+                              final pinnedIndex = pinned.indexWhere(
+                                (d) => d.branchIndex == currentIndex,
+                              );
+                              final dockCurrentIndex =
+                                  (open || pinnedIndex < 0)
+                                      ? moreIndex
+                                      : pinnedIndex;
+
+                              return FloatingDock(
+                                items: dockItems,
+                                currentIndex: dockCurrentIndex,
+                                accentColor: OledTheme.accent,
+                                onChanged: (idx) => _onDockChanged(
+                                  idx,
+                                  pinned,
+                                  moreIndex,
+                                ),
+                              );
+                            },
                           ),
-                        ),
-                        child: _FloatingGlassNavBar(
-                          currentIndex: currentIndex,
-                          isMenuOpenNotifier: _isMenuOpenNotifier,
-                          onTap: _onTap,
-                          hasBadge: totalUnread > 0,
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+
+              // ── Left edge swipe to open sidebar ───────────────────────
+              if (!isNestedRoute)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: navBottom + _kNavBarHeight + 8,
+                  width: 16,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onHorizontalDragUpdate: (d) => _dragSidebar(d.delta.dx),
+                    onHorizontalDragEnd: (d) =>
+                        _settleSidebar(d.velocity.pixelsPerSecond.dx),
+                  ),
+                ),
+
+              // ── Sidebar ───────────────────────────────────────────────
+              _SidebarOverlay(
+                controller: _sidebar,
+                isOpen: _sidebarOpen,
+                width: _sidebarWidth,
+                onClose: _closeSidebar,
+                onDrag: _dragSidebar,
+                onDragEnd: _settleSidebar,
+                child: _SidebarPanel(
+                  controller: _sidebar,
+                  currentIndex: currentIndex,
+                  branchCount: _branchCount,
+                  unreadCount: unread,
+                  onSelect: _onSidebarSelect,
+                  onClose: _closeSidebar,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  _FloatingGlassNavBar — The main glass capsule widget
-// ═══════════════════════════════════════════════════════════════════════════════
-class _FloatingGlassNavBar extends StatelessWidget {
-  final int currentIndex;
-  final ValueNotifier<bool> isMenuOpenNotifier;
-  final ValueChanged<int> onTap;
-  final bool hasBadge;
+// ═════════════════════════════════════════════════════════════════════════════
+//  Glass surface — real blur on capable devices, solid graphite on slow ones
+// ═════════════════════════════════════════════════════════════════════════════
 
-  const _FloatingGlassNavBar({
-    required this.currentIndex,
-    required this.isMenuOpenNotifier,
-    required this.onTap,
-    this.hasBadge = false,
+class _GlassSurface extends ConsumerWidget {
+  final BorderRadius borderRadius;
+  final Widget child;
+  final double blur;
+
+  const _GlassSurface({
+    required this.borderRadius,
+    required this.child,
+    this.blur = 24,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(navPrefsProvider.select((p) => p.glassMode));
+    return ValueListenableBuilder<bool>(
+      valueListenable: DevicePerformance.isLowEnd,
+      builder: (context, lowEnd, _) {
+        final useBlur =
+            mode == GlassMode.full || (mode == GlassMode.auto && !lowEnd);
+
+        Widget body = DecoratedBox(
+          decoration: BoxDecoration(
+            color: useBlur ? OledTheme.glassFill : OledTheme.glassFillOpaque,
+            borderRadius: borderRadius,
+            border: Border.all(color: OledTheme.glassBorder, width: 0.6),
+          ),
+          child: child,
+        );
+
+        if (useBlur) {
+          body = BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+            child: body,
+          );
+        }
+
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x80000000),
+                blurRadius: 24,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: ClipRRect(borderRadius: borderRadius, child: body),
+        );
+      },
+    );
+  }
+}
+
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Sidebar
+// ═════════════════════════════════════════════════════════════════════════════
+
+class _SidebarOverlay extends StatelessWidget {
+  final AnimationController controller;
+  final ValueNotifier<bool> isOpen;
+  final double width;
+  final VoidCallback onClose;
+  final ValueChanged<double> onDrag;
+  final ValueChanged<double> onDragEnd;
+  final Widget child;
+
+  const _SidebarOverlay({
+    required this.controller,
+    required this.isOpen,
+    required this.width,
+    required this.onClose,
+    required this.onDrag,
+    required this.onDragEnd,
+    required this.child,
   });
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final horizontalPadding =
-        (screenWidth * _kNavBarHorizontalPaddingFraction).clamp(12.0, 28.0);
-    final navWidth = (screenWidth - horizontalPadding * 2).clamp(280.0, 520.0);
-
-    // Adaptive blur: 12.0 sigma for excellent 60/120fps performance on mobile,
-    // with automatic 0-blur high-opacity OLED fallback for accessibility/reduced motion
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    final double blurSigma = reduceMotion ? 0.0 : 12.0;
-    final glassColor = blurSigma > 0
-        ? const Color(0xFF101722).withValues(alpha: 0.82)
-        : const Color(0xF40D1420); // 96% opaque OLED surface fallback
-
-    Widget glassBody = Container(
-      decoration: BoxDecoration(
-        color: glassColor,
-        borderRadius: BorderRadius.circular(_kNavBarHeight / 2),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.08),
-          width: 0.8,
-        ),
-      ),
-      child: Stack(
-        children: [
-          // ── Top edge highlight (glass refraction line) ────────
-          Positioned(
-            top: 0,
-            left: _kNavBarHeight / 2,
-            right: _kNavBarHeight / 2,
-            height: 0.6,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white.withValues(alpha: 0.0),
-                    Colors.white.withValues(alpha: 0.10),
-                    Colors.white.withValues(alpha: 0.0),
-                  ],
+    return ValueListenableBuilder<bool>(
+      valueListenable: isOpen,
+      child: child,
+      builder: (context, open, panel) {
+        // Fully removed from the tree when closed — zero cost.
+        if (!open) return const SizedBox.shrink();
+        return Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onClose,
+            onHorizontalDragUpdate: (d) => onDrag(d.delta.dx),
+            onHorizontalDragEnd: (d) => onDragEnd(d.velocity.pixelsPerSecond.dx),
+            child: Stack(
+              children: [
+                // Dim scrim — animated color, no saveLayer.
+                Positioned.fill(
+                  child: AnimatedBuilder(
+                    animation: controller,
+                    builder: (context, _) => ColoredBox(
+                      color: Color.fromRGBO(0, 0, 0, 0.6 * controller.value),
+                    ),
+                  ),
                 ),
-              ),
+                AnimatedBuilder(
+                  animation: controller,
+                  builder: (context, child) => Transform.translate(
+                    offset: Offset(-(1 - controller.value) * (width + 24), 0),
+                    child: child,
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        10,
+                        MediaQuery.paddingOf(context).top + 8,
+                        0,
+                        math.max(MediaQuery.paddingOf(context).bottom, 10) + 8,
+                      ),
+                      child: SizedBox(
+                        width: width,
+                        child: GestureDetector(
+                          onTap: () {}, // swallow taps inside the panel
+                          child: RepaintBoundary(child: panel),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
+        );
+      },
+    );
+  }
+}
 
-          // ── Nav items with sliding capsule ───────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-            child: ValueListenableBuilder<bool>(
-              valueListenable: isMenuOpenNotifier,
-              builder: (context, isMenuOpen, _) {
-                return _GlassNavBarContent(
-                  currentIndex: currentIndex,
-                  isMenuOpen: isMenuOpen,
-                  onTap: onTap,
-                  hasBadge: hasBadge,
-                );
-              },
+class _SidebarPanel extends ConsumerStatefulWidget {
+  final AnimationController controller;
+  final int currentIndex;
+  final int branchCount;
+  final int unreadCount;
+  final ValueChanged<AppDestination> onSelect;
+  final VoidCallback onClose;
+
+  const _SidebarPanel({
+    required this.controller,
+    required this.currentIndex,
+    required this.branchCount,
+    required this.unreadCount,
+    required this.onSelect,
+    required this.onClose,
+  });
+
+  @override
+  ConsumerState<_SidebarPanel> createState() => _SidebarPanelState();
+}
+
+class _SidebarPanelState extends ConsumerState<_SidebarPanel> {
+  static const _staggerSlots = 12;
+  late final List<Animation<double>> _stagger;
+  bool _editing = false;
+  bool _limitHint = false;
+  Timer? _limitTimer;
+
+  @override
+  void dispose() {
+    _limitTimer?.cancel();
+    for (final a in _stagger) {
+      (a as CurvedAnimation).dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _stagger = List.generate(_staggerSlots, (i) {
+      final start = (0.10 + i * 0.045).clamp(0.0, 0.7);
+      return CurvedAnimation(
+        parent: widget.controller,
+        curve: Interval(start, (start + 0.45).clamp(0.0, 1.0), curve: AppMotion.enter),
+        reverseCurve: const Interval(0.0, 1.0),
+      );
+    });
+  }
+
+  Widget _staggered(int slot, Widget child) {
+    final anim = _stagger[slot.clamp(0, _staggerSlots - 1)];
+    return FadeTransition(
+      opacity: anim,
+      child: AnimatedBuilder(
+        animation: anim,
+        builder: (context, child) => Transform.translate(
+          offset: Offset(-14 * (1 - anim.value), 0),
+          child: child,
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  void _flashLimit() {
+    HapticFeedback.mediumImpact();
+    setState(() => _limitHint = true);
+    _limitTimer?.cancel();
+    _limitTimer = Timer(const Duration(milliseconds: 1400), () {
+      if (mounted) setState(() => _limitHint = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = ref.watch(navPrefsProvider);
+    final notifier = ref.read(navPrefsProvider.notifier);
+    final destinations = AppDestinations.all
+        .where((d) => d.branchIndex == null || d.branchIndex! < widget.branchCount)
+        .toList();
+
+    var slot = 0;
+    return _GlassSurface(
+      borderRadius: BorderRadius.circular(28),
+      blur: 30,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _staggered(slot++, _SidebarHeader(onClose: widget.onClose)),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 18),
+            child: Divider(height: 1, color: OledTheme.glassBorder),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+              physics: const BouncingScrollPhysics(),
+              children: [
+                _staggered(slot++, const _SectionLabel('Navigate')),
+                for (final d in destinations)
+                  _staggered(
+                    slot++,
+                    _SidebarRow(
+                      destination: d,
+                      active: d.branchIndex != null && d.branchIndex == widget.currentIndex,
+                      pinned: prefs.pinned.contains(d.id),
+                      badge: d.id == 'messages' ? widget.unreadCount : 0,
+                      onTap: () => widget.onSelect(d),
+                    ),
+                  ),
+                const SizedBox(height: 14),
+                _staggered(
+                  slot++,
+                  _SectionLabel(
+                    'Bottom bar',
+                    trailing: _TextAction(
+                      label: _editing ? 'Done' : 'Edit',
+                      onTap: () => setState(() => _editing = !_editing),
+                    ),
+                  ),
+                ),
+                _staggered(
+                  slot++,
+                  AnimatedSize(
+                    duration: AppMotion.standard,
+                    curve: AppMotion.enter,
+                    alignment: Alignment.topCenter,
+                    child: _editing
+                        ? _TabEditor(
+                            prefs: prefs,
+                            branchCount: widget.branchCount,
+                            limitHint: _limitHint,
+                            onToggle: (id) {
+                              if (!notifier.togglePin(id)) _flashLimit();
+                            },
+                            onReorder: notifier.reorder,
+                            onReset: notifier.resetPinned,
+                          )
+                        : _PinnedPreview(prefs: prefs),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _staggered(slot++, const _SectionLabel('Performance')),
+                _staggered(
+                  slot++,
+                  _GlassModePicker(
+                    mode: prefs.glassMode,
+                    onChanged: notifier.setGlassMode,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
-
-    // Apply BackdropFilter only if blur is enabled
-    if (blurSigma > 0) {
-      glassBody = BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-        child: glassBody,
-      );
-    }
-
-    return Center(
-      child: SizedBox(
-        width: navWidth,
-        height: _kNavBarHeight,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(_kNavBarHeight / 2),
-            // Soft floating shadow
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.55),
-                blurRadius: 28,
-                spreadRadius: -4,
-                offset: const Offset(0, 10),
-              ),
-              // Ambient accent glow
-              BoxShadow(
-                color: OledTheme.electricBlue.withValues(alpha: 0.06),
-                blurRadius: 32,
-                spreadRadius: -2,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(_kNavBarHeight / 2),
-            child: glassBody,
-          ),
-        ),
-      ),
-    );
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  _GlassNavBarContent — Layout with animated sliding capsule + items
-// ═══════════════════════════════════════════════════════════════════════════════
-class _GlassNavBarContent extends StatelessWidget {
-  final int currentIndex;
-  final bool isMenuOpen;
-  final ValueChanged<int> onTap;
-  final bool hasBadge;
-
-  const _GlassNavBarContent({
-    required this.currentIndex,
-    required this.isMenuOpen,
-    required this.onTap,
-    required this.hasBadge,
-  });
-
-  static const _icons = <IconData>[
-    LucideIcons.layoutGrid,
-    LucideIcons.bookOpen,
-    LucideIcons.calendar,
-    LucideIcons.trendingUp,
-    LucideIcons.moreHorizontal,
-  ];
-
-  static const _labels = <String>[
-    'Today',
-    'Skills',
-    'Calendar',
-    'Progress',
-    'More',
-  ];
+class _SidebarHeader extends ConsumerWidget {
+  final VoidCallback onClose;
+  const _SidebarHeader({required this.onClose});
 
   @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final itemWidth = constraints.maxWidth / 5;
-        final itemHeight = constraints.maxHeight;
-        final effectiveIndex = isMenuOpen ? 4 : currentIndex;
-        final accent = _kNavAccents[effectiveIndex];
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(profileProvider).valueOrNull;
+    final user = ref.watch(currentUserProvider);
+    final name = (profile?.fullName.trim().isNotEmpty ?? false)
+        ? profile!.fullName.trim()
+        : 'FocusFlow';
+    final email = profile?.email.isNotEmpty == true ? profile!.email : (user?.email ?? '');
+    final initials = name
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .take(2)
+        .map((p) => p[0].toUpperCase())
+        .join();
 
-        return Stack(
-          children: [
-            // ── Snappy sliding active capsule (200ms easeOutCubic: no lag) ─
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              left: effectiveIndex * itemWidth + 3,
-              top: 2,
-              width: itemWidth - 6,
-              height: itemHeight - 4,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOutCubic,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(itemHeight / 2),
-                  border: Border.all(
-                    color: accent.withValues(alpha: 0.30),
-                    width: 0.8,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: accent.withValues(alpha: 0.15),
-                      blurRadius: 10,
-                      spreadRadius: -2,
-                    ),
-                  ],
-                ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 18, 12, 16),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: OledTheme.accent.withValues(alpha: 0.16),
+              shape: BoxShape.circle,
+              border: Border.all(color: OledTheme.accent.withValues(alpha: 0.35)),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              initials.isEmpty ? 'F' : initials,
+              style: const TextStyle(
+                color: OledTheme.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
               ),
             ),
-
-            // ── Navigation items ──────────────────────────────────────
-            Row(
-              children: List.generate(5, (index) {
-                final isSelected =
-                    (index == 4) ? isMenuOpen : (currentIndex == index && !isMenuOpen);
-
-                return SizedBox(
-                  width: itemWidth,
-                  height: itemHeight,
-                  child: _GlassNavItem(
-                    icon: _icons[index],
-                    label: _labels[index],
-                    accent: _kNavAccents[index],
-                    isSelected: isSelected,
-                    isMore: index == 4,
-                    isMenuOpen: isMenuOpen,
-                    hasBadge: index == 4 && hasBadge,
-                    onTap: () => onTap(index),
-                  ),
-                );
-              }),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  _GlassNavItem — Individual destination with immediate tactile feedback
-// ═══════════════════════════════════════════════════════════════════════════════
-class _GlassNavItem extends StatefulWidget {
-  final IconData icon;
-  final String label;
-  final Color accent;
-  final bool isSelected;
-  final bool isMore;
-  final bool isMenuOpen;
-  final bool hasBadge;
-  final VoidCallback onTap;
-
-  const _GlassNavItem({
-    required this.icon,
-    required this.label,
-    required this.accent,
-    required this.isSelected,
-    this.isMore = false,
-    this.isMenuOpen = false,
-    this.hasBadge = false,
-    required this.onTap,
-  });
-
-  @override
-  State<_GlassNavItem> createState() => _GlassNavItemState();
-}
-
-class _GlassNavItemState extends State<_GlassNavItem>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pressController;
-  bool _isPressed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Fast, crisp press animation: 70ms in, 100ms out — immediate, not bouncy
-    _pressController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 70),
-      reverseDuration: const Duration(milliseconds: 100),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pressController.dispose();
-    super.dispose();
-  }
-
-  void _handleTapDown(TapDownDetails _) {
-    if (!_isPressed) {
-      _isPressed = true;
-      _pressController.forward();
-      setState(() {});
-    }
-  }
-
-  void _handleTapUp(TapUpDetails _) {
-    _isPressed = false;
-    _pressController.reverse();
-    setState(() {});
-  }
-
-  void _handleTapCancel() {
-    _isPressed = false;
-    _pressController.reverse();
-    setState(() {});
-  }
-
-  void _handleTap() {
-    HapticFeedback.selectionClick();
-    widget.onTap();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final sel = widget.isSelected;
-    final accent = widget.accent;
-    const inactiveColor = Color(0xFF5A6678);
-    final iconColor = sel ? accent : inactiveColor;
-    final labelColor = sel ? accent : const Color(0xFF7A8899);
-
-    return GestureDetector(
-      onTapDown: _handleTapDown,
-      onTapUp: _handleTapUp,
-      onTapCancel: _handleTapCancel,
-      onTap: _handleTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedBuilder(
-        animation: _pressController,
-        builder: (context, child) {
-          // Snappy 0.94x press scale
-          final pressScale = 1.0 - (_pressController.value * 0.06);
-          return Transform.scale(scale: pressScale, child: child);
-        },
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // ── Icon with snappy 1.12x scale transition ─────────────
-            Stack(
-              clipBehavior: Clip.none,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AnimatedScale(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOutCubic,
-                  scale: sel ? 1.12 : 1.0,
-                  child: widget.isMore
-                      ? AnimatedRotation(
-                          duration: const Duration(milliseconds: 200),
-                          curve: Curves.easeOutCubic,
-                          turns: widget.isMenuOpen ? 0.25 : 0.0,
-                          child: Icon(
-                            widget.icon,
-                            size: 19,
-                            color: iconColor,
-                          ),
-                        )
-                      : Icon(
-                          widget.icon,
-                          size: 19,
-                          color: iconColor,
-                        ),
-                ),
-
-                // ── Unread badge on More ──────────────────────────────
-                if (widget.hasBadge)
-                  Positioned(
-                    top: -2,
-                    right: -3,
-                    child: Container(
-                      width: 7,
-                      height: 7,
-                      decoration: BoxDecoration(
-                        color: OledTheme.coral,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: OledTheme.coral.withValues(alpha: 0.6),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                    ),
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: OledTheme.textPrimary,
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
                   ),
+                ),
+                if (email.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    email,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: OledTheme.textSecondary, fontSize: 12),
+                  ),
+                ],
               ],
             ),
+          ),
+          _CircleButton(icon: LucideIcons.x, onTap: onClose, label: 'Close sidebar'),
+        ],
+      ),
+    );
+  }
+}
 
-            const SizedBox(height: 4),
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  final Widget? trailing;
+  const _SectionLabel(this.text, {this.trailing});
 
-            // ── Label with smooth style transition ───────────────────
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOutCubic,
-              style: TextStyle(
-                fontSize: sel ? 10.0 : 9.5,
-                fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                color: labelColor,
-                letterSpacing: sel ? 0.2 : 0.0,
-                height: 1.1,
-              ),
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 160),
-                opacity: sel ? 1.0 : 0.75,
-                child: Text(widget.label, maxLines: 1),
-              ),
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 4, 6, 8),
+      child: Row(
+        children: [
+          Text(
+            text.toUpperCase(),
+            style: const TextStyle(
+              color: OledTheme.textMuted,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.9,
             ),
-          ],
+          ),
+          const Spacer(),
+          ?trailing,
+        ],
+      ),
+    );
+  }
+}
+
+class _TextAction extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _TextAction({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: AnimatedSwitcher(
+          duration: AppMotion.fast,
+          child: Text(
+            label,
+            key: ValueKey(label),
+            style: const TextStyle(
+              color: OledTheme.accent,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Data class for More-menu items
-// ═══════════════════════════════════════════════════════════════════════════════
-class _MoreItemData {
-  final String route;
+class _CircleButton extends StatelessWidget {
   final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final int badgeCount;
-  final bool isActive;
-
-  const _MoreItemData({
-    required this.route,
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    this.badgeCount = 0,
-    this.isActive = false,
-  });
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  _DockedMoreMenuOverlay — Floating overlay popup from the More button
-// ═══════════════════════════════════════════════════════════════════════════════
-class _DockedMoreMenuOverlay extends StatelessWidget {
-  final AnimationController menuController;
-  final ValueNotifier<bool> isOpenNotifier;
-  final Animation<double> fadeAnimation;
-  final Animation<double> scaleAnimation;
-  final Animation<double> curvedAnimation;
-  final VoidCallback onClose;
-  final void Function(String route) onNavigate;
-  final List<_MoreItemData> menuItems;
-
-  const _DockedMoreMenuOverlay({
-    required this.menuController,
-    required this.isOpenNotifier,
-    required this.fadeAnimation,
-    required this.scaleAnimation,
-    required this.curvedAnimation,
-    required this.onClose,
-    required this.onNavigate,
-    required this.menuItems,
-  });
+  final VoidCallback onTap;
+  final String label;
+  const _CircleButton({required this.icon, required this.onTap, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final navBarBottom = getFloatingNavBarBottom(context);
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    final double blurSigma = reduceMotion ? 0.0 : 14.0;
-    final glassColor = blurSigma > 0
-        ? const Color(0xFF0C1322).withValues(alpha: 0.88)
-        : const Color(0xF6090E18);
-
-    return ValueListenableBuilder<bool>(
-      valueListenable: isOpenNotifier,
-      builder: (context, isOpen, _) {
-        return AnimatedBuilder(
-          animation: menuController,
-          builder: (context, _) {
-            final isVisible = isOpen || menuController.value > 0.0;
-            if (!isVisible) {
-              return const SizedBox.shrink();
-            }
-
-            Widget menuBody = Container(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-              decoration: BoxDecoration(
-                color: glassColor,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.09),
-                  width: 0.9,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.65),
-                    blurRadius: 32,
-                    offset: const Offset(0, 12),
-                  ),
-                  BoxShadow(
-                    color: OledTheme.electricBlue.withValues(alpha: 0.08),
-                    blurRadius: 24,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Mini OLED Header
-                  Row(
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: OledTheme.cyan,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'MORE FEATURES',
-                        style: TextStyle(
-                          color: OledTheme.textMuted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: onClose,
-                        behavior: HitTestBehavior.opaque,
-                        child: Container(
-                          padding: const EdgeInsets.all(5),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              width: 0.8,
-                            ),
-                          ),
-                          child: const Icon(
-                            LucideIcons.x,
-                            size: 13,
-                            color: OledTheme.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Staggered Menu items with internal scroll safety
-                  ...List.generate(menuItems.length, (index) {
-                    final item = menuItems[index];
-                    final start = (0.06 + index * 0.10).clamp(0.0, 1.0);
-                    final end = (start + 0.40).clamp(0.0, 1.0);
-                    final itemAnim = CurvedAnimation(
-                      parent: menuController,
-                      curve: Interval(start, end, curve: Curves.easeOutCubic),
-                    );
-
-                    return AnimatedBuilder(
-                      animation: itemAnim,
-                      builder: (context, child) {
-                        final itemDy = (1.0 - itemAnim.value) * 8.0;
-                        return Transform.translate(
-                          offset: Offset(0, itemDy),
-                          child: Opacity(
-                            opacity: itemAnim.value.clamp(0.0, 1.0),
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          bottom: index < menuItems.length - 1 ? 8 : 0,
-                        ),
-                        child: _FloatingMoreMenuItem(
-                          icon: item.icon,
-                          color: item.color,
-                          title: item.title,
-                          subtitle: item.subtitle,
-                          badgeCount: item.badgeCount,
-                          isActive: item.isActive,
-                          onTap: () => onNavigate(item.route),
-                        ),
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            );
-
-            if (blurSigma > 0) {
-              menuBody = ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-                  child: menuBody,
-                ),
-              );
-            }
-
-            return RepaintBoundary(
-              child: Stack(
-                children: [
-                  // Full screen backdrop barrier
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: onClose,
-                      behavior: HitTestBehavior.opaque,
-                      child: FadeTransition(
-                        opacity: fadeAnimation,
-                        child: Container(
-                          color: const Color(0x78000000),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Docked Floating More Menu — precisely positioned above the floating capsule
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: navBarBottom + _kNavBarHeight + 12,
-                    child: Align(
-                      alignment: Alignment.bottomRight,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: 336,
-                          maxHeight: MediaQuery.sizeOf(context).height * 0.65,
-                        ),
-                        child: FadeTransition(
-                          opacity: fadeAnimation,
-                          child: ScaleTransition(
-                            scale: scaleAnimation,
-                            alignment: const Alignment(0.85, 1.0),
-                            child: SingleChildScrollView(
-                              physics: const BouncingScrollPhysics(),
-                              child: menuBody,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: const BoxDecoration(
+            color: Color(0x14FFFFFF),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 15, color: OledTheme.textSecondary),
+        ),
+      ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  _FloatingMoreMenuItem — Individual item in the More popup
-// ═══════════════════════════════════════════════════════════════════════════════
-class _FloatingMoreMenuItem extends StatefulWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final int badgeCount;
-  final bool isActive;
+class _SidebarRow extends StatefulWidget {
+  final AppDestination destination;
+  final bool active;
+  final bool pinned;
+  final int badge;
   final VoidCallback onTap;
 
-  const _FloatingMoreMenuItem({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    this.badgeCount = 0,
-    this.isActive = false,
+  const _SidebarRow({
+    required this.destination,
+    required this.active,
+    required this.pinned,
+    required this.badge,
     required this.onTap,
   });
 
   @override
-  State<_FloatingMoreMenuItem> createState() => _FloatingMoreMenuItemState();
+  State<_SidebarRow> createState() => _SidebarRowState();
 }
 
-class _FloatingMoreMenuItemState extends State<_FloatingMoreMenuItem> {
-  bool _isPressed = false;
+class _SidebarRowState extends State<_SidebarRow> {
+  bool _pressed = false;
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = widget.isActive
-        ? (_isPressed
-            ? widget.color.withValues(alpha: 0.18)
-            : widget.color.withValues(alpha: 0.11))
-        : (_isPressed
-            ? const Color(0xFF1A2333).withValues(alpha: 0.65)
-            : const Color(0xFF0F1728).withValues(alpha: 0.50));
-
-    final borderColor = widget.isActive
-        ? widget.color.withValues(alpha: 0.50)
-        : (_isPressed
-            ? widget.color.withValues(alpha: 0.35)
-            : Colors.white.withValues(alpha: 0.07));
+    final d = widget.destination;
+    final active = widget.active;
+    final bg = active
+        ? const Color(0x17FFFFFF)
+        : (_pressed ? const Color(0x0DFFFFFF) : Colors.transparent);
 
     return GestureDetector(
-      onTapDown: (_) => setState(() => _isPressed = true),
-      onTapUp: (_) => setState(() => _isPressed = false),
-      onTapCancel: () => setState(() => _isPressed = false),
-      onTap: widget.onTap,
       behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) => setState(() => _pressed = false),
+      onTapCancel: () => setState(() => _pressed = false),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        widget.onTap();
+      },
       child: AnimatedScale(
-        duration: const Duration(milliseconds: 110),
-        curve: Curves.easeOutCubic,
-        scale: _isPressed ? 0.965 : 1.0,
+        scale: _pressed ? 0.98 : 1.0,
+        duration: AppMotion.instant,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 130),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: bgColor,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-              color: borderColor,
-              width: widget.isActive ? 1.2 : 0.9,
-            ),
-            boxShadow: widget.isActive
-                ? [
-                    BoxShadow(
-                      color: widget.color.withValues(alpha: 0.16),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
-          ),
+          duration: AppMotion.fast,
+          curve: AppMotion.standardCurve,
+          margin: const EdgeInsets.only(bottom: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
           child: Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
-                  color: widget.color.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(11),
-                  border: Border.all(
-                    color: widget.color.withValues(alpha: 0.22),
-                    width: 0.8,
-                  ),
+                  color: active
+                      ? OledTheme.accent.withValues(alpha: 0.18)
+                      : const Color(0x0FFFFFFF),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Center(
-                  child: Icon(
-                    widget.icon,
-                    color: widget.color,
-                    size: 19,
-                  ),
+                child: Icon(
+                  d.icon,
+                  size: 16,
+                  color: active ? OledTheme.accent : OledTheme.textSecondary,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          widget.title,
-                          style: TextStyle(
-                            color: widget.isActive
-                                ? widget.color
-                                : OledTheme.textPrimary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13.5,
-                            letterSpacing: -0.1,
-                          ),
-                        ),
-                        if (widget.isActive) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            width: 5,
-                            height: 5,
-                            decoration: BoxDecoration(
-                              color: widget.color,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: widget.color.withValues(alpha: 0.7),
-                                  blurRadius: 4,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 1.5),
                     Text(
-                      widget.subtitle,
-                      style: const TextStyle(
-                        color: OledTheme.textSecondary,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
+                      d.label,
+                      style: TextStyle(
+                        color: active ? OledTheme.textPrimary : const Color(0xFFE4E4E7),
+                        fontSize: 14,
+                        fontWeight: active ? FontWeight.w700 : FontWeight.w600,
+                        letterSpacing: -0.1,
                       ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      d.subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: OledTheme.textMuted, fontSize: 11.5),
                     ),
                   ],
                 ),
               ),
-              if (widget.badgeCount > 0) ...[
+              if (widget.badge > 0)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: OledTheme.coral.withValues(alpha: 0.18),
+                    color: OledTheme.coral,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: OledTheme.coral.withValues(alpha: 0.45),
-                      width: 0.8,
-                    ),
                   ),
                   child: Text(
-                    widget.badgeCount > 99
-                        ? '99+'
-                        : widget.badgeCount.toString(),
+                    widget.badge > 99 ? '99+' : '${widget.badge}',
                     style: const TextStyle(
-                      color: OledTheme.coral,
+                      color: Colors.white,
                       fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-              ],
-              Icon(
-                LucideIcons.chevronRight,
-                color: widget.isActive
-                    ? widget.color
-                    : OledTheme.textMuted.withValues(alpha: 0.6),
-                size: 16,
-              ),
+                )
+              else if (widget.pinned)
+                const Icon(LucideIcons.pin, size: 13, color: OledTheme.textMuted),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Compact read-only preview of the current bottom bar.
+class _PinnedPreview extends StatelessWidget {
+  final NavPrefs prefs;
+  const _PinnedPreview({required this.prefs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0x0AFFFFFF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: OledTheme.glassBorder, width: 0.6),
+      ),
+      child: Row(
+        children: [
+          for (final d in prefs.pinnedDestinations)
+            Expanded(
+              child: Column(
+                children: [
+                  Icon(d.icon, size: 16, color: OledTheme.textSecondary),
+                  const SizedBox(height: 4),
+                  Text(
+                    d.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: OledTheme.textMuted, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TabEditor extends StatelessWidget {
+  final NavPrefs prefs;
+  final int branchCount;
+  final bool limitHint;
+  final ValueChanged<String> onToggle;
+  final void Function(int, int) onReorder;
+  final VoidCallback onReset;
+
+  const _TabEditor({
+    required this.prefs,
+    required this.branchCount,
+    required this.limitHint,
+    required this.onToggle,
+    required this.onReorder,
+    required this.onReset,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pinned = prefs.pinnedDestinations;
+    final available = AppDestinations.all
+        .where((d) =>
+            d.isPinnable && d.branchIndex! < branchCount && !prefs.pinned.contains(d.id))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+          child: AnimatedDefaultTextStyle(
+            duration: AppMotion.fast,
+            style: TextStyle(
+              color: limitHint ? OledTheme.coral : OledTheme.textMuted,
+              fontSize: 11.5,
+              height: 1.35,
+            ),
+            child: const Text('Drag to reorder. Keep 2–4 tabs in the bar.'),
+          ),
+        ),
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          itemCount: pinned.length,
+          onReorder: onReorder,
+          proxyDecorator: (child, index, animation) => AnimatedBuilder(
+            animation: animation,
+            builder: (context, child) => Transform.scale(
+              scale: 1 + 0.03 * Curves.easeOut.transform(animation.value),
+              child: child,
+            ),
+            child: Material(color: Colors.transparent, child: child),
+          ),
+          itemBuilder: (context, i) {
+            final d = pinned[i];
+            return _EditRow(
+              key: ValueKey('pinned_${d.id}'),
+              destination: d,
+              pinned: true,
+              index: i,
+              onToggle: () => onToggle(d.id),
+            );
+          },
+        ),
+        if (available.isNotEmpty) ...[
+          const Padding(
+            padding: EdgeInsets.fromLTRB(10, 10, 10, 6),
+            child: Text(
+              'More tabs',
+              style: TextStyle(
+                color: OledTheme.textMuted,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          for (final d in available)
+            _EditRow(
+              key: ValueKey('avail_${d.id}'),
+              destination: d,
+              pinned: false,
+              onToggle: () => onToggle(d.id),
+            ),
+        ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 4, top: 4),
+            child: _TextAction(label: 'Reset to default', onTap: onReset),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EditRow extends StatelessWidget {
+  final AppDestination destination;
+  final bool pinned;
+  final int? index;
+  final VoidCallback onToggle;
+
+  const _EditRow({
+    super.key,
+    required this.destination,
+    required this.pinned,
+    required this.onToggle,
+    this.index,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: pinned ? const Color(0x0FFFFFFF) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onToggle();
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(
+                pinned ? LucideIcons.minusCircle : LucideIcons.plusCircle,
+                size: 18,
+                color: pinned ? OledTheme.coral : OledTheme.emerald,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Icon(destination.icon, size: 15, color: OledTheme.textSecondary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              destination.label,
+              style: const TextStyle(
+                color: OledTheme.textPrimary,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          if (pinned && index != null)
+            ReorderableDragStartListener(
+              index: index!,
+              child: const Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(LucideIcons.gripVertical, size: 16, color: OledTheme.textMuted),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GlassModePicker extends StatelessWidget {
+  final GlassMode mode;
+  final ValueChanged<GlassMode> onChanged;
+  const _GlassModePicker({required this.mode, required this.onChanged});
+
+  static const _labels = {
+    GlassMode.auto: 'Auto',
+    GlassMode.full: 'Glass',
+    GlassMode.lite: 'Lite',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final modes = GlassMode.values;
+    final selected = modes.indexOf(mode);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            height: 36,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              color: const Color(0x0FFFFFFF),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: LayoutBuilder(
+              builder: (context, c) {
+                final w = c.maxWidth / modes.length;
+                return Stack(
+                  children: [
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(end: selected.toDouble()),
+                      duration: AppMotion.standard,
+                      curve: AppMotion.enter,
+                      builder: (context, v, child) =>
+                          Transform.translate(offset: Offset(v * w, 0), child: child),
+                      child: Container(
+                        width: w,
+                        height: c.maxHeight,
+                        decoration: BoxDecoration(
+                          color: OledTheme.subtleSurface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: OledTheme.glassBorder, width: 0.6),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        for (final m in modes)
+                          Expanded(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                onChanged(m);
+                              },
+                              child: Center(
+                                child: Text(
+                                  _labels[m]!,
+                                  style: TextStyle(
+                                    color: m == mode
+                                        ? OledTheme.textPrimary
+                                        : OledTheme.textMuted,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.fromLTRB(6, 8, 6, 0),
+            child: Text(
+              'Lite swaps live blur for solid surfaces on slower phones. '
+              'Animations stay the same.',
+              style: TextStyle(color: OledTheme.textMuted, fontSize: 11.5, height: 1.35),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -42,10 +42,10 @@ class MoneyPdfExportDialog extends StatefulWidget {
 }
 
 class _MoneyPdfExportDialogState extends State<MoneyPdfExportDialog> {
-  static const Color _focusFlowBlue = Color(0xFF2F6BFF);
-  static const Color _cardBg = Color(0xFF0E1526);
-  static const Color _borderIdle = Color(0xFF1B2B48);
-  static const Color _textDim = Color(0xFF7E93A8);
+  static const Color _focusFlowBlue = Color(0xFF4F8CFF);
+  static const Color _cardBg = Color(0xFF0D0D0F);
+  static const Color _borderIdle = Color(0xFF222226);
+  static const Color _textDim = Color(0xFFA1A1AA);
 
   bool _isExporting = false;
 
@@ -200,7 +200,7 @@ class _MoneyPdfExportDialogState extends State<MoneyPdfExportDialog> {
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: _focusFlowBlue.withValues(alpha: 0.3),
+                        color: Colors.transparent,
                         blurRadius: 14,
                         offset: const Offset(0, 4),
                       ),
@@ -266,7 +266,7 @@ class _MoneyPdfExportDialogState extends State<MoneyPdfExportDialog> {
             value,
             textAlign: TextAlign.right,
             style: TextStyle(
-              color: isHighlighted ? const Color(0xFF93C5FD) : AppColors.textPrimary,
+              color: isHighlighted ? const Color(0xFF8FB3FF) : AppColors.textPrimary,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),

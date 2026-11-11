@@ -221,7 +221,7 @@ class _PressableCardState extends State<_PressableCard> {
           boxShadow: _isPressed
               ? [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.12),
+                    color: Colors.transparent,
                     blurRadius: 10,
                     offset: const Offset(0, 2),
                   ),

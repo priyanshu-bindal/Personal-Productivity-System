@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'ocean_theme.dart';
+import 'oled_theme.dart';
 
 /// App-wide Centralized Typography System
 /// Headings, Screen Titles, Big Numeric Stats: Space Grotesk
@@ -10,7 +10,7 @@ class AppTextStyles {
   static TextStyle get displayTitle => GoogleFonts.spaceGrotesk(
         fontSize: 22,
         fontWeight: FontWeight.w600,
-        color: OceanTheme.textPrimary,
+        color: OledTheme.textPrimary,
         letterSpacing: -0.5,
         height: 1.3,
       );
@@ -19,7 +19,7 @@ class AppTextStyles {
   static TextStyle get displayHero => GoogleFonts.spaceGrotesk(
         fontSize: 52,
         fontWeight: FontWeight.w700,
-        color: OceanTheme.textPrimary,
+        color: OledTheme.textPrimary,
         letterSpacing: -1.0,
         height: 1.1,
       );
@@ -28,7 +28,7 @@ class AppTextStyles {
   static TextStyle get cardHeadline => GoogleFonts.spaceGrotesk(
         fontSize: 17,
         fontWeight: FontWeight.w600,
-        color: OceanTheme.textPrimary,
+        color: OledTheme.textPrimary,
         letterSpacing: -0.3,
         height: 1.3,
       );
@@ -37,7 +37,7 @@ class AppTextStyles {
   static TextStyle get headingMedium => GoogleFonts.spaceGrotesk(
         fontSize: 18,
         fontWeight: FontWeight.w600,
-        color: OceanTheme.textPrimary,
+        color: OledTheme.textPrimary,
         letterSpacing: -0.3,
         height: 1.3,
       );
@@ -46,7 +46,7 @@ class AppTextStyles {
   static TextStyle get sectionLabel => GoogleFonts.inter(
         fontSize: 12,
         fontWeight: FontWeight.w500,
-        color: OceanTheme.textFaint,
+        color: OledTheme.textMuted,
         letterSpacing: 0.48, // 0.04em
         height: 1.35,
       );
@@ -55,7 +55,7 @@ class AppTextStyles {
   static TextStyle get bodyStrong => GoogleFonts.inter(
         fontSize: 15,
         fontWeight: FontWeight.w600,
-        color: OceanTheme.textPrimary,
+        color: OledTheme.textPrimary,
         height: 1.35,
       );
 
@@ -63,7 +63,7 @@ class AppTextStyles {
   static TextStyle get bodyMedium => GoogleFonts.inter(
         fontSize: 14,
         fontWeight: FontWeight.w400,
-        color: OceanTheme.textPrimary,
+        color: OledTheme.textPrimary,
         height: 1.35,
       );
 
@@ -71,7 +71,7 @@ class AppTextStyles {
   static TextStyle get bodySecondary => GoogleFonts.inter(
         fontSize: 13,
         fontWeight: FontWeight.w500,
-        color: OceanTheme.textDim,
+        color: OledTheme.textSecondary,
         height: 1.35,
       );
 
@@ -79,7 +79,7 @@ class AppTextStyles {
   static TextStyle get labelSmall => GoogleFonts.inter(
         fontSize: 11.5,
         fontWeight: FontWeight.w500,
-        color: OceanTheme.textFaint,
+        color: OledTheme.textMuted,
         height: 1.35,
       );
 
@@ -87,7 +87,7 @@ class AppTextStyles {
   static TextStyle get buttonText => GoogleFonts.inter(
         fontSize: 13,
         fontWeight: FontWeight.w700,
-        color: OceanTheme.bg,
+        color: Colors.white,
         height: 1.2,
       );
 

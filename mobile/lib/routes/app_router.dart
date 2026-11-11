@@ -6,8 +6,7 @@ import '../services/supabase_service.dart';
 import '../features/auth/onboarding_screen.dart';
 import '../features/auth_v2/auth_flow_v2_screen.dart';
 import '../features/auth/email_verification_screen.dart';
-import '../features/auth/widgets/liquid_theme.dart';
-import '../features/auth/widgets/liquid_background.dart';
+import '../core/theme/legacy_messages_theme.dart';
 import '../features/today/today_screen.dart';
 import '../features/skills/skills_screen.dart';
 import '../features/skills/skill_detail_screen.dart';
@@ -46,8 +45,12 @@ final _authRefreshNotifier = _GoRouterRefreshStream(
 /// Global route observer enabling RouteAware subscription across tabs and pushed screens
 final appRouteObserver = RouteObserver<ModalRoute<void>>();
 
+/// Root navigator — detail screens use it to cover the floating navbar.
+final rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/login',
     observers: [appRouteObserver],
     // refreshListenable makes GoRouter re-run redirect on every auth state change
@@ -72,18 +75,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Persistent Auth Shell with shared LiquidBackground
       ShellRoute(
         builder: (context, state, child) {
-          final reducedMotion = MediaQuery.of(context).disableAnimations;
-          return Scaffold(
-            backgroundColor: LiquidTheme.mainBackground,
-            body: Stack(
-              children: [
-                Positioned.fill(
-                  child: LiquidBackground(reducedMotion: reducedMotion),
-                ),
-                child,
-              ],
-            ),
-          );
+          // Static OLED canvas. (The old animated painter here ran forever
+          // behind opaque auth screens — pure wasted GPU on slow phones.)
+          return ColoredBox(color: Colors.black, child: child);
         },
         routes: [
           // Onboarding — shared continuous LiquidBackground, pure fade+scale transition
@@ -123,12 +117,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Bottom Navigation Shell with smooth entrance transition
-      StatefulShellRoute.indexedStack(
+      // Main app shell — every pinnable tab is a branch so it can live in the
+      // bottom bar or the sidebar. Tab switches cross-fade smoothly.
+      StatefulShellRoute(
         pageBuilder: (context, state, navigationShell) =>
             LiquidPageTransition.appShell(
           key: state.pageKey,
           child: ScaffoldWithNavBar(navigationShell: navigationShell),
+        ),
+        navigatorContainerBuilder: (context, navigationShell, children) =>
+            AnimatedBranchContainer(
+          currentIndex: navigationShell.currentIndex,
+          children: [
+            for (var i = 0; i < children.length; i++)
+              // Notes & Money weren't designed around a floating bar; give them
+              // a bottom inset so their lists and FABs clear it.
+              (i == 4 || i == 5) ? NavBarSafeInset(child: children[i]) : children[i],
+          ],
         ),
         branches: [
           StatefulShellBranch(
@@ -147,34 +152,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: ':id',
-                    pageBuilder: (context, state) {
-                      final id = state.pathParameters['id']!;
-                      return CustomTransitionPage(
-                        key: state.pageKey,
-                        child: SkillDetailScreen(skillId: id),
-                        transitionsBuilder:
-                            (context, animation, secondaryAnimation, child) {
-                          final curved = CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOutCubic,
-                            reverseCurve: Curves.easeInCubic,
-                          );
-                          return FadeTransition(
-                            opacity:
-                                Tween<double>(begin: 0.0, end: 1.0).animate(curved),
-                            child: SlideTransition(
-                              position: Tween<Offset>(
-                                begin: const Offset(0.06, 0),
-                                end: Offset.zero,
-                              ).animate(curved),
-                              child: child,
-                            ),
-                          );
-                        },
-                        transitionDuration: const Duration(milliseconds: 250),
-                        reverseTransitionDuration: const Duration(milliseconds: 220),
-                      );
-                    },
+                    builder: (context, state) =>
+                        SkillDetailScreen(skillId: state.pathParameters['id']!),
                   ),
                 ],
               ),
@@ -196,137 +175,79 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ],
           ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/notes',
+                builder: (context, state) => const NotesScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/money',
+                builder: (context, state) => const MoneyScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'category/:category',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) => CategoryTransactionsScreen(
+                      category: state.pathParameters['category'] ?? '',
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'trash',
+                    parentNavigatorKey: rootNavigatorKey,
+                    builder: (context, state) => const TrashScreen(),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/settings',
+                builder: (context, state) => const SettingsScreen(),
+              ),
+            ],
+          ),
         ],
       ),
 
-      // Sub-routes outside shell
-      GoRoute(
-        path: '/notes',
-        builder: (context, state) => const NotesScreen(),
-      ),
-      GoRoute(
-        path: '/money',
-        builder: (context, state) => const MoneyScreen(),
-        routes: [
-          GoRoute(
-            path: 'category/:category',
-            pageBuilder: (context, state) {
-              final category = state.pathParameters['category'] ?? '';
-              return CustomTransitionPage(
-                key: state.pageKey,
-                child: CategoryTransactionsScreen(category: category),
-                transitionsBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                  final curved = CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                    reverseCurve: Curves.easeInCubic,
-                  );
-                  return FadeTransition(
-                    opacity:
-                        Tween<double>(begin: 0.0, end: 1.0).animate(curved),
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0.06, 0),
-                        end: Offset.zero,
-                      ).animate(curved),
-                      child: child,
-                    ),
-                  );
-                },
-                transitionDuration: const Duration(milliseconds: 250),
-                reverseTransitionDuration: const Duration(milliseconds: 220),
-              );
-            },
-          ),
-          GoRoute(
-            path: 'trash',
-            pageBuilder: (context, state) {
-              return CustomTransitionPage(
-                key: state.pageKey,
-                child: const TrashScreen(),
-                transitionsBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                  final curved = CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeOutCubic,
-                    reverseCurve: Curves.easeInCubic,
-                  );
-                  return FadeTransition(
-                    opacity:
-                        Tween<double>(begin: 0.0, end: 1.0).animate(curved),
-                    child: SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(0.06, 0),
-                        end: Offset.zero,
-                      ).animate(curved),
-                      child: child,
-                    ),
-                  );
-                },
-                transitionDuration: const Duration(milliseconds: 250),
-                reverseTransitionDuration: const Duration(milliseconds: 220),
-              );
-            },
-          ),
-        ],
-      ),
+      // Messages — intentionally unchanged: pushed full-screen with its
+      // original theme and stock page transition.
       GoRoute(
         path: '/messages',
-        builder: (context, state) => const MessagesScreen(),
+        pageBuilder: (context, state) => PlatformDefaultPage(
+          key: state.pageKey,
+          child: const MessagesScreen(),
+        ),
         routes: [
           GoRoute(
             path: 'new',
-            builder: (context, state) => const NewMessageScreen(),
+            pageBuilder: (context, state) => PlatformDefaultPage(
+              key: state.pageKey,
+              child: const NewMessageScreen(),
+            ),
           ),
           GoRoute(
             path: 'chat/:id',
-            builder: (context, state) {
+            pageBuilder: (context, state) {
               final id = state.pathParameters['id']!;
               final extra = state.extra as Map<String, dynamic>?;
-              return ChatScreen(
-                conversationId: id,
-                otherChatId: extra?['otherChatId'] as String?,
-                otherDisplayName: extra?['otherDisplayName'] as String?,
+              return PlatformDefaultPage(
+                key: state.pageKey,
+                child: ChatScreen(
+                  conversationId: id,
+                  otherChatId: extra?['otherChatId'] as String?,
+                  otherDisplayName: extra?['otherDisplayName'] as String?,
+                ),
               );
             },
           ),
         ],
-      ),
-      GoRoute(
-        path: '/settings',
-        pageBuilder: (context, state) {
-          return CustomTransitionPage(
-            key: state.pageKey,
-            child: const SettingsScreen(),
-            // Exact mirror transition:
-            // OPEN:  opacity 0.85 → 1.0, offset 14px below → 0, Curves.easeOutCubic (300ms)
-            // CLOSE: opacity 1.0 → 0.85, offset 0 → 14px below, Curves.easeInCubic (250ms)
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              final curved = CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutCubic,
-                reverseCurve: Curves.easeInCubic,
-              );
-              final screenHeight = MediaQuery.sizeOf(context).height;
-              final dy = 14.0 / (screenHeight > 0 ? screenHeight : 800.0);
-
-              return FadeTransition(
-                opacity: Tween<double>(begin: 0.85, end: 1.0).animate(curved),
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: Offset(0.0, dy),
-                    end: Offset.zero,
-                  ).animate(curved),
-                  child: child,
-                ),
-              );
-            },
-            transitionDuration: const Duration(milliseconds: 300),
-            reverseTransitionDuration: const Duration(milliseconds: 250),
-          );
-        },
       ),
     ],
   );

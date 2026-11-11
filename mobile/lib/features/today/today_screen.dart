@@ -169,7 +169,7 @@ class TodayScreen extends ConsumerWidget {
                             const StreakButton(),
                             const SizedBox(width: 10),
                             PressableScale(
-                              onTap: () => context.push('/settings'),
+                              onTap: () => context.go('/settings'),
                               child: Container(
                                 width: 44,
                                 height: 44,
@@ -182,7 +182,7 @@ class TodayScreen extends ConsumerWidget {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: _TodayPalette.blueElectric.withValues(alpha: 0.12),
+                                      color: Colors.transparent,
                                       blurRadius: 10,
                                       offset: const Offset(0, 2),
                                     ),
@@ -574,8 +574,7 @@ class _TodayProgressHeroCardState extends State<_TodayProgressHeroCard>
             offset: Offset(0, 8),
           ),
           BoxShadow(
-            color: (isAllDone ? _TodayPalette.emerald : _TodayPalette.blueElectric)
-                .withValues(alpha: 0.08),
+            color: Colors.transparent,
             blurRadius: 20,
             spreadRadius: 0,
           ),
@@ -1079,7 +1078,7 @@ class _TodaySessionCardState extends State<_TodaySessionCard>
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: accent.withValues(alpha: 0.35),
+                                color: Colors.transparent,
                                 blurRadius: 10,
                                 offset: const Offset(0, 2),
                               ),

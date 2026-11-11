@@ -112,7 +112,7 @@ class _StreakButtonState extends ConsumerState<StreakButton>
               ),
               boxShadow: [
                 BoxShadow(
-                  color: OledTheme.amber.withValues(alpha: 0.12),
+                  color: Colors.transparent,
                   blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),

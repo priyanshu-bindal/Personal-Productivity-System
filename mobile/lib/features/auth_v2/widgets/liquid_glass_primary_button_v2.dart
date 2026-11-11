@@ -2,188 +2,205 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Premium iOS-inspired Liquid Glass Primary Button V2.
-/// Features:
-/// - Exact 54px height & 15px border radius
-/// - #2F6BFF deep blue glass gradient with restrained luminous depth
-/// - Subtle top specular reflection line
-/// - Restrained soft blue shadow (zero excessive neon)
-/// - White Space Grotesk w700 typography
-/// - Micro-scale press response (1.0 → 0.98 → 1.0, 120ms easeOutCubic, no bounce) with light haptic feedback
-/// - Loading state preserves exact button dimensions and blocks duplicate taps
+import '../../../core/theme/app_motion.dart';
+import '../../../core/theme/oled_theme.dart';
+
+/// Solid accent primary button. Press = quick scale + tone shift,
+/// loading = label cross-fades into a spinner. No glow.
 class LiquidGlassPrimaryButtonV2 extends StatefulWidget {
   final String label;
   final VoidCallback? onTap;
   final bool isLoading;
-  final IconData? icon;
+  final IconData? trailingIcon;
 
   const LiquidGlassPrimaryButtonV2({
     super.key,
     required this.label,
-    required this.onTap,
+    this.onTap,
     this.isLoading = false,
-    this.icon,
+    this.trailingIcon,
   });
 
   @override
-  State<LiquidGlassPrimaryButtonV2> createState() =>
-      _LiquidGlassPrimaryButtonV2State();
+  State<LiquidGlassPrimaryButtonV2> createState() => _LiquidGlassPrimaryButtonV2State();
 }
 
-class _LiquidGlassPrimaryButtonV2State
-    extends State<LiquidGlassPrimaryButtonV2> {
-  bool _isPressed = false;
+class _LiquidGlassPrimaryButtonV2State extends State<LiquidGlassPrimaryButtonV2> {
+  bool _pressed = false;
 
-  void _handleTapDown(TapDownDetails _) {
-    if (widget.isLoading || widget.onTap == null) return;
-    HapticFeedback.lightImpact();
-    setState(() => _isPressed = true);
-  }
+  bool get _enabled => widget.onTap != null && !widget.isLoading;
 
-  void _handleTapUp(TapUpDetails _) {
-    if (widget.isLoading || widget.onTap == null) return;
-    setState(() => _isPressed = false);
-  }
-
-  void _handleTapCancel() {
-    if (widget.isLoading || widget.onTap == null) return;
-    setState(() => _isPressed = false);
+  void _set(bool v) {
+    if (_pressed != v) setState(() => _pressed = v);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDisabled = widget.onTap == null && !widget.isLoading;
-    final scale = _isPressed ? 0.98 : 1.0;
+    final color = _pressed ? const Color(0xFF3F7BEA) : OledTheme.accent;
 
     return Semantics(
       button: true,
-      enabled: !isDisabled,
+      enabled: _enabled,
       label: widget.label,
-      child: AnimatedScale(
-        scale: scale,
-        duration: const Duration(milliseconds: 120),
-        curve: Curves.easeOutCubic,
-        child: GestureDetector(
-          onTapDown: _handleTapDown,
-          onTapUp: _handleTapUp,
-          onTapCancel: _handleTapCancel,
-          onTap: widget.isLoading ? null : widget.onTap,
-          behavior: HitTestBehavior.opaque,
-          child: Container(
-          height: 54, // Consistent 54px height across all states
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15),
-            // Restrained soft blue elevation glow
-            boxShadow: isDisabled
-                ? null
-                : const [
-                    BoxShadow(
-                      color: Color(0x382F6BFF), // Soft blue glow
-                      blurRadius: 20,
-                      spreadRadius: -2,
-                      offset: Offset(0, 6),
-                    ),
-                    BoxShadow(
-                      color: Color(0x18000000),
-                      blurRadius: 6,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-            // Deep glass blue gradient
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: isDisabled
-                  ? [
-                      const Color(0xFF1E293B),
-                      const Color(0xFF0F172A),
-                    ]
-                  : [
-                      const Color(0xFF3D7FFF), // Luminous top catch
-                      const Color(0xFF2F6BFF), // FocusFlow primary blue
-                      const Color(0xFF1E58E8), // Rich bottom anchor
-                    ],
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: _enabled ? (_) => _set(true) : null,
+        onTapUp: _enabled ? (_) => _set(false) : null,
+        onTapCancel: () => _set(false),
+        onTap: _enabled
+            ? () {
+                HapticFeedback.lightImpact();
+                widget.onTap!();
+              }
+            : null,
+        child: AnimatedScale(
+          scale: _pressed ? 0.975 : 1.0,
+          duration: AppMotion.instant,
+          curve: AppMotion.press,
+          child: AnimatedContainer(
+            duration: AppMotion.fast,
+            height: 54,
+            decoration: BoxDecoration(
+              color: widget.isLoading ? OledTheme.accent.withValues(alpha: 0.75) : color,
+              borderRadius: BorderRadius.circular(14),
             ),
-            // Subtle top highlight reflection border
-            border: Border.all(
-              color: isDisabled
-                  ? const Color(0xFF334155)
-                  : const Color(0xFF6B9CFF).withValues(alpha: 0.50),
-              width: 1.0,
-            ),
-          ),
-          child: Stack(
             alignment: Alignment.center,
-            children: [
-              // Subtle top internal specular highlight line
-              if (!isDisabled)
-                Positioned(
-                  top: 0,
-                  left: 20,
-                  right: 20,
-                  height: 1,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.transparent,
-                          Colors.white.withValues(alpha: 0.40),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
+            child: AnimatedSwitcher(
+              duration: AppMotion.fast,
+              switchInCurve: AppMotion.standardCurve,
+              transitionBuilder: (child, a) => FadeTransition(
+                opacity: a,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.9, end: 1).animate(a),
+                  child: child,
                 ),
-
-              // Button Content: Loading spinner or Label + Icon
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 180),
-                child: widget.isLoading
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (widget.icon != null) ...[
-                                Icon(
-                                  widget.icon,
-                                  size: 18,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 8),
-                              ],
-                              Text(
-                                widget.label,
-                                style: GoogleFonts.spaceGrotesk(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                  letterSpacing: 0.2,
-                                ),
-                              ),
-                            ],
+              ),
+              child: widget.isLoading
+                  ? const SizedBox(
+                      key: ValueKey('loading'),
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Row(
+                      key: const ValueKey('label'),
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.label,
+                          style: GoogleFonts.inter(
+                            fontSize: 15.5,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            letterSpacing: -0.1,
                           ),
                         ),
-                      ),
-              ),
-            ],
+                        if (widget.trailingIcon != null) ...[
+                          const SizedBox(width: 8),
+                          Icon(widget.trailingIcon, size: 17, color: Colors.white),
+                        ],
+                      ],
+                    ),
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
+
+/// Inline text link used across auth screens.
+class AuthTextLink extends StatefulWidget {
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+  final double fontSize;
+
+  const AuthTextLink({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.color = OledTheme.accent,
+    this.fontSize = 13.5,
+  });
+
+  @override
+  State<AuthTextLink> createState() => _AuthTextLinkState();
+}
+
+class _AuthTextLinkState extends State<AuthTextLink> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: widget.label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          FocusManager.instance.primaryFocus?.unfocus();
+          widget.onTap();
+        },
+        child: AnimatedOpacity(
+          opacity: _pressed ? 0.5 : 1.0,
+          duration: AppMotion.instant,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+            child: Text(
+              widget.label,
+              style: GoogleFonts.inter(
+                fontSize: widget.fontSize,
+                fontWeight: FontWeight.w600,
+                color: widget.color,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Error banner shared by auth forms.
+class AuthErrorBanner extends StatelessWidget {
+  final String? message;
+  const AuthErrorBanner({super.key, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSize(
+      duration: AppMotion.fast,
+      curve: AppMotion.standardCurve,
+      alignment: Alignment.topCenter,
+      child: message == null
+          ? const SizedBox(width: double.infinity)
+          : Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: OledTheme.coral.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: OledTheme.coral.withValues(alpha: 0.28)),
+              ),
+              child: Text(
+                message!,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFFFF9A9A),
+                  height: 1.35,
+                ),
+              ),
+            ),
+    );
+  }
 }

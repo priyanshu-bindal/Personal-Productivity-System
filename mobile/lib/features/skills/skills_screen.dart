@@ -114,7 +114,7 @@ class SkillsScreen extends ConsumerWidget {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: OledTheme.cyan.withValues(alpha: 0.15),
+                                  color: Colors.transparent,
                                   blurRadius: 12,
                                   offset: const Offset(0, 2),
                                 ),
@@ -250,7 +250,7 @@ class SkillsScreen extends ConsumerWidget {
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: OledTheme.cyan.withValues(alpha: 0.15),
+                                      color: Colors.transparent,
                                       blurRadius: 12,
                                       offset: const Offset(0, 2),
                                     ),

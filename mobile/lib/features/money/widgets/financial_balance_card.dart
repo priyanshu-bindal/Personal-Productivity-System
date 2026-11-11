@@ -62,7 +62,7 @@ class FinancialBalanceCard extends ConsumerWidget {
           ),
           if (hasOptimistic)
             BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.08),
+              color: Colors.transparent,
               blurRadius: 24,
               offset: const Offset(0, 4),
             ),

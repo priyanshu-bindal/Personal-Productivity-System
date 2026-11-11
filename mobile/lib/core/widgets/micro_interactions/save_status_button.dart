@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-import '../../theme/app_colors.dart';
 import '../pressable_scale.dart';
 
 enum SaveButtonState {
@@ -141,7 +140,7 @@ class _SaveStatusButtonState extends State<SaveStatusButton>
       ),
       boxShadow: [
         BoxShadow(
-          color: AppColors.primary.withValues(alpha: 0.28),
+          color: Colors.transparent,
           blurRadius: 16,
           offset: const Offset(0, 4),
         ),

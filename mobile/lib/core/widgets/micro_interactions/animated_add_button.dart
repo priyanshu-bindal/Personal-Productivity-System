@@ -113,7 +113,7 @@ class _AnimatedAddButtonState extends State<AnimatedAddButton> {
           border: widget.border,
           boxShadow: [
             BoxShadow(
-              color: currentBg.withValues(alpha: 0.3),
+              color: Colors.transparent,
               blurRadius: 12,
               offset: const Offset(0, 3),
             ),

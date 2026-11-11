@@ -104,7 +104,7 @@ class _FloatingAmountIndicatorState extends State<FloatingAmountIndicator>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: color.withValues(alpha: 0.18),
+                      color: Colors.transparent,
                       blurRadius: 12,
                       offset: const Offset(0, 4),
                     ),

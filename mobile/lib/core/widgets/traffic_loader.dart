@@ -70,7 +70,7 @@ class _TrafficLoaderState extends State<TrafficLoader>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: colors[index].withValues(alpha: opacity * 0.5),
+                        color: Colors.transparent,
                         blurRadius: widget.size * 0.8,
                         spreadRadius: widget.size * 0.2,
                       ),

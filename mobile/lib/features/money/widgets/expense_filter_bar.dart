@@ -13,10 +13,10 @@ import 'transaction_list_item.dart';
 class ExpenseFilterBar extends ConsumerWidget {
   const ExpenseFilterBar({super.key});
 
-  static const Color _focusFlowBlue = Color(0xFF2F6BFF);
-  static const Color _cardBg = Color(0xFF0E1526);
-  static const Color _borderIdle = Color(0xFF1B2B48);
-  static const Color _textDim = Color(0xFF7E93A8);
+  static const Color _focusFlowBlue = Color(0xFF4F8CFF);
+  static const Color _cardBg = Color(0xFF0D0D0F);
+  static const Color _borderIdle = Color(0xFF222226);
+  static const Color _textDim = Color(0xFFA1A1AA);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -224,7 +224,7 @@ class ExpenseFilterBar extends ConsumerWidget {
                             Text(
                               '${filterState.activeFilterCount} ${filterState.activeFilterCount == 1 ? 'filter' : 'filters'} active',
                               style: const TextStyle(
-                                color: Color(0xFF93C5FD),
+                                color: Color(0xFF8FB3FF),
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -296,7 +296,7 @@ class ExpenseFilterBar extends ConsumerWidget {
           boxShadow: hasActive
               ? [
                   BoxShadow(
-                    color: _focusFlowBlue.withValues(alpha: 0.25),
+                    color: Colors.transparent,
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -367,7 +367,7 @@ class ExpenseFilterBar extends ConsumerWidget {
           boxShadow: isActive
               ? [
                   BoxShadow(
-                    color: _focusFlowBlue.withValues(alpha: 0.3),
+                    color: Colors.transparent,
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -466,10 +466,10 @@ class _AdvancedFilterSheetContent extends StatefulWidget {
 
 class _AdvancedFilterSheetContentState
     extends State<_AdvancedFilterSheetContent> {
-  static const Color _focusFlowBlue = Color(0xFF2F6BFF);
-  static const Color _borderIdle = Color(0xFF1B2B48);
-  static const Color _cardBg = Color(0xFF0E1526);
-  static const Color _textDim = Color(0xFF7E93A8);
+  static const Color _focusFlowBlue = Color(0xFF4F8CFF);
+  static const Color _borderIdle = Color(0xFF222226);
+  static const Color _cardBg = Color(0xFF0D0D0F);
+  static const Color _textDim = Color(0xFFA1A1AA);
 
   late QuickDateFilter _dateFilter;
   late DateTimeRange? _customRange;
@@ -514,7 +514,7 @@ class _AdvancedFilterSheetContentState
             colorScheme: const ColorScheme.dark(
               primary: _focusFlowBlue,
               onPrimary: Colors.white,
-              surface: Color(0xFF0E1526),
+              surface: Color(0xFF0D0D0F),
               onSurface: Colors.white,
             ),
           ),
@@ -541,7 +541,7 @@ class _AdvancedFilterSheetContentState
         color: Color(0xFF0A1120),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         border: Border(
-          top: BorderSide(color: Color(0xFF172A46), width: 1),
+          top: BorderSide(color: Color(0xFF222226), width: 1),
         ),
       ),
       child: SafeArea(
@@ -599,7 +599,7 @@ class _AdvancedFilterSheetContentState
               ),
             ),
             const SizedBox(height: 12),
-            const Divider(color: Color(0xFF172A46), height: 1),
+            const Divider(color: Color(0xFF222226), height: 1),
 
             // Scrollable Filter Sections
             Flexible(
@@ -800,7 +800,7 @@ class _AdvancedFilterSheetContentState
               decoration: const BoxDecoration(
                 color: Color(0xFF080E1C),
                 border: Border(
-                  top: BorderSide(color: Color(0xFF172A46), width: 1),
+                  top: BorderSide(color: Color(0xFF222226), width: 1),
                 ),
               ),
               child: Row(
@@ -858,7 +858,7 @@ class _AdvancedFilterSheetContentState
                           borderRadius: BorderRadius.circular(14),
                           boxShadow: [
                             BoxShadow(
-                              color: _focusFlowBlue.withValues(alpha: 0.35),
+                              color: Colors.transparent,
                               blurRadius: 10,
                               offset: const Offset(0, 2),
                             ),
@@ -919,7 +919,7 @@ class _AdvancedFilterSheetContentState
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: _focusFlowBlue.withValues(alpha: 0.3),
+                    color: Colors.transparent,
                     blurRadius: 6,
                     offset: const Offset(0, 1),
                   ),

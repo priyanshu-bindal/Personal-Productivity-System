@@ -101,7 +101,7 @@ class _SetBudgetSheetState extends State<SetBudgetSheet> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.15),
+                    color: Colors.transparent,
                     blurRadius: 12,
                     offset: const Offset(0, 3),
                   ),

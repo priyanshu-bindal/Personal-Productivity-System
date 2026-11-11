@@ -234,7 +234,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                 boxShadow: _isAmountFocused
                     ? [
                         BoxShadow(
-                          color: AppColors.secondary.withValues(alpha: 0.14),
+                          color: Colors.transparent,
                           blurRadius: 14,
                           offset: const Offset(0, 3),
                         ),
@@ -523,7 +523,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.28),
+                      color: Colors.transparent,
                       blurRadius: 16,
                       offset: const Offset(0, 4),
                     ),

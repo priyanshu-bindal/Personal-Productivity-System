@@ -65,7 +65,7 @@ class MoneyEmptyState extends StatelessWidget {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: accentColor.withValues(alpha: 0.12),
+                      color: Colors.transparent,
                       blurRadius: 16,
                       spreadRadius: 0,
                     ),
