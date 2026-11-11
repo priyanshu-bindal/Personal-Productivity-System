@@ -54,6 +54,8 @@ key.properties
 keystore.properties
 **/key.properties
 **/keystore.properties
+*.apk
+*.aab
 
 # iOS Generated / Pods Files
 mobile/ios/Pods/
