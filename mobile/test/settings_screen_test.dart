@@ -213,7 +213,7 @@ void main() {
     expect(find.text('Cancel deletion'), findsOneWidget);
   });
 
-  testWidgets('About section contains Version 1.0.0, Privacy Policy, Terms of Service, and NOT Open Source Licenses', (tester) async {
+  testWidgets('About section contains Version 1.0.1, Privacy Policy, Terms of Service, and NOT Open Source Licenses', (tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.0;
     addTearDown(tester.view.resetPhysicalSize);
@@ -243,7 +243,7 @@ void main() {
     await tester.scrollUntilVisible(find.text('ABOUT'), 200);
 
     expect(find.text('FocusFlow'), findsOneWidget);
-    expect(find.text('Version 1.0.0'), findsOneWidget);
+    expect(find.text('Version 1.0.1'), findsOneWidget);
     expect(find.text('Privacy Policy'), findsOneWidget);
     expect(find.text('Terms of Service'), findsOneWidget);
     expect(find.text('Open Source Licenses'), findsNothing);

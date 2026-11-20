@@ -5,7 +5,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/ocean_theme.dart';
+import '../../core/widgets/pressable_scale.dart';
 import '../../models/expense.dart';
 import 'widgets/financial_dropdown_field.dart';
 import 'widgets/transaction_list_item.dart';
@@ -29,7 +29,10 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
   final _amountController = TextEditingController();
   final _descController = TextEditingController();
   final _noteController = TextEditingController();
+
   final _amountFocusNode = FocusNode();
+  final _descFocusNode = FocusNode();
+  final _noteFocusNode = FocusNode();
 
   late String _selectedCategory;
   late String _selectedPaymentMethod;
@@ -37,9 +40,20 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
 
   bool _isSubmitting = false;
   bool _isAmountFocused = false;
+  bool _isDescFocused = false;
+  bool _isNoteFocused = false;
   bool _hasRequestedFocus = false;
 
   final List<double> _quickAmounts = [100, 250, 500, 1000, 2000];
+
+  // Design Tokens (Refined Dark Palette - No Bright Glow)
+  static const Color _surfaceCard = Color(0xFF16161B);
+  static const Color _borderColor = Color(0xFF26262C);
+  static const Color _borderActive = Color(0xFF3B82F6);
+  static const Color _textPrimary = Color(0xFFF4F4F5);
+  static const Color _textSecondary = Color(0xFFA1A1AA);
+  static const Color _textMuted = Color(0xFF71717A);
+  static const Color _accent = Color(0xFF3B82F6);
 
   @override
   void initState() {
@@ -53,7 +67,8 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
       _descController.text = exp.description;
       _noteController.text = exp.note ?? '';
       _selectedCategory = exp.category.toLowerCase();
-      _selectedPaymentMethod = exp.paymentMethod.toLowerCase().replaceAll(' ', '_');
+      _selectedPaymentMethod =
+          exp.paymentMethod.toLowerCase().replaceAll(' ', '_');
       _selectedDate = DateTime.tryParse(exp.expenseDate) ?? DateTime.now();
     } else {
       final initCat = widget.initialCategory?.trim().toLowerCase();
@@ -69,8 +84,13 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
     }
 
     _amountFocusNode.addListener(_handleAmountFocusChange);
+    _descFocusNode.addListener(() {
+      if (mounted) setState(() => _isDescFocused = _descFocusNode.hasFocus);
+    });
+    _noteFocusNode.addListener(() {
+      if (mounted) setState(() => _isNoteFocused = _noteFocusNode.hasFocus);
+    });
 
-    // Focus amount field exactly once after modal is mounted
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && !_hasRequestedFocus) {
         _hasRequestedFocus = true;
@@ -96,16 +116,25 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
     _descController.dispose();
     _noteController.dispose();
     _amountFocusNode.dispose();
+    _descFocusNode.dispose();
+    _noteFocusNode.dispose();
     super.dispose();
   }
 
   void _addQuickAmount(double val) {
+    HapticFeedback.selectionClick();
     final current = double.tryParse(_amountController.text.trim()) ?? 0.0;
     final total = (current + val).toStringAsFixed(0);
     _amountController.text = total;
     _amountController.selection = TextSelection.fromPosition(
       TextPosition(offset: _amountController.text.length),
     );
+    setState(() {});
+  }
+
+  void _clearAmount() {
+    HapticFeedback.lightImpact();
+    _amountController.clear();
     setState(() {});
   }
 
@@ -143,12 +172,23 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
     }
   }
 
+  String _formatQuickAmount(double val) {
+    if (val >= 1000) {
+      final k = val / 1000;
+      return k == k.roundToDouble()
+          ? '+₹${k.toInt()}k'
+          : '+₹${k.toStringAsFixed(1)}k';
+    }
+    return '+₹${val.toInt()}';
+  }
+
   void _submit() {
     if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
 
     final amount = double.tryParse(_amountController.text.trim());
     if (amount == null || amount <= 0) {
+      HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Amount must be greater than ₹0.'),
@@ -158,6 +198,7 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
       return;
     }
 
+    HapticFeedback.mediumImpact();
     setState(() => _isSubmitting = true);
 
     final desc = _descController.text.trim().isNotEmpty
@@ -175,7 +216,6 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
           : null,
     };
 
-    // Dismiss keyboard cleanly before popping to avoid flash
     _amountFocusNode.unfocus();
     FocusScope.of(context).unfocus();
     SystemChannels.textInput.invokeMethod('TextInput.hide');
@@ -184,113 +224,391 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // Build category items
     final categoryItems = AppConstants.expenseCategories.map((c) {
       final label = c[0].toUpperCase() + c.substring(1);
       final icon = TransactionListItem.getCategoryIcon(c);
-      final iconColor = TransactionListItem.getCategoryColor(c);
       return FinancialDropdownItem<String>(
         value: c,
         label: label,
         icon: icon,
-        iconColor: iconColor,
+        iconColor: _textSecondary,
       );
     }).toList();
 
-    // Build payment items
     final paymentItems = AppConstants.paymentMethods.map((m) {
       return FinancialDropdownItem<String>(
         value: m,
         label: _getPaymentLabel(m),
         icon: _getPaymentIcon(m),
-        iconColor: AppColors.secondary,
+        iconColor: _textSecondary,
       );
     }).toList();
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // UNIFIED AMOUNT INPUT COMPONENT (Single clean border with smooth focus animation)
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: _isAmountFocused
-                    ? OceanTheme.cardHi.withValues(alpha: 0.85)
-                    : OceanTheme.card.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: _isAmountFocused
-                      ? AppColors.secondary.withValues(alpha: 0.8)
-                      : AppColors.border,
-                  width: _isAmountFocused ? 1.4 : 1.0,
-                ),
-                boxShadow: _isAmountFocused
-                    ? [
-                        BoxShadow(
-                          color: Colors.transparent,
-                          blurRadius: 14,
-                          offset: const Offset(0, 3),
-                        ),
-                      ]
-                    : const [
-                        BoxShadow(
-                          color: Color(0x20000000),
-                          blurRadius: 6,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── 1. Hero Amount Card ──────────────────────────────────────
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: _surfaceCard,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _isAmountFocused ? _borderActive : _borderColor,
+                width: _isAmountFocused ? 1.2 : 1.0,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'AMOUNT',
-                    style: TextStyle(
-                      color: AppColors.textDim,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.1,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'AMOUNT',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.9,
+                        color: _textMuted,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        '₹ ',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w700,
-                          color: _isAmountFocused
-                              ? AppColors.blueHighlight
-                              : AppColors.secondary,
+                    if (_amountController.text.isNotEmpty)
+                      GestureDetector(
+                        onTap: _clearAmount,
+                        behavior: HitTestBehavior.opaque,
+                        child: const Padding(
+                          padding: EdgeInsets.all(2.0),
+                          child: Row(
+                            children: [
+                              Icon(
+                                LucideIcons.x,
+                                size: 13,
+                                color: _textMuted,
+                              ),
+                              SizedBox(width: 3),
+                              Text(
+                                'Clear',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: _textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      '₹ ',
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w600,
+                        color: _isAmountFocused ? _accent : _textMuted,
+                      ),
+                    ),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _amountController,
+                        focusNode: _amountFocusNode,
+                        autofocus: false,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(
+                          color: _textPrimary,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.5,
+                        ),
+                        cursorColor: _accent,
+                        decoration: const InputDecoration(
+                          hintText: '0',
+                          hintStyle: TextStyle(
+                            color: Color(0xFF3F3F46),
+                            fontSize: 32,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          errorBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          focusedErrorBorder: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Enter an amount.';
+                          }
+                          final parsed = double.tryParse(v.trim());
+                          if (parsed == null) {
+                            return 'Enter a valid amount.';
+                          }
+                          if (parsed <= 0) {
+                            return 'Amount must be greater than ₹0.';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // ── 2. Quick Amount Selector Pills ───────────────────────────
+          Row(
+            children: _quickAmounts.map((amt) {
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2.5),
+                  child: PressableScale(
+                    onTap: () => _addQuickAmount(amt),
+                    scaleFactor: 0.94,
+                    child: Container(
+                      height: 33,
+                      decoration: BoxDecoration(
+                        color: _surfaceCard,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _borderColor, width: 1.0),
+                      ),
+                      child: Center(
+                        child: Text(
+                          _formatQuickAmount(amt),
+                          style: const TextStyle(
+                            color: _textSecondary,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 14),
+
+          // ── 3. Description Input Card ────────────────────────────────
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              color: _surfaceCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _isDescFocused ? _borderActive : _borderColor,
+                width: _isDescFocused ? 1.2 : 1.0,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  LucideIcons.fileText,
+                  size: 16,
+                  color: _isDescFocused ? _accent : _textMuted,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: TextFormField(
+                    controller: _descController,
+                    focusNode: _descFocusNode,
+                    textCapitalization: TextCapitalization.sentences,
+                    style: const TextStyle(
+                      color: _textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    cursorColor: _accent,
+                    decoration: const InputDecoration(
+                      labelText: 'Description',
+                      labelStyle: TextStyle(
+                        color: _textMuted,
+                        fontSize: 13,
+                      ),
+                      hintText: 'What was this for? (e.g. Lunch, Uber)',
+                      hintStyle: TextStyle(
+                        color: Color(0xFF52525B),
+                        fontSize: 13,
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                      floatingLabelBehavior: FloatingLabelBehavior.auto,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // ── 4. Category & Payment Dropdown Row ───────────────────────
+          Row(
+            children: [
+              Expanded(
+                child: FinancialDropdownField<String>(
+                  label: 'Category',
+                  value: _selectedCategory,
+                  items: categoryItems,
+                  onChanged: (val) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _selectedCategory = val);
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FinancialDropdownField<String>(
+                  label: 'Payment',
+                  value: _selectedPaymentMethod,
+                  items: paymentItems,
+                  onChanged: (val) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _selectedPaymentMethod = val);
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // ── 5. Date & Note Row ───────────────────────────────────────
+          Row(
+            children: [
+              // Date Selector
+              Expanded(
+                flex: 4,
+                child: PressableScale(
+                  onTap: () async {
+                    HapticFeedback.selectionClick();
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime.now().add(const Duration(days: 365)),
+                      builder: (context, child) {
+                        return Theme(
+                          data: ThemeData.dark().copyWith(
+                            colorScheme: const ColorScheme.dark(
+                              primary: _accent,
+                              surface: _surfaceCard,
+                              onSurface: _textPrimary,
+                            ),
+                            dialogTheme: const DialogThemeData(
+                              backgroundColor: Color(0xFF16161B),
+                            ),
+                          ),
+                          child: child!,
+                        );
+                      },
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedDate = picked);
+                    }
+                  },
+                  scaleFactor: 0.97,
+                  child: Container(
+                    height: 48,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: _surfaceCard,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _borderColor, width: 1.0),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          LucideIcons.calendar,
+                          color: _textMuted,
+                          size: 15,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            DateFormat('MMM d, yyyy').format(_selectedDate),
+                            style: const TextStyle(
+                              color: _textPrimary,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const Icon(
+                          LucideIcons.chevronDown,
+                          color: _textMuted,
+                          size: 14,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+
+              // Note Input (Optional)
+              Expanded(
+                flex: 5,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  height: 48,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: _surfaceCard,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _isNoteFocused ? _borderActive : _borderColor,
+                      width: _isNoteFocused ? 1.2 : 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        LucideIcons.stickyNote,
+                        color: _isNoteFocused ? _accent : _textMuted,
+                        size: 15,
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: TextFormField(
-                          controller: _amountController,
-                          focusNode: _amountFocusNode,
-                          autofocus: false,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          controller: _noteController,
+                          focusNode: _noteFocusNode,
+                          textCapitalization: TextCapitalization.sentences,
                           style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 32,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.5,
+                            color: _textPrimary,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
                           ),
+                          cursorColor: _accent,
                           decoration: const InputDecoration(
-                            hintText: '0',
+                            hintText: 'Note (Optional)',
                             hintStyle: TextStyle(
-                              color: AppColors.textFaint,
-                              fontSize: 32,
-                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF52525B),
+                              fontSize: 12.5,
                             ),
                             border: InputBorder.none,
                             enabledBorder: InputBorder.none,
@@ -298,244 +616,37 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                             errorBorder: InputBorder.none,
                             disabledBorder: InputBorder.none,
                             focusedErrorBorder: InputBorder.none,
-                            filled: false,
-                            fillColor: Colors.transparent,
                             isDense: true,
                             contentPadding: EdgeInsets.zero,
                           ),
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Enter an amount.';
-                            }
-                            final parsed = double.tryParse(v.trim());
-                            if (parsed == null) {
-                              return 'Enter a valid amount.';
-                            }
-                            if (parsed <= 0) {
-                              return 'Amount must be greater than ₹0.';
-                            }
-                            return null;
-                          },
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Container(
-                    height: 1,
-                    color: _isAmountFocused
-                        ? AppColors.secondary.withValues(alpha: 0.35)
-                        : AppColors.border.withValues(alpha: 0.6),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Quick Amount Selector Chips
-            SizedBox(
-              height: 32,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _quickAmounts.length,
-                separatorBuilder: (context, index) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final amt = _quickAmounts[index];
-                  return InkWell(
-                    onTap: () => _addQuickAmount(amt),
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: OceanTheme.cardHi,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Center(
-                        child: Text(
-                          '+₹${amt.toInt()}',
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Description Input
-            TextFormField(
-              controller: _descController,
-              textCapitalization: TextCapitalization.sentences,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-              decoration: InputDecoration(
-                labelText: 'Description',
-                hintText: 'e.g. Groceries, Team Lunch, Books',
-                hintStyle: const TextStyle(color: AppColors.textFaint, fontSize: 13),
-                prefixIcon: const Icon(LucideIcons.fileText, color: AppColors.textDim, size: 18),
-                filled: true,
-                fillColor: OceanTheme.bg.withValues(alpha: 0.35),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.8)),
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
+            ],
+          ),
+          const SizedBox(height: 22),
 
-            // Premium Custom Dropdown Row: Category & Payment
-            Row(
-              children: [
-                Expanded(
-                  child: FinancialDropdownField<String>(
-                    label: 'Category',
-                    value: _selectedCategory,
-                    items: categoryItems,
-                    onChanged: (val) {
-                      setState(() => _selectedCategory = val);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FinancialDropdownField<String>(
-                    label: 'Payment',
-                    value: _selectedPaymentMethod,
-                    items: paymentItems,
-                    onChanged: (val) {
-                      setState(() => _selectedPaymentMethod = val);
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-
-            // Date Selector
-            InkWell(
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDate,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now().add(const Duration(days: 365)),
-                  builder: (context, child) {
-                    return Theme(
-                      data: ThemeData.dark().copyWith(
-                        colorScheme: const ColorScheme.dark(
-                          primary: AppColors.primary,
-                          surface: OceanTheme.card,
-                        ),
-                      ),
-                      child: child!,
-                    );
-                  },
-                );
-                if (picked != null) setState(() => _selectedDate = picked);
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: OceanTheme.bg.withValues(alpha: 0.35),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(LucideIcons.calendar, color: AppColors.textDim, size: 16),
-                        const SizedBox(width: 10),
-                        Text(
-                          DateFormat('MMMM d, yyyy').format(_selectedDate),
-                          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                    const Icon(LucideIcons.chevronDown, color: AppColors.textDim, size: 16),
-                  ],
-                ),
+          // ── 6. Primary Action CTA Button ─────────────────────────────
+          PressableScale(
+            onTap: _isSubmitting ? null : _submit,
+            scaleFactor: 0.98,
+            child: Container(
+              height: 48,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                color: _accent,
               ),
-            ),
-            const SizedBox(height: 14),
-
-            // Note Field (Optional)
-            TextFormField(
-              controller: _noteController,
-              textCapitalization: TextCapitalization.sentences,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
-              decoration: InputDecoration(
-                labelText: 'Note (Optional)',
-                hintText: 'Add context or tags',
-                hintStyle: const TextStyle(color: AppColors.textFaint, fontSize: 13),
-                prefixIcon: const Icon(LucideIcons.stickyNote, color: AppColors.textDim, size: 18),
-                filled: true,
-                fillColor: OceanTheme.bg.withValues(alpha: 0.35),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.8)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 22),
-
-            // Premium Financial CTA Button
-            InkWell(
-              onTap: _isSubmitting ? null : _submit,
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                height: 52,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(14),
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF14C8A8),
-                      Color(0xFF0F9F86),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.transparent,
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: _isSubmitting
+              child: Center(
+                child: _isSubmitting
                     ? const SizedBox(
-                        width: 20,
-                        height: 20,
+                        width: 18,
+                        height: 18,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
+                          strokeWidth: 2.0,
                           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
@@ -545,9 +656,9 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                           Icon(
                             widget.existingExpense != null
                                 ? LucideIcons.check
-                                : LucideIcons.plusCircle,
+                                : LucideIcons.plus,
                             color: Colors.white,
-                            size: 18,
+                            size: 16,
                           ),
                           const SizedBox(width: 8),
                           Text(
@@ -555,19 +666,18 @@ class _AddExpenseSheetState extends State<AddExpenseSheet> {
                                 ? 'Save Changes'
                                 : 'Add Expense',
                             style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w600,
                               color: Colors.white,
                               letterSpacing: 0.2,
                             ),
                           ),
                         ],
                       ),
-                ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -231,7 +231,7 @@ class FcmNotificationService {
         'platform': defaultTargetPlatform.name,
         'deviceId': deviceId,
         'updatedAt': FieldValue.serverTimestamp(),
-        'appVersion': '1.0.0',
+        'appVersion': '1.0.1',
         'notificationEnabled': userPref,
         'announcementsEnabled': annPref,
         'supabaseUserId': userId,

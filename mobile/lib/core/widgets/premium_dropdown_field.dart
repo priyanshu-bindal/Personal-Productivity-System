@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../theme/app_colors.dart';
-import '../theme/ocean_theme.dart';
 
 class PremiumDropdownItem<T> {
   final T value;
@@ -158,11 +157,11 @@ class _PremiumDropdownFieldState<T> extends State<PremiumDropdownField<T>>
         child: Container(
           constraints: const BoxConstraints(maxHeight: 240),
           decoration: BoxDecoration(
-            color: OceanTheme.cardHi,
+            color: const Color(0xFF16161B),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: AppColors.border.withValues(alpha: 0.9),
-              width: 1.2,
+              color: const Color(0xFF2E2E36),
+              width: 1.0,
             ),
             boxShadow: [
               BoxShadow(
@@ -170,20 +169,7 @@ class _PremiumDropdownFieldState<T> extends State<PremiumDropdownField<T>>
                 blurRadius: 22,
                 offset: const Offset(0, 8),
               ),
-              BoxShadow(
-                color: Colors.transparent,
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
             ],
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                OceanTheme.cardHi,
-                OceanTheme.card,
-              ],
-            ),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(14),
@@ -214,7 +200,7 @@ class _PremiumDropdownFieldState<T> extends State<PremiumDropdownField<T>>
                     ),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? AppColors.secondary.withValues(alpha: 0.14)
+                          ? const Color(0xFF1D263B)
                           : Colors.transparent,
                     ),
                     child: Row(
@@ -342,24 +328,15 @@ class _PremiumDropdownFieldState<T> extends State<PremiumDropdownField<T>>
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           decoration: BoxDecoration(
             color: _isOpen
-                ? OceanTheme.cardHi.withValues(alpha: 0.9)
-                : OceanTheme.bg.withValues(alpha: 0.45),
+                ? const Color(0xFF1B1B22)
+                : const Color(0xFF16161B),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: _isOpen
-                  ? AppColors.secondary.withValues(alpha: 0.75)
-                  : AppColors.border,
-              width: _isOpen ? 1.4 : 1.0,
+                  ? const Color(0xFF3B82F6)
+                  : const Color(0xFF26262C),
+              width: _isOpen ? 1.2 : 1.0,
             ),
-            boxShadow: _isOpen
-                ? [
-                    BoxShadow(
-                      color: Colors.transparent,
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -1506,7 +1506,7 @@ class _AboutCard extends StatelessWidget {
           icon: LucideIcons.info,
           iconColor: _SettingsColors.amber,
           title: 'FocusFlow',
-          subtitle: 'Version 1.0.0',
+          subtitle: 'Version 1.0.1',
         ),
 
         // Privacy Policy
