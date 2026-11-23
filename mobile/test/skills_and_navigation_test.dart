@@ -5,6 +5,7 @@ import 'package:focus_flow/core/widgets/custom_bottom_sheet.dart';
 import 'package:focus_flow/core/widgets/premium_dropdown_field.dart';
 import 'package:focus_flow/providers/chat_provider.dart';
 import 'package:focus_flow/routes/scaffold_with_nav_bar.dart';
+import 'package:focus_flow/widgets/floating_dock.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -317,6 +318,18 @@ void main() {
       await tester.tap(find.text('Money'));
       await tester.pumpAndSettle();
       expect(find.text('MoneyScreenContent'), findsOneWidget);
+
+      final dock = find.byType(FloatingDock);
+      final backdrop = find.descendant(
+        of: dock,
+        matching: find.byType(BackdropFilter),
+      );
+      expect(tester.widget<BackdropFilter>(backdrop).enabled, isTrue);
+
+      await tester.tap(find.text('Today'));
+      await tester.pumpAndSettle();
+      expect(find.text('TodayScreenContent'), findsOneWidget);
+      expect(tester.widget<BackdropFilter>(backdrop).enabled, isTrue);
     });
 
     testWidgets('Cannot unpin below the 2-tab minimum', (WidgetTester tester) async {

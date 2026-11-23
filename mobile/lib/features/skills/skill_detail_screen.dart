@@ -6,6 +6,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/oled_theme.dart';
 import '../../core/widgets/custom_bottom_sheet.dart';
 import '../../models/skill.dart';
 import '../../providers/skills_provider.dart';
@@ -20,7 +21,8 @@ class SkillDetailScreen extends ConsumerWidget {
     final result = await CustomBottomSheet.show<Map<String, dynamic>>(
       context: context,
       title: 'Edit Skill',
-      subtitle: 'Update practice schedule and level',
+      leadingIcon: LucideIcons.bookOpen,
+      accentColor: OledTheme.violet,
       child: AddSkillSheet(
         existingSkillId: skill.id,
         initialName: skill.name,
@@ -31,7 +33,7 @@ class SkillDetailScreen extends ConsumerWidget {
       ),
     );
 
-    if (result != null) {
+    if (result != null && context.mounted) {
       ref.read(skillsProvider.notifier).updateSkill(
             skill.id,
             name: result['name'] as String,

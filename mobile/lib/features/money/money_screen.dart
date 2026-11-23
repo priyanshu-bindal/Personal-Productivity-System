@@ -6,15 +6,19 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/navigation/app_shell_scope.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/ocean_theme.dart';
+import '../../core/theme/oled_theme.dart';
 import '../../core/widgets/custom_bottom_sheet.dart';
 import '../../core/widgets/money_empty_state.dart';
+import '../../core/widgets/pressable_scale.dart';
+import '../../core/widgets/shell_leading_button.dart';
+import '../../core/widgets/trash_confirmation_overlay.dart';
 import '../../models/expense.dart';
 import '../../providers/money_provider.dart';
 import '../../providers/trash_provider.dart';
-import '../../core/widgets/pressable_scale.dart';
-import '../../core/widgets/trash_confirmation_overlay.dart';
+import '../../routes/scaffold_with_nav_bar.dart';
 import 'add_expense_sheet.dart';
 import 'category_transactions_screen.dart';
 import 'models/expense_filter_state.dart';
@@ -25,7 +29,14 @@ import 'widgets/money_pdf_export_dialog.dart';
 import 'widgets/month_selector_bar.dart';
 import 'widgets/spending_trend_chart.dart';
 import 'widgets/transaction_list_item.dart';
-import '../../core/widgets/shell_leading_button.dart';
+
+double _moneyBottomPadding(BuildContext context, double spacing) {
+  if (MediaQuery.viewInsetsOf(context).bottom > 80) return spacing;
+  if (AppShellScope.maybeOf(context) != null) {
+    return spacing + getNavBarClearance(context);
+  }
+  return spacing + MediaQuery.paddingOf(context).bottom;
+}
 
 class MoneyScreen extends ConsumerStatefulWidget {
   const MoneyScreen({super.key});
@@ -83,7 +94,8 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen>
     final result = await CustomBottomSheet.show<Map<String, dynamic>>(
       context: context,
       title: 'Add Expense',
-      subtitle: 'Log spending into your financial record',
+      leadingIcon: LucideIcons.wallet,
+      accentColor: OledTheme.accent,
       child: const AddExpenseSheet(),
     );
 
@@ -209,45 +221,46 @@ class _MoneyScreenState extends ConsumerState<MoneyScreen>
             ),
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: _MoneyTabBar(controller: _tabController),
-          ),
-        ),
       ),
       body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: TabBarView(
-              controller: _tabController,
-              physics: const ClampingScrollPhysics(),
-              children: [
-                _KeepAliveTab(
-                  child: _OverviewTab(
-                    floatingAmount: _lastAddedAmount,
-                    onFloatingComplete: () {
-                      if (mounted) setState(() => _lastAddedAmount = null);
-                    },
-                    onAddTap: _openAddExpenseModal,
-                    onSetBudgetTap: _openSetBudgetModal,
-                    onViewAllExpensesTap: () => _tabController.animateTo(1),
-                  ),
+        bottom: false,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const ClampingScrollPhysics(),
+                  children: [
+                    _KeepAliveTab(
+                      child: _OverviewTab(
+                        floatingAmount: _lastAddedAmount,
+                        onFloatingComplete: () {
+                          if (mounted) setState(() => _lastAddedAmount = null);
+                        },
+                        onAddTap: _openAddExpenseModal,
+                        onSetBudgetTap: _openSetBudgetModal,
+                        onViewAllExpensesTap: () => _tabController.animateTo(1),
+                      ),
+                    ),
+                    _KeepAliveTab(
+                      child: _ExpensesTab(onAddTap: _openAddExpenseModal),
+                    ),
+                    const _KeepAliveTab(child: _CategoriesTab()),
+                  ],
                 ),
-                _KeepAliveTab(
-                  child: _ExpensesTab(
-                    onAddTap: _openAddExpenseModal,
-                  ),
-                ),
-                const _KeepAliveTab(
-                  child: _CategoriesTab(),
-                ),
-              ],
+              ),
             ),
-          ),
+            Positioned(
+              top: _MoneyTabBar.topGap,
+              left: 12,
+              right: 12,
+              child: Center(child: _MoneyTabBar(controller: _tabController)),
+            ),
+          ],
         ),
       ),
     );
@@ -309,7 +322,12 @@ class _OverviewTab extends ConsumerWidget {
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        _MoneyTabBar.contentTop,
+        20,
+        _moneyBottomPadding(context, 32),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -345,12 +363,17 @@ class _OverviewTab extends ConsumerWidget {
                       children: const [
                         Icon(LucideIcons.plusCircle, color: AppColors.primary, size: 16),
                         SizedBox(width: 8),
-                        Text(
-                          'Add Expense',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'Add Expense',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -377,12 +400,17 @@ class _OverviewTab extends ConsumerWidget {
                       children: const [
                         Icon(LucideIcons.target, color: AppColors.secondary, size: 16),
                         SizedBox(width: 8),
-                        Text(
-                          'Set Budget',
-                          style: TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'Set Budget',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -771,7 +799,12 @@ class _ExpensesTab extends ConsumerWidget {
         children: [
           // 1. Search Bar and Export PDF Action Row
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
+            padding: const EdgeInsets.fromLTRB(
+              20,
+              _MoneyTabBar.contentTop,
+              20,
+              10,
+            ),
             child: Row(
               children: [
                 const Expanded(
@@ -835,13 +868,13 @@ class _ExpensesTab extends ConsumerWidget {
           Expanded(
             child: expensesAsync.isLoading && filtered.isEmpty
                 ? ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, _moneyBottomPadding(context, 24)),
                     itemCount: 5,
                     itemBuilder: (context, index) => _SkeletonTransactionItem(),
                   )
                 : filtered.isEmpty
                     ? Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        padding: EdgeInsets.fromLTRB(20, 0, 20, _moneyBottomPadding(context, 0)),
                         child: Center(
                           child: _buildContextualEmptyState(
                             context: context,
@@ -855,7 +888,7 @@ class _ExpensesTab extends ConsumerWidget {
                       )
                     : ListView.builder(
                         physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                        padding: EdgeInsets.fromLTRB(20, 0, 20, _moneyBottomPadding(context, 24)),
                         itemCount: filtered.length,
                         itemBuilder: (context, index) {
                           final expense = filtered[index];
@@ -938,15 +971,17 @@ class _ExpensesTab extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 8),
-            Text(
-              '$count ${count == 1 ? 'transaction' : 'transactions'}',
-              style: const TextStyle(
-                color: Color(0xFF8FB3FF),
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+            Expanded(
+              child: Text(
+                '$count ${count == 1 ? 'transaction' : 'transactions'}',
+                style: const TextStyle(
+                  color: Color(0xFF8FB3FF),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             const Text(
               'Total: ',
               style: TextStyle(
@@ -1150,7 +1185,12 @@ class _CategoriesTab extends ConsumerWidget {
 
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        _MoneyTabBar.contentTop,
+        20,
+        _moneyBottomPadding(context, 24),
+      ),
       itemCount: sortedCategories.length,
       itemBuilder: (context, index) {
         final catKey = sortedCategories[index].value;
@@ -1252,150 +1292,71 @@ class _CategoriesTab extends ConsumerWidget {
   }
 }
 
-// ─── Premium Money Tab Bar ──────────────────────────────────────────────────
-// Compact, responsive 3-tab bar matching FocusFlow's OLED dark glass theme.
-// Uses a Stack + AnimatedBuilder sliding pill with equal-width segments.
-class _MoneyTabBar extends StatefulWidget {
-  final TabController controller;
-
+class _MoneyTabBar extends StatelessWidget {
   const _MoneyTabBar({required this.controller});
 
-  @override
-  State<_MoneyTabBar> createState() => _MoneyTabBarState();
-}
+  static const topGap = 4.0;
+  static const _height = 40.0;
+  static const contentTop = topGap + _height + 12;
+  static const _labelSize = 13.0;
 
-class _MoneyTabBarState extends State<_MoneyTabBar> {
-  static const _tabs = ['Overview', 'Expenses', 'Categories'];
-  static const double _height = 40.0;
-  static const double _pillPad = 3.5;
-  static const double _outerRadius = 22.0;
-  static const double _pillRadius = 18.0;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_onTabChanged);
-  }
-
-  void _onTabChanged() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void dispose() {
-    widget.controller.removeListener(_onTabChanged);
-    super.dispose();
-  }
+  final TabController controller;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final totalWidth = constraints.maxWidth;
-        final tabWidth = totalWidth / _tabs.length;
+    final labelScale =
+        MediaQuery.textScalerOf(context).scale(_labelSize) / _labelSize;
+    final radius = BorderRadius.circular(_height / 2);
 
-        return SizedBox(
-          height: _height,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(_outerRadius),
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xF2080D1A),
-                borderRadius: BorderRadius.circular(_outerRadius),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  width: 1.0,
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x40000000),
-                    blurRadius: 10,
-                    offset: Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: AnimatedBuilder(
-                animation: widget.controller.animation!,
-                builder: (context, _) {
-                  final anim = widget.controller.animation!.value;
-                  final pillLeft = anim * tabWidth + _pillPad;
-                  final pillWidth = (tabWidth - (_pillPad * 2)).clamp(0.0, totalWidth);
-
-                  return Stack(
-                    children: [
-                      // Smooth sliding indicator pill
-                      Positioned(
-                        top: _pillPad,
-                        bottom: _pillPad,
-                        left: pillLeft,
-                        width: pillWidth,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF132238),
-                            borderRadius: BorderRadius.circular(_pillRadius),
-                            border: Border.all(
-                              color: const Color(0xFF4F8CFF).withValues(alpha: 0.8),
-                              width: 1.0,
-                            ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.transparent,
-                                blurRadius: 8,
-                                spreadRadius: 0.5,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      // Equal-width tab interactive targets
-                      Row(
-                        children: List.generate(_tabs.length, (i) {
-                          final distance = (anim - i).abs();
-                          final weight = (1.0 - distance.clamp(0.0, 1.0));
-
-                          final labelColor = Color.lerp(
-                            const Color(0xFF718299),
-                            const Color(0xFFF1F5F9),
-                            weight,
-                          )!;
-                          final fontWeight = weight > 0.5 ? FontWeight.w700 : FontWeight.w500;
-
-                          return Expanded(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                widget.controller.animateTo(i);
-                              },
-                              child: Center(
-                                child: AnimatedDefaultTextStyle(
-                                  duration: const Duration(milliseconds: 200),
-                                  curve: Curves.easeOutCubic,
-                                  style: TextStyle(
-                                    color: labelColor,
-                                    fontSize: 13.0,
-                                    fontWeight: fontWeight,
-                                    letterSpacing: -0.1,
-                                  ),
-                                  child: Text(
-                                    _tabs[i],
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
+    return SizedBox(
+      width: 276.0 * labelScale.clamp(1.0, 1.6),
+      child: Material(
+        color: OledTheme.glassFillOpaque,
+        elevation: 4,
+        shadowColor: Colors.black54,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: const BorderSide(color: OledTheme.glassBorder),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: TabBar(
+          controller: controller,
+          dividerHeight: 0,
+          indicatorSize: TabBarIndicatorSize.tab,
+          indicatorPadding: const EdgeInsets.symmetric(
+            horizontal: 3,
+            vertical: 4,
           ),
-        );
-      },
+          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+          indicator: BoxDecoration(
+            color: const Color(0xFF132238),
+            borderRadius: radius,
+            border: Border.all(color: OledTheme.accent.withValues(alpha: 0.72)),
+          ),
+          splashBorderRadius: radius,
+          labelColor: OledTheme.textPrimary,
+          unselectedLabelColor: OledTheme.textSecondary,
+          labelStyle: const TextStyle(
+            fontSize: _labelSize,
+            fontWeight: FontWeight.w700,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: _labelSize,
+            fontWeight: FontWeight.w500,
+          ),
+          onTap: (_) => HapticFeedback.selectionClick(),
+          tabs: [
+            for (final label in const ['Overview', 'Expenses', 'Categories'])
+              Tab(
+                height: _height,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(label, maxLines: 1),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

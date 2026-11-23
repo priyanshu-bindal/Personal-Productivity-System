@@ -24,11 +24,12 @@ class SkillsScreen extends ConsumerWidget {
     final result = await CustomBottomSheet.show<Map<String, dynamic>>(
       context: context,
       title: 'Add New Skill',
-      subtitle: 'Define a skill area you want to master',
+      leadingIcon: LucideIcons.bookOpen,
+      accentColor: OledTheme.violet,
       child: const AddSkillSheet(),
     );
 
-    if (result != null) {
+    if (result != null && context.mounted) {
       ref.read(skillsProvider.notifier).createSkill(
             name: result['name'] as String,
             category: result['category'] as String,

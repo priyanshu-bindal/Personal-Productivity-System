@@ -1,14 +1,15 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/constants/app_constants.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/oled_theme.dart';
 import '../../core/widgets/premium_dropdown_field.dart';
-import '../../core/widgets/pressable_scale.dart';
 
-class AddSkillSheet extends ConsumerStatefulWidget {
+class AddSkillSheet extends StatefulWidget {
   final String? existingSkillId;
   final String? initialName;
   final String? initialCategory;
@@ -27,14 +28,12 @@ class AddSkillSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<AddSkillSheet> createState() => _AddSkillSheetState();
+  State<AddSkillSheet> createState() => _AddSkillSheetState();
 }
 
-class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
-    with TickerProviderStateMixin {
+class _AddSkillSheetState extends State<AddSkillSheet> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
-  final _nameFocusNode = FocusNode();
 
   late String _selectedCategory;
   late String _selectedLevel;
@@ -45,10 +44,6 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
   late final List<PremiumDropdownItem<String>> _levelItems;
 
   bool _isSubmitting = false;
-  bool _isNameFocused = false;
-
-  final Map<String, AnimationController> _dayControllers = {};
-  final Map<String, Animation<double>> _dayScales = {};
 
   static const List<String> _weekDays = [
     'Monday',
@@ -60,28 +55,9 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
     'Sunday',
   ];
 
-  static const List<String> _dayShortLabels = [
-    'Mon',
-    'Tue',
-    'Wed',
-    'Thu',
-    'Fri',
-    'Sat',
-    'Sun',
-  ];
-
   static const List<int> _durations = [30, 45, 60, 90, 120];
 
-  // Design Tokens (Refined Dark Palette - No Bright Glow)
-  static const Color _surfaceCard = Color(0xFF16161B);
-  static const Color _surfaceInput = Color(0xFF1A1A20);
-  static const Color _surfaceSelected = Color(0xFF1D263B);
-  static const Color _borderColor = Color(0xFF26262C);
-  static const Color _borderActive = Color(0xFF3B82F6);
-  static const Color _textPrimary = Color(0xFFF4F4F5);
-  static const Color _textSecondary = Color(0xFFA1A1AA);
-  static const Color _textMuted = Color(0xFF71717A);
-  static const Color _accent = Color(0xFF3B82F6);
+  static const _accent = OledTheme.violet;
 
   String _safeCategory(String? raw) {
     if (raw == null || raw.trim().isEmpty) {
@@ -102,7 +78,8 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
   }
 
   String _safeLevel(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return AppConstants.skillLevels.first;
+    if (raw == null || raw.trim().isEmpty)
+      return AppConstants.skillLevels.first;
     final normalized = raw.trim();
     if (AppConstants.skillLevels.contains(normalized)) return normalized;
     return AppConstants.skillLevels.first;
@@ -157,66 +134,42 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
 
     final categories = AppConstants.skillCategories.toSet().toList();
     _categoryItems = categories
-        .map((c) => PremiumDropdownItem<String>(
-              value: c,
-              label: c,
-              icon: _getCategoryIcon(c),
-              iconColor: _textSecondary,
-            ))
+        .map(
+          (c) => PremiumDropdownItem<String>(
+            value: c,
+            label: c,
+            icon: _getCategoryIcon(c),
+            iconColor: OledTheme.textSecondary,
+          ),
+        )
         .toList();
 
     _levelItems = AppConstants.skillLevels
-        .map((l) => PremiumDropdownItem<String>(
-              value: l,
-              label: l,
-              icon: _getLevelIcon(l),
-              iconColor: _textSecondary,
-            ))
+        .map(
+          (l) => PremiumDropdownItem<String>(
+            value: l,
+            label: l,
+            icon: _getLevelIcon(l),
+            iconColor: OledTheme.textSecondary,
+          ),
+        )
         .toList();
-
-    _nameFocusNode.addListener(() {
-      if (mounted) {
-        setState(() {
-          _isNameFocused = _nameFocusNode.hasFocus;
-        });
-      }
-    });
-
-    for (final day in _weekDays) {
-      final ctrl = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 160),
-      );
-      _dayControllers[day] = ctrl;
-      _dayScales[day] = Tween<double>(begin: 0.92, end: 1.0).animate(
-        CurvedAnimation(parent: ctrl, curve: Curves.easeOutCubic),
-      );
-      ctrl.value = 1.0;
-    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _nameFocusNode.dispose();
-    for (final ctrl in _dayControllers.values) {
-      ctrl.dispose();
-    }
     super.dispose();
   }
 
   void _toggleDay(String day) {
     HapticFeedback.selectionClick();
-    final ctrl = _dayControllers[day]!;
     setState(() {
       if (_selectedDays.contains(day)) {
         _selectedDays.remove(day);
       } else {
         _selectedDays.add(day);
       }
-    });
-    ctrl.reverse().then((_) {
-      if (mounted) ctrl.forward();
     });
   }
 
@@ -235,7 +188,7 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
     }
 
     HapticFeedback.mediumImpact();
-    setState(() => _isSubmitting = true);
+    _isSubmitting = true;
 
     final result = {
       'name': _nameController.text.trim(),
@@ -245,124 +198,69 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
       'preferredDays': _selectedDays.toList(),
     };
 
+    FocusScope.of(context).unfocus();
     Navigator.of(context).pop(result);
   }
 
   String _formatDuration(int mins) {
-    if (mins >= 60) {
+    if (mins >= 60 && mins % 30 == 0) {
       final hrs = mins / 60;
-      return hrs == hrs.roundToDouble() ? '${hrs.toInt()}h' : '${hrs.toStringAsFixed(1)}h';
+      return hrs == hrs.roundToDouble()
+          ? '${hrs.toInt()}h'
+          : '${hrs.toStringAsFixed(1)}h';
     }
     return '${mins}m';
   }
 
   @override
   Widget build(BuildContext context) {
-    final weeklyMinutes = _selectedDays.length * _sessionDuration;
-    final weeklyHours = weeklyMinutes / 60;
+    final isEditing = widget.existingSkillId != null;
+    final weeklyHours = _selectedDays.length * _sessionDuration / 60;
+    final durations = {..._durations, ?widget.initialDuration}.toList()..sort();
 
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          // ── 1. Skill Name Card ───────────────────────────────────────
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: _surfaceCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: _isNameFocused ? _borderActive : _borderColor,
-                width: _isNameFocused ? 1.2 : 1.0,
+          TextFormField(
+            controller: _nameController,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.done,
+            style: const TextStyle(color: OledTheme.textPrimary, fontSize: 16),
+            cursorColor: _accent,
+            decoration: InputDecoration(
+              labelText: 'Skill name',
+              hintText: 'e.g. System Design, Guitar, Spanish',
+              labelStyle: const TextStyle(color: OledTheme.textSecondary),
+              hintStyle: const TextStyle(
+                color: OledTheme.textSecondary,
+                fontSize: 13,
+              ),
+              prefixIcon: Icon(
+                _getCategoryIcon(_selectedCategory),
+                color: _accent,
+                size: 18,
+              ),
+              filled: true,
+              fillColor: OledTheme.card,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: OledTheme.borderHighlight),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: _accent),
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'SKILL NAME',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.9,
-                        color: _textMuted,
-                      ),
-                    ),
-                    if (_nameController.text.isNotEmpty)
-                      GestureDetector(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          _nameController.clear();
-                          setState(() {});
-                        },
-                        behavior: HitTestBehavior.opaque,
-                        child: const Padding(
-                          padding: EdgeInsets.all(2.0),
-                          child: Icon(
-                            LucideIcons.x,
-                            size: 14,
-                            color: _textMuted,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Icon(
-                      _getCategoryIcon(_selectedCategory),
-                      size: 18,
-                      color: _isNameFocused ? _accent : _textSecondary,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _nameController,
-                        focusNode: _nameFocusNode,
-                        onChanged: (_) => setState(() {}),
-                        textCapitalization: TextCapitalization.words,
-                        style: const TextStyle(
-                          color: _textPrimary,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        cursorColor: _accent,
-                        decoration: const InputDecoration(
-                          hintText: 'e.g. System Design, Guitar, Spanish',
-                          hintStyle: TextStyle(
-                            color: _textMuted,
-                            fontSize: 14,
-                            fontWeight: FontWeight.normal,
-                          ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          errorBorder: InputBorder.none,
-                          focusedErrorBorder: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Please enter skill name'
-                            : null,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+            validator: (value) => value == null || value.trim().isEmpty
+                ? 'Enter a skill name'
+                : null,
           ),
-          const SizedBox(height: 12),
-
-          // ── 2. Category & Level Dropdowns ────────────────────────────
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
@@ -370,9 +268,9 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
                   label: 'Category',
                   value: _selectedCategory,
                   items: _categoryItems,
-                  onChanged: (val) {
+                  onChanged: (value) {
                     HapticFeedback.selectionClick();
-                    setState(() => _selectedCategory = val);
+                    setState(() => _selectedCategory = value);
                   },
                 ),
               ),
@@ -382,252 +280,166 @@ class _AddSkillSheetState extends ConsumerState<AddSkillSheet>
                   label: 'Level',
                   value: _selectedLevel,
                   items: _levelItems,
-                  onChanged: (val) {
+                  onChanged: (value) {
                     HapticFeedback.selectionClick();
-                    setState(() => _selectedLevel = val);
+                    setState(() => _selectedLevel = value);
                   },
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-
-          // ── 3. Target Session Duration ───────────────────────────────
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'SESSION DURATION',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.9,
-                  color: _textMuted,
-                ),
-              ),
-              Text(
-                '$_sessionDuration min / session',
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: _textSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: _durations.map((duration) {
-              final isSelected = _sessionDuration == duration;
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3.0),
-                  child: PressableScale(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _sessionDuration = duration);
+          const SizedBox(height: 16),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFF211B31),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: _accent.withValues(alpha: 0.28)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Practice schedule',
+                    style: TextStyle(
+                      color: OledTheme.textPrimary,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Session duration', style: _sectionLabel),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 5,
+                    runSpacing: 4,
+                    children: [
+                      for (final duration in durations)
+                        ChoiceChip(
+                          label: Text(_formatDuration(duration)),
+                          selected: _sessionDuration == duration,
+                          showCheckmark: false,
+                          labelPadding: const EdgeInsets.symmetric(
+                            horizontal: 3,
+                          ),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          side: BorderSide(
+                            color: _sessionDuration == duration
+                                ? _accent
+                                : const Color(0xFF49405D),
+                          ),
+                          labelStyle: TextStyle(
+                            color: _sessionDuration == duration
+                                ? OledTheme.bg
+                                : OledTheme.textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          backgroundColor: const Color(0xFF2A233B),
+                          selectedColor: _accent,
+                          onSelected: (selected) {
+                            if (!selected) return;
+                            HapticFeedback.selectionClick();
+                            setState(() => _sessionDuration = duration);
+                          },
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Practice days', style: _sectionLabel),
+                  const SizedBox(height: 6),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final evenlySpacedWidth = (constraints.maxWidth - 24) / 7;
+                      final width = math.max(
+                        evenlySpacedWidth,
+                        MediaQuery.textScalerOf(context).scale(33),
+                      );
+                      return Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: [
+                          for (final day in _weekDays)
+                            SizedBox(width: width, child: _buildDay(day)),
+                        ],
+                      );
                     },
-                    scaleFactor: 0.94,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      curve: Curves.easeOutCubic,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: isSelected ? _surfaceSelected : _surfaceCard,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isSelected ? _borderActive : _borderColor,
-                          width: isSelected ? 1.2 : 1.0,
-                        ),
+                  ),
+                  const Divider(height: 22, color: Color(0xFF49405D)),
+                  Row(
+                    children: [
+                      const Icon(
+                        LucideIcons.calendarClock,
+                        color: _accent,
+                        size: 17,
                       ),
-                      child: Center(
+                      const SizedBox(width: 8),
+                      Expanded(
                         child: Text(
-                          _formatDuration(duration),
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight:
-                                isSelected ? FontWeight.w600 : FontWeight.w500,
-                            color: isSelected ? _textPrimary : _textSecondary,
+                          _selectedDays.isEmpty
+                              ? 'Select at least one practice day'
+                              : '${weeklyHours.toStringAsFixed(1)} hrs / week · ${_selectedDays.length} ${_selectedDays.length == 1 ? 'session' : 'sessions'}',
+                          style: const TextStyle(
+                            color: OledTheme.textPrimary,
+                            fontSize: 13,
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 18),
-
-          // ── 4. Preferred Practice Days ───────────────────────────────
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'PRACTICE DAYS',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.9,
-                  color: _textMuted,
-                ),
+                ],
               ),
-              Text(
-                '${_selectedDays.length} days / week',
-                style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: _selectedDays.isNotEmpty ? _accent : _textMuted,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: List.generate(_weekDays.length, (index) {
-              final day = _weekDays[index];
-              final label = _dayShortLabels[index];
-              final isSelected = _selectedDays.contains(day);
-
-              return Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2.5),
-                  child: ScaleTransition(
-                    scale: _dayScales[day]!,
-                    child: GestureDetector(
-                      onTap: () => _toggleDay(day),
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 160),
-                        curve: Curves.easeOutCubic,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isSelected ? _surfaceSelected : _surfaceCard,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: isSelected ? _borderActive : _borderColor,
-                            width: isSelected ? 1.2 : 1.0,
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              label,
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: isSelected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color:
-                                    isSelected ? _textPrimary : _textMuted,
-                              ),
-                            ),
-                            const SizedBox(height: 3),
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 160),
-                              width: isSelected ? 4 : 0,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: isSelected ? _accent : Colors.transparent,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
+            ),
           ),
           const SizedBox(height: 16),
-
-          // ── 5. Commitment Insight Banner ─────────────────────────────
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: _surfaceInput,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _borderColor, width: 0.8),
+          FilledButton.icon(
+            onPressed: _submit,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 49),
+              backgroundColor: _accent,
+              foregroundColor: OledTheme.bg,
             ),
-            child: Row(
-              children: [
-                const Icon(
-                  LucideIcons.calendarClock,
-                  size: 15,
-                  color: _accent,
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Text(
-                    _selectedDays.isEmpty
-                        ? 'Select at least 1 day to set schedule'
-                        : '~${weeklyHours.toStringAsFixed(1)} hrs / week target • ${_selectedDays.length} sessions',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: _textSecondary,
-                    ),
-                  ),
-                ),
-              ],
+            icon: Icon(
+              isEditing ? LucideIcons.check : LucideIcons.plus,
+              size: 18,
             ),
-          ),
-          const SizedBox(height: 22),
-
-          // ── 6. Primary Action CTA Button ─────────────────────────────
-          PressableScale(
-            onTap: _isSubmitting ? null : _submit,
-            scaleFactor: 0.98,
-            child: Container(
-              height: 48,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: _accent,
-              ),
-              child: Center(
-                child: _isSubmitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.0,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            widget.existingSkillId != null
-                                ? LucideIcons.check
-                                : LucideIcons.plus,
-                            size: 16,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            widget.existingSkillId != null
-                                ? 'Update Skill'
-                                : 'Create Skill',
-                            style: const TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
+            label: Text(isEditing ? 'Update Skill' : 'Create Skill'),
           ),
         ],
       ),
     );
   }
+
+  Widget _buildDay(String day) {
+    final selected = _selectedDays.contains(day);
+    return Semantics(
+      selected: selected,
+      label: day,
+      child: OutlinedButton(
+        onPressed: () => _toggleDay(day),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: selected
+              ? const Color(0xFF443864)
+              : Colors.transparent,
+          foregroundColor: selected
+              ? OledTheme.textPrimary
+              : OledTheme.textSecondary,
+          minimumSize: const Size(0, 40),
+          padding: EdgeInsets.zero,
+          side: BorderSide(color: selected ? _accent : const Color(0xFF49405D)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          textStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+        ),
+        child: ExcludeSemantics(child: Text(day.substring(0, 3))),
+      ),
+    );
+  }
+
+  static const _sectionLabel = TextStyle(
+    color: OledTheme.textSecondary,
+    fontWeight: FontWeight.w600,
+    fontSize: 12,
+  );
 }

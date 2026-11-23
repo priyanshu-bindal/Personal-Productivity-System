@@ -130,9 +130,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           currentIndex: navigationShell.currentIndex,
           children: [
             for (var i = 0; i < children.length; i++)
-              // Notes & Money weren't designed around a floating bar; give them
-              // a bottom inset so their lists and FABs clear it.
-              (i == 4 || i == 5) ? NavBarSafeInset(child: children[i]) : children[i],
+              // Money handles dock clearance in its scrollable content.
+              i == 4 ? NavBarSafeInset(child: children[i]) : children[i],
           ],
         ),
         branches: [

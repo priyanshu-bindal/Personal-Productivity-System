@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:focus_flow/features/money/category_transactions_screen.dart';
 import 'package:focus_flow/features/money/money_screen.dart';
 import 'package:focus_flow/features/money/widgets/animated_balance_ticker.dart';
 import 'package:focus_flow/features/money/widgets/financial_dropdown_field.dart';
+import 'package:focus_flow/features/money/widgets/month_selector_bar.dart';
 import 'package:focus_flow/models/budget.dart';
 import 'package:focus_flow/models/expense.dart';
 import 'package:focus_flow/providers/money_provider.dart';
@@ -351,54 +353,51 @@ void main() {
     });
   });
 
-  group('Responsive TabBar - No Text Clipping', () {
-    testWidgets('Renders all 3 finance tab labels fully without clipping on small screen (360x640)', (tester) async {
+  testWidgets(
+    'Compact Money tabs stay visible while the Overview scrolls',
+    (tester) async {
       tester.view.physicalSize = const Size(360, 640);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: DefaultTabController(
-            length: 3,
-            child: Scaffold(
-              appBar: AppBar(
-                bottom: PreferredSize(
-                  preferredSize: const Size.fromHeight(48),
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                    padding: const EdgeInsets.all(3),
-                    child: TabBar(
-                      isScrollable: false,
-                      tabs: const [
-                        Tab(child: Text('Overview', maxLines: 1, softWrap: false)),
-                        Tab(child: Text('Expenses', maxLines: 1, softWrap: false)),
-                        Tab(child: Text('Categories', maxLines: 1, softWrap: false)),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              body: const TabBarView(
-                children: [
-                  Text('Overview Tab Content'),
-                  Text('Expenses Tab Content'),
-                  Text('Categories Tab Content'),
-                ],
-              ),
-            ),
-          ),
+        ProviderScope(
+          overrides: [
+            expensesProvider.overrideWith((ref) => FakeExpensesNotifier([])),
+            budgetsProvider.overrideWith((ref) => FakeBudgetsNotifier()),
+          ],
+          child: const MaterialApp(home: MoneyScreen()),
         ),
       );
-
       await tester.pumpAndSettle();
 
-      // All 3 tabs must be fully visible and rendered
-      expect(find.text('Overview'), findsOneWidget);
-      expect(find.text('Expenses'), findsOneWidget);
-      expect(find.text('Categories'), findsOneWidget);
-    });
-  });
+      final tabs = find.byType(TabBar);
+      final tabBounds = tester.getRect(tabs);
+      expect(tabBounds.width, lessThan(300));
+      expect(tabBounds.height, lessThan(48));
+      expect(tabBounds.center.dx, 180);
+      for (final label in ['Overview', 'Expenses', 'Categories']) {
+        final tabLabel = find.descendant(of: tabs, matching: find.text(label));
+        expect(
+          tester.renderObject<RenderParagraph>(tabLabel).didExceedMaxLines,
+          isFalse,
+        );
+      }
+
+      final monthSelector = find.byType(MonthSelectorBar);
+      final initialTop = tester.getTopLeft(monthSelector).dy;
+      expect(initialTop, greaterThan(tabBounds.bottom));
+      await tester.dragFrom(const Offset(180, 520), const Offset(0, -180));
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(monthSelector).dy, lessThan(initialTop));
+      expect(tester.getRect(tabs), tabBounds);
+
+      await tester.tap(find.text('Expenses'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TabBar>(tabs).controller!.index, 1);
+    },
+  );
 
   group('Category Transactions Drill-Down & Screen Tests', () {
     testWidgets('Renders category header stats and filtered transactions sorted newest first', (tester) async {

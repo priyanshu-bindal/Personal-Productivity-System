@@ -6,6 +6,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/ocean_theme.dart';
+import '../../core/theme/oled_theme.dart';
 import '../../core/widgets/custom_bottom_sheet.dart';
 import '../../core/widgets/money_empty_state.dart';
 import '../../providers/money_provider.dart';
@@ -71,7 +72,8 @@ class _CategoryTransactionsScreenState
     final result = await CustomBottomSheet.show<Map<String, dynamic>>(
       context: context,
       title: 'Add $catName Expense',
-      subtitle: 'Log spending under $catName',
+      leadingIcon: LucideIcons.wallet,
+      accentColor: OledTheme.accent,
       child: AddExpenseSheet(initialCategory: normalizedCat),
     );
 

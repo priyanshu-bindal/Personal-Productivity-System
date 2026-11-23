@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -9,9 +11,7 @@ import '../theme/oled_theme.dart';
 /// iOS-style modal sheet used for every form in the app
 /// (add skill, add note, add expense, set budget…).
 ///
-/// - Slides up from the bottom with a long, soft deceleration; closes with a
-///   quicker settle. Only `transform` animates, so it stays smooth on slow
-///   phones even while the keyboard is opening.
+/// - Slides in and out, with an optional inset layout for forms with an icon.
 /// - Drag the handle/header down to dismiss (velocity aware).
 /// - Rides on top of the keyboard.
 class CustomBottomSheet {
@@ -20,40 +20,61 @@ class CustomBottomSheet {
     required String title,
     required Widget child,
     String? subtitle,
+    IconData? leadingIcon,
+    Color accentColor = OledTheme.accent,
   }) {
     HapticFeedback.selectionClick();
-    return showGeneralDialog<T>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Dismiss',
-      barrierColor: Colors.black.withValues(alpha: 0.62),
-      transitionDuration: AppMotion.sheetOpen,
-      pageBuilder: (dialogContext, animation, secondaryAnimation) {
-        return _SheetScaffold(
+    return Navigator.of(context, rootNavigator: true).push<T>(
+      _SheetRoute<T>(
+        reduceMotion: MediaQuery.disableAnimationsOf(context),
+        barrierLabel: MaterialLocalizations.of(
+          context,
+        ).modalBarrierDismissLabel,
+        pageBuilder: (context, animation, secondaryAnimation) => _SheetScaffold(
           title: title,
           subtitle: subtitle,
+          leadingIcon: leadingIcon,
+          accentColor: accentColor,
+          animation: animation,
           child: child,
-        );
-      },
-      transitionBuilder: (context, animation, secondaryAnimation, sheet) {
-        return SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-              .animate(AppMotion.curved(animation)),
-          child: sheet,
-        );
-      },
+        ),
+      ),
     );
   }
+}
+
+class _SheetRoute<T> extends RawDialogRoute<T> {
+  _SheetRoute({
+    required this.reduceMotion,
+    required super.barrierLabel,
+    required super.pageBuilder,
+  }) : super(
+         barrierColor: const Color(0xA6000000),
+         transitionDuration: reduceMotion ? Duration.zero : AppMotion.sheetOpen,
+         transitionBuilder: (_, _, _, child) => child,
+       );
+
+  final bool reduceMotion;
+
+  @override
+  Duration get reverseTransitionDuration =>
+      reduceMotion ? Duration.zero : AppMotion.sheetClose;
 }
 
 class _SheetScaffold extends StatefulWidget {
   final String title;
   final String? subtitle;
+  final IconData? leadingIcon;
+  final Color accentColor;
+  final Animation<double> animation;
   final Widget child;
 
   const _SheetScaffold({
     required this.title,
     required this.subtitle,
+    required this.leadingIcon,
+    required this.accentColor,
+    required this.animation,
     required this.child,
   });
 
@@ -65,11 +86,13 @@ class _SheetScaffoldState extends State<_SheetScaffold>
     with SingleTickerProviderStateMixin {
   final ValueNotifier<double> _dragOffset = ValueNotifier<double>(0);
   late final AnimationController _settle;
+  late final CurvedAnimation _transition;
   double _settleFrom = 0;
 
   @override
   void initState() {
     super.initState();
+    _transition = AppMotion.curved(widget.animation);
     _settle = AnimationController(vsync: this, duration: AppMotion.standard)
       ..addListener(() {
         _dragOffset.value =
@@ -79,6 +102,7 @@ class _SheetScaffoldState extends State<_SheetScaffold>
 
   @override
   void dispose() {
+    _transition.dispose();
     _settle.dispose();
     _dragOffset.dispose();
     super.dispose();
@@ -102,22 +126,38 @@ class _SheetScaffoldState extends State<_SheetScaffold>
       _close();
       return;
     }
-    _settleFrom = _dragOffset.value;
-    _settle.forward(from: 0);
+    _resetDrag();
+  }
+
+  void _resetDrag() {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _dragOffset.value = 0;
+    } else {
+      _settleFrom = _dragOffset.value;
+      _settle.forward(from: 0);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final mq = MediaQuery.of(context);
     final keyboard = mq.viewInsets.bottom;
-    final bottomSafe = keyboard > 0 ? 12.0 : mq.padding.bottom + 12.0;
-    final maxHeight = (mq.size.height - mq.padding.top - keyboard - 24)
-        .clamp(200.0, mq.size.height * 0.92);
+    final inset = widget.leadingIcon != null;
+    final bottomGap = inset
+        ? math.max(keyboard, mq.padding.bottom) + 12
+        : keyboard;
+    final bottomSafe = inset || keyboard > 0 ? 12.0 : mq.padding.bottom + 12.0;
+    final maxHeight = math.max(
+      0.0,
+      mq.size.height - mq.padding.top - bottomGap - 16,
+    );
+    final compact = maxHeight < 200;
 
     final header = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onVerticalDragUpdate: _onDragUpdate,
       onVerticalDragEnd: _onDragEnd,
+      onVerticalDragCancel: _resetDrag,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 8, 14, 0),
         child: Column(
@@ -132,19 +172,37 @@ class _SheetScaffoldState extends State<_SheetScaffold>
             ),
             const SizedBox(height: 14),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: inset
+                  ? CrossAxisAlignment.center
+                  : CrossAxisAlignment.start,
               children: [
+                if (widget.leadingIcon case final icon?) ...[
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: widget.accentColor.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: SizedBox.square(
+                      dimension: 42,
+                      child: Icon(icon, color: widget.accentColor, size: 20),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.title,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.4,
+                      Semantics(
+                        header: true,
+                        child: Text(
+                          widget.title,
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: inset ? 23 : 20,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.5,
+                          ),
                         ),
                       ),
                       if (widget.subtitle != null) ...[
@@ -161,25 +219,16 @@ class _SheetScaffoldState extends State<_SheetScaffold>
                   ),
                 ),
                 const SizedBox(width: 12),
-                Semantics(
-                  button: true,
-                  label: 'Close',
-                  child: GestureDetector(
-                    onTap: _close,
-                    behavior: HitTestBehavior.opaque,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(
-                        color: OledTheme.subtleSurface,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        LucideIcons.x,
-                        color: AppColors.textSecondary,
-                        size: 16,
-                      ),
-                    ),
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: _close,
+                  style: IconButton.styleFrom(
+                    backgroundColor: OledTheme.subtleSurface,
+                  ),
+                  icon: const Icon(
+                    LucideIcons.x,
+                    color: AppColors.textSecondary,
+                    size: 17,
                   ),
                 ),
               ],
@@ -190,39 +239,65 @@ class _SheetScaffoldState extends State<_SheetScaffold>
       ),
     );
 
+    final panel = ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: 560, maxHeight: maxHeight),
+      child: Material(
+        color: OledTheme.cardElevated,
+        shape: RoundedRectangleBorder(
+          borderRadius: inset
+              ? BorderRadius.circular(26)
+              : const BorderRadius.vertical(top: Radius.circular(26)),
+          side: const BorderSide(color: OledTheme.borderHighlight),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!compact) header,
+            Flexible(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (compact) header,
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomSafe),
+                      child: widget.child,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    final slide = SlideTransition(
+      position: Tween<Offset>(
+        begin: Offset(0, inset ? 0.24 : 1),
+        end: Offset.zero,
+      ).animate(_transition),
+      child: panel,
+    );
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
-        padding: EdgeInsets.only(bottom: keyboard),
+        padding: EdgeInsets.fromLTRB(
+          inset ? 12 : 0,
+          0,
+          inset ? 12 : 0,
+          bottomGap,
+        ),
         child: ValueListenableBuilder<double>(
           valueListenable: _dragOffset,
           builder: (context, dy, sheet) =>
               Transform.translate(offset: Offset(0, dy), child: sheet),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 560, maxHeight: maxHeight),
-            child: Material(
-              color: OledTheme.cardElevated,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-                side: BorderSide(color: OledTheme.border, width: 0.8),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  header,
-                  Flexible(
-                    child: SingleChildScrollView(
-                      physics: const BouncingScrollPhysics(),
-                      padding: EdgeInsets.fromLTRB(20, 0, 20, bottomSafe),
-                      child: widget.child,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          child: inset
+              ? FadeTransition(opacity: _transition, child: slide)
+              : slide,
         ),
       ),
     );
